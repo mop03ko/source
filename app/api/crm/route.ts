@@ -48,7 +48,8 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
  const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
  const activityMap=new Map(byActivity.results.map((r:Record<string,unknown>)=>[r.actor as string,r.count as number]));
- const reportMembers=(team.results as Member[]).filter(t=>t.active||byMemberMap.has(t.email)).map(t=>{
+ // Тайлан зөвхөн борлуулалтын ажилтныг харьцуулна; удирдлага/админ хувийн үзүүлэлтгүй.
+ const reportMembers=(team.results as Member[]).filter(t=>t.role==='agent'&&(t.active||byMemberMap.has(t.email))).map(t=>{
  const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
  return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
  });
