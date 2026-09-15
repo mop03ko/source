@@ -24,13 +24,19 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  if(view==='recycle'){where+=" AND l.recycle_at IS NOT NULL AND l.next_at IS NOT NULL AND (l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)";}
  // "Бүх хүсэлт" таб шинэ хүсэлтийг эхэнд харуулна; ажлын дараалалтай (today/recycle) табууд тов-оор эрэмбэлнэ.
  const order=view==='all'?'l.created_at DESC':'l.next_at IS NULL,l.next_at ASC,l.created_at DESC';
- const [rows,count,stats,team,dist]=await Promise.all([
+ // Тайлангийн хугацааны хүрээ нь жагсаалтын шүүлтээс тусдаа: ирсэн огноогоор (УБ цагийн бүсээр) хязгаарлана.
+ const rFrom=(url.searchParams.get('rfrom')||'').slice(0,10),rTo=(url.searchParams.get('rto')||'').slice(0,10);
+ let reportWhere='1=1'+s.sql,reportArgs:unknown[]=[...s.args];
+ if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime())){reportWhere+=' AND l.created_at>=?';reportArgs.push(t.toISOString());}}
+ if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){reportWhere+=' AND l.created_at<=?';reportArgs.push(t.toISOString());}}
+ const [rows,count,stats,team,dist,byMember]=await Promise.all([
  db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
  db().prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`).bind(...args).first(),
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),...s.args).first(),
  db().prepare(m.role==='agent'?'SELECT email,name,role,active FROM members WHERE email=?':'SELECT email,name,role,active FROM members ORDER BY active DESC,name').bind(...(m.role==='agent'?[m.email]:[])).all(),
- db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE 1=1 ${s.sql} GROUP BY status`).bind(...s.args).all()]);
- return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,page},{headers:{'Cache-Control':'no-store'}});
+ db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE ${reportWhere} GROUP BY status`).bind(...reportArgs).all(),
+ db().prepare(`SELECT owner,COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status='lost'),0) lost,COALESCE(SUM(status NOT IN ('won','lost','invalid')),0) active FROM leads l WHERE ${reportWhere} AND owner!='__sheet_unassigned__' GROUP BY owner`).bind(...reportArgs).all()]);
+ return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:byMember.results,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
