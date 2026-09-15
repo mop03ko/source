@@ -13,8 +13,13 @@ function err(e:unknown){if(e instanceof Failure)return Response.json({error:e.me
 async function validOwner(email:string,m:Member){if(m.role==='agent'&&email!==m.email)throw new Failure('Зөвхөн өөртөө хүсэлт хуваарилна.',403);if(!await db().prepare('SELECT email FROM members WHERE email=? AND active=1').bind(email).first())throw new Failure('Идэвхтэй хариуцагч сонгоно уу.');}
 export async function GET(req:Request){try{const m=await member(),url=new URL(req.url),s=scope(m);const id=url.searchParams.get('id');if(id){const lead=await getLead(id,m);const activities=await db().prepare('SELECT * FROM activities WHERE lead_id=? ORDER BY created_at DESC LIMIT 100').bind(id).all();return Response.json({lead,activities:activities.results},{headers:{'Cache-Control':'no-store'}});}
  const page=Math.max(1,Math.min(10000,Number(url.searchParams.get('page'))||1));const q=(url.searchParams.get('q')||'').slice(0,100),status=url.searchParams.get('status')||'',view=url.searchParams.get('view')||'all';
+ const owner=(url.searchParams.get('owner')||'').trim().toLowerCase().slice(0,120),dateFrom=(url.searchParams.get('from')||'').slice(0,10),dateTo=(url.searchParams.get('to')||'').slice(0,10);
  let where='1=1'+s.sql,args:unknown[]=[...s.args];
  if(q){where+=' AND (l.name LIKE ? OR l.phone LIKE ? OR l.product LIKE ?)';args.push(...Array(3).fill('%'+q+'%'));}if(status&&Object.hasOwn(stages,status)){where+=' AND l.status=?';args.push(status);}
+ if(owner){where+=' AND l.owner=?';args.push(owner);}
+ // Дараагийн тов биш, харилцагчийн ирсэн огноогоор шүүнэ (Улаанбаатар цагийн бүсээр).
+ if(/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)){const t=new Date(dateFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime())){where+=' AND l.created_at>=?';args.push(t.toISOString());}}
+ if(/^\d{4}-\d{2}-\d{2}$/.test(dateTo)){const t=new Date(dateTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){where+=' AND l.created_at<=?';args.push(t.toISOString());}}
  if(view==='today'){where+=" AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.owner!='__sheet_unassigned__' AND l.next_at<=?";args.push(new Date().toISOString());}
  if(view==='recycle'){where+=" AND l.recycle_at IS NOT NULL AND l.next_at IS NOT NULL AND (l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)";}
  const [rows,count,stats,team,dist]=await Promise.all([
