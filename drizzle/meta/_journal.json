@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789444444184,
+      "tag": "0000_magical_marauders",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789445784561,
+      "tag": "0001_slow_rumiko_fujikawa",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789446581534,
+      "tag": "0002_wide_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789448509970,
+      "tag": "0003_careless_mauler",
+      "breakpoints": true
+    }
+  ]
+}
