@@ -10,7 +10,6 @@ export const {handlers,auth,signIn,signOut}=NextAuth({
   async signIn({account,profile}){
    const identity=googleIdentity(account?.provider,profile);
    const owner=process.env.CRM_OWNER_EMAIL?.trim().toLowerCase();
-   console.error('[debug signIn]',JSON.stringify({provider:account?.provider,hasProfile:!!profile,profileEmail:(profile as Record<string,unknown>|null|undefined)?.email,emailVerified:(profile as Record<string,unknown>|null|undefined)?.email_verified,identityEmail:identity?.email,owner,hasSecret:!!process.env.AUTH_SECRET,hasUrl:!!process.env.AUTH_URL}));
    if(!identity || !owner || !process.env.AUTH_SECRET || !process.env.AUTH_URL)return false;
    // Google must verify the email, and an admin must pre-register non-owner members.
    if(identity.email===owner)return true;
