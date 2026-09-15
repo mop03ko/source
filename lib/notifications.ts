@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '@/lib/runtime';
 const db=()=>env.DB!;
 // Appended to the same batch as the lead write: no notification on a failed or stale update.
 export function assignmentNotice(id:string,op:string,at:string,previousOwner=''){

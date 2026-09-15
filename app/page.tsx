@@ -1,4 +1,4 @@
-import {requireChatGPTUser} from './chatgpt-auth';
+import {requireCurrentUser} from './session';
 import CRM from './crm';
 export const dynamic='force-dynamic';
-export default async function Page(){await requireChatGPTUser('/');return <CRM/>;}
+export default async function Page(){await requireCurrentUser();return <CRM/>;}

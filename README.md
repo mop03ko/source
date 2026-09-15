@@ -1,68 +1,147 @@
-# AntMall CRM
+# AntMall CRM — Vercel хувилбар
 
-Private, authenticated Mongolian CRM for AntMall. The Sites deployment is owner-only by default. Grant a teammate platform access and add their ChatGPT sign-in email in the application's Team section to allow team use. Do not make the site public to work around team access.
+Энэ хувилбар стандарт Next.js build ашиглаж `.next/routes-manifest.json` үүсгэнэ. Vercel дээр апп ажиллана, Turso дээр өгөгдөл хадгалагдана, Google аккаунтаар нэвтэрнэ. Өмнөх Cloudflare/Sites серверийг шаардахгүй.
 
-## First use
+**Суулгахын өмнө:** Turso өгөгдлийн сан, Google OAuth client, Vercel environment variables-аа тохируулна. Эдгээр account/secret нь ZIP-д байхгүй. Энэ багцыг production domain-д хараахан deploy хийгээгүй.
 
-1. Open the private site while signed into the owning ChatGPT account. The first verified owner-only visitor initializes the organization and administrator membership.
-2. Add a request or import UTF-8 CSV using the in-app blank template. Import is previewed and confirmed, up to 100 rows per batch; duplicate and suppressed phone numbers are skipped. Google Sheet imports use the configured connection; no sample personal data is seeded.
-3. Add members and assign requests. Agents only access their own requests; managers access all requests; admins also manage members. Team registration sends no email invitations.
-4. Record interactions, set the next appointment in Ulaanbaatar time, and manage Recycle from the request detail panel.
+## 1. ZIP болон Vercel тохиргоо
 
-## Included
+ZIP-ийг задлаад `antmall-crm-vercel` хавтасны агуулгыг GitHub repository-д байрлуулна. `package.json` нь repository-ийн root-д байвал Vercel-ийн Root Directory-г хоосон үлдээнэ. Хэрэв бүх хавтсыг repository-д оруулсан бол Root Directory = `antmall-crm-vercel` гэж сонгоно.
 
-- Persistent D1 records with generated Drizzle migrations.
-- Server-verified identity and membership authorization on every API request.
-- Request create/update, source, owner, stage, next action, phone-normalized duplicate detection.
-- Search, stage filter, 40-row pagination and CSV export of the displayed page.
-- Interaction timeline, optimistic concurrency control and atomic activity logging.
-- Phone-wide do-not-contact suppression; no-answer attempts counted across the last 14 days.
-- Recycle enrolment and next-call scheduling, stop after the third unanswered call even if a later appointment was submitted.
-- Closed and opted-out cases excluded from the contact queue. Unconnected expired Recycle cycles excluded from the active queue.
-- All-time live status distribution and purchased-stage conversion; no fabricated historical baseline or causal ROI.
-- Mongolian internal guide and responsive interface.
+Vercel → Add New Project → тухайн repository-г Import:
 
-## Deliberate boundaries
+| Тохиргоо | Утга |
+|---|---|
+| Framework Preset | Next.js |
+| Node.js Version | 24.x |
+| Install Command | npm ci |
+| Build Command | npm run build |
+| Output Directory | Override унтраалттай, Next.js default |
 
-Calls/SMS/Messenger are performed externally and logged here. No automatic outbound messaging, Facebook integration, background notification service, purchasing or bank-loan submission is connected. The first deployment is private to the owner; adding application membership alone does not grant platform access. No deletion or opt-out reversal is exposed. CSV export is explicitly page-scoped. The displayed activity history is the last 100 events; older events remain in the database. No demo data is seeded.
+`dist`, `out`, `.next/server` гэж Output Directory тохируулахгүй. Өмнөх төсөл дээр Override тавьсан бол арилгана. `vercel.json` build/install командыг агуулна. `node_modules` болон `.next` хавтас upload хийх шаардлагагүй; Vercel source-оос build хийнэ.
 
-## Validation
+## 2. Turso өгөгдлийн сан бэлтгэх
 
-`pnpm exec tsc --noEmit` checks the application. `node tests/crm.test.cjs` runs the actual route handlers against an in-memory SQLite D1-compatible adapter, exercising authentication, authorization, request lifecycle, CSV/imports, concurrency, opt-out and Recycle limits. `node <sites-plugin>/scripts/build-site.mjs` produces the deployment bundle.
+Өөрийн Turso аккаунт дээр хоосон cloud database үүсгэж, URL (`libsql://...turso.io`) болон database token авна. Бодит харилцагчийн мэдээллийг локал SQLite файлд эсвэл Vercel-ийн түр filesystem-д хадгалахгүй.
 
-WebMCP tools open existing views and the creation form only; they do not save records. Runtime WebMCP validation and browser visual validation were unavailable because this task did not authorize a managed browser preview. They are not represented as completed checks.
+Компьютерт Node.js 24 суулгаад төслийн хавтас дотор `.env.example` файлыг `.env.local` нэрээр хуулж, дор хаяж `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` утгаа бөглөнө. Дараах командыг ажиллуул:
 
-## Google Sheets integration
+```bash
+npm ci
+npm run db:migrate
+```
 
-The Google Sheets page is admin-only. It is prefilled from the observed `ЗЭЭЛИЙН ХҮСЭЛТ-2026.09.07` workbook and `Онлайн зээлийн хүсэлт-2026/09` tab. Selected columns are A (timestamp), B (phone), D (product), E (employee name), H (initial status), and C (registration). Free-text financial details are not requested. Header drift fails closed. All-history mode is enabled by default; employee alias mapping still requires active CRM members.
+Migration нь дөрвөн SQL файлыг дарааллаар хэрэгжүүлж, checksum/history хадгалдаг. Дахин ажиллуулахад өмнө хэрэгжсэн migration-ийг алгасана. Нэг migration алдаа гарвал тэр migration-ийн өөрчлөлтүүд rollback хийнэ. Өмнөх CRM хүснэгтүүдтэй боловч migration history-гүй санд зориуд зогсоно; хүчээр дахин ажиллуулахгүй.
 
-An administrator must configure a dedicated Google service account with Sheets API enabled, share only the source workbook with its service-account email as Viewer, upload the JSON key in the CRM settings, map source employee names to existing active CRM members, test the read and then enable automatic reading. Credentials are encrypted with AES-GCM using a separately managed Sites secret `CRM_CONNECTION_ENCRYPTION_KEY`. Read responses never expose the private key; OAuth uses `spreadsheets.readonly` with no delegated user. The shared key is not in the source repository.
+`npm run build` нь DB migration ажиллуулахгүй. Production болон тусдаа Preview DB ашиглавал тус бүрт migration хэрэгжүүлнэ. Preview төслөө production харилцагчийн сантай автоматаар холбохгүй.
 
-Automatic polling occurs every 30 seconds while at least one authenticated CRM page is visible, with a global lease and 25-second minimum interval. There is no provisioned scheduler while all pages are closed. A persistent background integration is still a separate deployment prerequisite; this build does not claim real-time or always-on Google change delivery. At most 80 changed/new requests are applied per poll. Existing source assignments are processed ahead of new imports. New imports run newest first. A row-derived timestamp plus normalized phone provides retry identity without modifying the Sheet; editing the timestamp or phone creates a new source identity; it does not rewrite a previous request. Sheets may grow to 60,000 rows; larger sources fail explicitly rather than silently truncate.
+## 3. Google аккаунтаар нэвтрэх тохиргоо
 
-Changed Sheet assignment updates the CRM owner and immutable activity history. CRM status, contacts, notes and agreed callbacks are not overwritten. Unmapped or inactive assignees are withheld from all agents in an unassigned queue visible to management. Mapping a formerly unassigned new request creates its first work task. An agent loses read access to a reassigned request immediately at the API layer, and visible request details are checked on the next 30-second refresh. The spreadsheet controls ownership of linked leads. Row deletion never deletes CRM history. Unknown source stages are held for review. Existing manual requests sharing a phone are not automatically hijacked.
+Google Cloud Console → Google Auth Platform / OAuth consent screen тохируулж → OAuth Client ID → **Web application** үүсгэнэ.
 
-Run `node tests/sheets.test.cjs` for the actual integration handlers against an in-memory SQLite adapter and mocked Google responses, including encrypted key roundtrip, scope/selected-column checks, setup activation gate, idempotency, row reorder, owner handoff, permissions, preservation of CRM history and callback, unmapped staff, terminal/opt-out handling and header drift. Real Google runtime connectivity remains unverified until the administrator completes credential setup.
+Authorized redirect URI:
 
-## Personal notifications
+```text
+https://YOUR-PROJECT.vercel.app/api/auth/callback/google
+```
 
-The top-bar bell shows only the signed-in member's assigned requests (including manager/admin accounts). Creating/importing an assigned request and changing its owner persist an assignment notice in the same D1 transaction. Google Sheets sync uses the same path. Repeated syncs and failed optimistic updates cannot create duplicate notices. Unknown/inactive assignees receive no notice.
+Өөрийн домэйн ашиглах үед тухайн домэйныг мөн нэмнэ:
 
-The open CRM polls every 30 seconds and materializes due reminders with a stable request/owner/schedule key. Read state persists across devices. Reassigned, closed, opted-out, rescheduled and expired unconnected-cycle reminders are filtered from the active inbox. There are 20 items per page; the read button affects only the displayed unread IDs. Notification API derives recipients from server authentication and rejects cross-origin writes.
+```text
+https://crm.example.mn/api/auth/callback/google
+```
 
-Optional desktop notifications require a user gesture, browser permission, HTTPS and an open CRM tab. Only generic text is shown outside the app. Delivery is best effort: browsers may throttle background tabs and mobile/embedded browsers may not support it. Atomic alert claims prevent duplicate desktop delivery across tabs; inbox records remain if OS display fails. This is not a service-worker push service; closed-browser delivery, email and SMS are not implemented. Due reminders missed while closed appear on the next open. Sheets assignment notifications start once the existing Google connection is configured and a sync runs.
+Google OAuth client ID/secret-ийг Vercel-д `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` нэрээр оруулна. Consent screen Testing горимтой бол хэрэглэх ажилтнуудыг Google-ийн Test users жагсаалтад нэмнэ, эсвэл байгууллагын тохирох publishing/internal access тохиргоог ашиглана.
 
-Verification: `pnpm exec tsc --noEmit`, `node tests/crm.test.cjs`, `node tests/sheets.test.cjs`, and the Sites production build. Route tests use real SQLite and mocked platform identity/Google transport; OS notification permission/display has not been browser-tested.
+Google нэвтрэлтийн OAuth client болон Google Sheets унших service account JSON нь **хоёр өөр зориулалттай түлхүүр**. Service account JSON-ийг `AUTH_GOOGLE_SECRET` дотор оруулж болохгүй.
 
-A deployment secret `CRM_GOOGLE_SERVICE_ACCOUNT_JSON` can supply an initial key. Only an authenticated administrator sync consumes it. It is sealed into D1 only if no key exists, preserves existing configuration, then runs the normal Google/header test before enabling sync. Failed validation leaves sync disabled with an actionable error; the admin can retry using Test connection and Enable. Existing credentials and a manually stopped connection are never overwritten or re-enabled by bootstrap. No raw key is included in source/build artifacts.
+## 4. Vercel Environment Variables
 
+Vercel → Project → Settings → Environment Variables:
 
-## Import completeness and registration numbers
+| Нэр | Утга / зориулалт |
+|---|---|
+| AUTH_URL | Нэвтрэх үндсэн хаяг: `https://YOUR-PROJECT.vercel.app` эсвэл өөрийн CRM домэйн |
+| AUTH_SECRET | Санамсаргүй, нууц session encryption утга |
+| AUTH_GOOGLE_ID | Google OAuth Web client ID |
+| AUTH_GOOGLE_SECRET | Google OAuth Web client secret |
+| CRM_OWNER_EMAIL | Анхны админы **Google аккаунтын и-мэйл** |
+| TURSO_DATABASE_URL | Turso cloud database URL |
+| TURSO_AUTH_TOKEN | Turso database token |
+| CRM_CONNECTION_ENCRYPTION_KEY | Google Sheets түлхүүрийг шифрлэх 32-byte base64 утга |
+| CRM_GOOGLE_SERVICE_ACCOUNT_JSON | Сонголтоор: Sheets унших service account-ийн бүрэн JSON |
 
-The online-loan tab now imports all historical dates by default (including existing saved configurations). Administrators may disable all-history mode and set a start date. Other workbook tabs remain separate sources and are not silently merged. Known source labels are mapped; ambiguous/unrecognized outcomes and missing products enter a paused review stage. Invalid timestamps/phones and exact timestamp+phone duplicates stay in the row issue list. Suppressed phones remain excluded. The diagnostics show source/eligible/date-filtered/invalid/duplicate/review counts, per-pass register backfills and pending work, refreshed every 15 seconds in Settings.
+`AUTH_SECRET` болон `CRM_CONNECTION_ENCRYPTION_KEY` тус бүрт энэ командыг **тусад нь** ажиллуулж ялгаатай утга үүсгэнэ:
 
-Different timestamp+phone identities create distinct Sheet requests even when the phone already exists. Stable source link identity prevents repeated imports. Manual/CSV duplicate policy remains unchanged. Up to 80 writes per sync continue across passes; the CRM must remain open for its existing polling. Registry backfills participate in this same queue.
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+```
 
-Column C supplies registration numbers. Existing configuration gains this mapping on read. Registration is optional, normalized to uppercase, and accepts two Cyrillic letters plus eight digits; this is format validation, not identity verification. Invalid source values are reported without rejecting the rest of a valid request. Existing linked requests with blank registration are backfilled. Manual edits or clears are protected from subsequent backfill. Full registration is shown only in the protected request details/edit UI, not desktop notifications or activity notes. Existing per-owner authorization remains in force.
+Утгуудыг Vercel environment variables-д оруулна. GitHub, frontend код, зураг, нийтийн чатад нийтлэхгүй. `NEXT_PUBLIC_` угтвар нэмэхгүй. Тохиргоо өөрчилсний дараа Redeploy хийнэ. Vercel орчинд Auth.js trusted-host тохиргоогоо танина; localhost хөгжүүлэлтэд шаардлагатай бол `AUTH_TRUST_HOST=true`-г зөвхөн локал `.env.local`-д нэмнэ.
 
-Request creation time is now displayed independently of the next-contact schedule in the table, detail and CSV, including year and UTC+08 clock time. Timestamp parsing validates calendar days/hours (no rollover), supports local ISO and en_US slash formats/AM-PM, and tolerates the observed trailing backslash typo. Numeric Sheets serial conversion and previously valid timestamp identities are unchanged. Invalid date cells remain excluded with separate date/phone counts and links to the source timestamp cell; no date is guessed from row order or neighboring customers. Existing valid dates are not bulk rewritten.
+Домэйн өөрчилбөл AUTH_URL болон Google callback URI хоёрыг тааруулж, дахин нэвтэрнэ. Анхны build хийхийн өмнө дээрх тохиргоог хийхийг зөвлөе; тохиргоо дутуу бол login дэлгэц мэдээлэл харуулна.
+
+## 5. Анхны нэвтрэлт ба ажилтны эрх
+
+1. `CRM_OWNER_EMAIL` дээр заасан Google аккаунтаар нэвтэрнэ. Google баталгаажуулсан и-мэйл ашиглана.
+2. Тэр эзэмшигч CRM-ийг анх нээхэд админы бүртгэл үүснэ. Дурын анхны зочин админ болохгүй.
+3. Багийн гишүүн хэсэгт ажилтны Google и-мэйл, нэр, үүрэг, идэвхтэй төлөвийг бүртгэнэ.
+4. Ажилтан яг тэр Google аккаунтаар нэвтэрнэ. Agent өөрт хуваарилсан хүсэлтийг; manager бүх хүсэлтийг; admin гишүүн болон Sheets тохиргоог удирдана.
+5. Идэвхгүй болгосон ажилтан өмнөх session-тэй байсан ч дараагийн API хүсэлт дээр мэдээлэл авах эрхгүй болно.
+
+CRM_OWNER_EMAIL-ийг дараа нь солих нь DB-ийн эзэмшигчийг автоматаар шилжүүлэхгүй. Эзэмшигч шилжүүлэх эсвэл өмнөх Sites-ийн user_id-уудыг Google identity-д шилжүүлэх нь тусдаа өгөгдлийн migration шаарддаг.
+
+## 6. Google Sheets холбох
+
+Өмнөх Sheets импортын боломж хадгалагдсан. Google Sheets API-г идэвхжүүлж, шаардлагатай хүснэгтийг service account-ийн и-мэйлд Viewer эрхээр share хийнэ. CRM-ийн Google Sheets тохиргоонд өөрийн spreadsheet ID, tab, баганын mapping-ийг шалгаж, JSON түлхүүр оруулах эсвэл environment variable-аар нийлүүлнэ. Дараа нь Test connection, ажилтны нэр холбох, импорт идэвхжүүлэх алхмуудыг хийнэ.
+
+- Хүсэлтийн огноо, утас, регистр, бүтээгдэхүүн, ажилтны хуваарилалт импортлогдоно.
+- Огноо + утас нь эх хүсэлтийн identity; нэг эх хүсэлт давхар импортлогдохгүй.
+- Түүхэн огноог хамруулах горим, регистрийн backfill, гараар зассан регистрийг хамгаалах ажиллагаа хадгалагдсан.
+- Ажилтантай холбогдоогүй нэрийн тоог `Ажилтантай холбоогүй: N` гэж харуулна.
+- CRM нээлттэй үед 30 секунд тутам polling хийнэ; нэг sync 80 хүртэл өөрчлөлт боловсруулна. Анхны их хэмжээний импорт олон sync шаардана.
+- Бүх CRM цонх хаалттай үед ажиллах scheduler, хаалттай browser руу push, автомат SMS/email энэ хувилбарт байхгүй.
+- Sheets API route-ийн Vercel maxDuration = 300 секунд. Ашиглаж буй Vercel тохиргоо/plan энэ хугацааг зөвшөөрөх эсэхийг deploy үед шалгана.
+
+## 7. Өмнөх өгөгдөл
+
+ZIP нь **кодын багц**; бодит харилцагчийн мэдээлэл, өмнөх DB backup, Google хувийн түлхүүр агуулаагүй. Шинэ Turso DB хоосон эхэлнэ. Sheets-ээс дахин импортлоход өмнөх CRM дээр хийсэн тэмдэглэл, Recycle түүх, уншсан мэдэгдэл автоматаар шилжихгүй.
+
+Бүх түүхийг шилжүүлэх шаардлагатай бол өмнөх орчноос бүрэн өгөгдлийн export авч, staging Turso сан руу баталгаажуулсан migration хийнэ. Үүнд organization owner, member user_id (Sites identity → Google identity), encrypted sheet credential, source links зэргийг тусгайлан тааруулна. Хуучин DB dump-ийг шинэ сан дээр шууд давхар ажиллуулахгүй.
+
+## 8. Алдаа гарвал
+
+| Алдаа | Шалгах зүйл |
+|---|---|
+| routes-manifest.json олдохгүй | Энэ шинэ багц мөн эсэх; зөв Root Directory; Framework = Next.js; Output override унтраалттай; npm run build дууссан эсэх |
+| redirect_uri_mismatch | Google OAuth callback URL ба AUTH_URL яг тохирсон эсэх |
+| Нэвтрэх боломжгүй / AccessDenied | CRM_OWNER_EMAIL эсвэл идэвхтэй ажилтны и-мэйл; Google test-user эрх |
+| no such table | Зөв Turso DB дээр npm run db:migrate ажилласан эсэх |
+| Database холбоогүй | TURSO URL/token, environment scope болон Redeploy |
+| Sheets decrypt алдаа | CRM_CONNECTION_ENCRYPTION_KEY өмнөх шифрлэсэн мэдээллийн түлхүүртэй ижил эсэх; үгүй бол холболтыг дахин тохируулах |
+
+## 9. Шалгалт
+
+Энэ багц дээр дараах шалгалтууд амжилттай дууссан:
+
+```bash
+npm test
+npm run build
+npm run test:production
+```
+
+- CRM/Sheets regression: эрх, хүсэлт, регистр, огноо, давхардалгүй импорт, ажилтан солилт, мэдэгдэл, Recycle хязгаар.
+- Бодит libSQL драйвертай локал тест: migration дахин ажиллуулах, transaction rollback, параметрүүд, RETURNING.
+- Production HTTP: нэвтрэх redirect, зөвшөөрөлгүй API, хуурамч identity header болон session татгалзах, зөв гарын үсэгтэй туршилтын session, админы bootstrap, гаднын origin-оос бичих хүсэлт татгалзах.
+- Next.js production build болон routes-manifest.json үүсэлт.
+
+Google-ийн бодит OAuth consent/callback, амьд Turso cloud холболт, хэрэглэгчийн Google Sheets болон Vercel account/domain дээр deploy хийхийг туршаагүй. Production HTTP тест зөвхөн тусгаарласан түр DB, туршилтын session ашигласан. Browser-ийн харагдац болон OS notification popup-ийг энэ хөрвүүлэлтийн үед дахин шалгаагүй.
+
+## Эх сурвалж
+
+- Vercel Next.js: https://vercel.com/docs/frameworks/full-stack/nextjs
+- Auth.js тохиргоо: https://authjs.dev/getting-started/installation
+- Google provider: https://authjs.dev/getting-started/providers/google
+- Turso TypeScript SDK / atomic batch: https://docs.turso.tech/sdk/ts/reference
+
+Auth.js 5.0.0-beta.32 хувилбарыг албан зааврын дагуу тогтоосон; beta dependency гэдгийг хөгжүүлэгч анхаарч шинэчлэхдээ нэвтрэлтийн тестүүдийг дахин ажиллуулна. Бүх dependency-ийн яг суулгасан хувилбар package-lock.json-д хадгалагдсан.

@@ -1,0 +1,14 @@
+{
+  "source_base_commit": "d37e9f220d1938ac5f13fa1eb7f0799b4333bcd7",
+  "target": "Vercel / Next.js / Turso / Google OAuth",
+  "checks": {
+    "npm_test": "passed",
+    "npm_run_build": "passed",
+    "routes_manifest": "created; version 3",
+    "production_http_security": "passed",
+    "live_google_oauth": "not run; requires account configuration",
+    "live_turso": "not run; requires database credentials",
+    "vercel_deployment": "not run"
+  },
+  "contains_production_data": false
+}

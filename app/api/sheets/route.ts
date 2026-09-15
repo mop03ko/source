@@ -1,4 +1,4 @@
-import {member} from '../crm/route';
+import {member} from '@/lib/access';
 import {bootstrapGoogleConnection,publicConnection,saveConnection,testConnection,setEnabled,syncSheets} from '@/lib/sheets';
 export const dynamic='force-dynamic';
 export async function GET(){try{const m=await member();if(m.role!=='admin')return Response.json({error:'Зөвхөн админ холболт удирдана.'},{status:403});return Response.json(await publicConnection(),{headers:{'Cache-Control':'no-store'}});}catch(e){return Response.json({error:(e as Error).message},{status:(e as {status?:number}).status||500});}}

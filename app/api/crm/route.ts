@@ -1,23 +1,10 @@
 import {assignmentNotice} from '@/lib/notifications';
-import {env} from 'cloudflare:workers';
-import {getChatGPTUser} from '../../chatgpt-auth';
+import {env} from '@/lib/runtime';
+import {member,Failure} from '@/lib/access';
 import {z} from 'zod';
 import {normalizePhone,normalizeRegistration,stages,closed, type Member,type Lead} from '@/lib/crm';
 export const dynamic='force-dynamic';
-class Failure extends Error {constructor(message:string,public status=400){super(message);}}
 const db=()=>env.DB!;
-export async function member(){
- const u=await getChatGPTUser();if(!u)throw new Failure('Нэвтрэх шаардлагатай.',401);
- const email=u.email.toLowerCase();
- // The platform restricts this application to its owner at initial deployment.
- await db().batch([
- db().prepare('INSERT OR IGNORE INTO organization(id,owner) VALUES(1,?)').bind(u.userId),
- db().prepare("INSERT OR IGNORE INTO members(email,user_id,name,role,active) SELECT ?,?,?, 'admin',1 FROM organization WHERE id=1 AND owner=?").bind(email,u.userId,u.displayName,u.userId),
- db().prepare('UPDATE members SET user_id=? WHERE email=? AND user_id IS NULL AND active=1').bind(u.userId,email)
- ]);
- const m=await db().prepare('SELECT * FROM members WHERE email=? AND user_id=? AND active=1').bind(email,u.userId).first<Member>();
- if(!m)throw new Failure('Энэ системд нэвтрэх эрх олгоогүй байна. AntMall-ын админтай холбогдоно уу.',403);return m;
-}
 const scope=(m:Member)=>m.role==='agent'?{sql:' AND l.owner=?',args:[m.email]}:{sql:'',args:[] as string[]};
 async function getLead(id:string,m:Member){const s=scope(m);const l=await db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked,(SELECT COUNT(*) FROM activities WHERE phone=l.phone AND kind='no_answer' AND created_at>=?) attempts FROM leads l WHERE l.id=? ${s.sql}`).bind(new Date(Date.now()-14*86400000).toISOString(),id,...s.args).first<Lead>();if(!l)throw new Failure('Хүсэлт олдсонгүй эсвэл хандах эрхгүй.',404);return l;}
 const bodySchema=z.object({action:z.enum(['create','update','activity','recycle','optout','member','import']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});

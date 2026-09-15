@@ -1,4 +1,4 @@
-import {member} from '../crm/route';import {refreshNotices,listNotices,readNotices,claimAlerts} from '@/lib/notifications';import {z} from 'zod';
+import {member} from '@/lib/access';import {refreshNotices,listNotices,readNotices,claimAlerts} from '@/lib/notifications';import {z} from 'zod';
 export const dynamic='force-dynamic';
 const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'Мэдэгдлийн хүсэлт буруу.':(e as Error).message},{status:(e as {status?:number}).status||400});
 export async function GET(req:Request){try{const m=await member(),url=new URL(req.url);const page=Math.max(1,Math.min(10000,Math.floor(Number(url.searchParams.get('page'))||1)));return Response.json(await listNotices(m.email,page,url.searchParams.get('unread')==='1'),{headers:{'Cache-Control':'no-store'}});}catch(e){return respondError(e);}}

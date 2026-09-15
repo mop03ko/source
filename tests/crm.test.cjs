@@ -1,12 +1,13 @@
+process.env.CRM_OWNER_EMAIL='owner@example.test';
 const {DatabaseSync}=require('node:sqlite');
 const ts=require('typescript');const fs=require('fs');const assert=require('node:assert/strict');
 const sqlite=new DatabaseSync(':memory:');for(const p of fs.readdirSync('drizzle').filter(p=>p.endsWith('.sql')))sqlite.exec(fs.readFileSync('drizzle/'+p,'utf8'));
 class Statement{constructor(sql,args=[]){this.sql=sql;this.args=args;}bind(...a){return new Statement(this.sql,a)}async first(){return sqlite.prepare(this.sql).get(...this.args)||null}async all(){return {results:sqlite.prepare(this.sql).all(...this.args)}}async run(){const r=sqlite.prepare(this.sql).run(...this.args);return {meta:{changes:Number(r.changes)}}}}
 const DB={prepare:s=>new Statement(s),batch:async statements=>{sqlite.exec('BEGIN');try{const r=[];for(const s of statements)r.push(await s.run());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 let user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
-const deps={'cloudflare:workers':{env:{DB}},'../../chatgpt-auth':{getChatGPTUser:async()=>user}};
+const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=>user}};
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
-const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;const route=load('app/api/crm/route.ts');deps['../crm/route']=route;const noticesRoute=load('app/api/notifications/route.ts');
+deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;const route=load('app/api/crm/route.ts');deps['../crm/route']=route;const noticesRoute=load('app/api/notifications/route.ts');
 async function notice(action,ids,origin='https://crm.test'){const r=await noticesRoute.POST(new Request('https://crm.test/api/notifications',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({action,ids})}));return [r.status,await r.json()];}
 async function get(query=''){const r=await route.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()]}
 async function post(action,data,id,version,origin='https://crm.test'){const r=await route.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})}));return [r.status,await r.json()]}
