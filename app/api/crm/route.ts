@@ -26,17 +26,33 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  const order=view==='all'?'l.created_at DESC':'l.next_at IS NULL,l.next_at ASC,l.created_at DESC';
  // Тайлангийн хугацааны хүрээ нь жагсаалтын шүүлтээс тусдаа: ирсэн огноогоор (УБ цагийн бүсээр) хязгаарлана.
  const rFrom=(url.searchParams.get('rfrom')||'').slice(0,10),rTo=(url.searchParams.get('rto')||'').slice(0,10);
+ let reportFromIso='',reportToIso='';
+ if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime()))reportFromIso=t.toISOString();}
+ if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime()))reportToIso=t.toISOString();}
  let reportWhere='1=1'+s.sql,reportArgs:unknown[]=[...s.args];
- if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime())){reportWhere+=' AND l.created_at>=?';reportArgs.push(t.toISOString());}}
- if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){reportWhere+=' AND l.created_at<=?';reportArgs.push(t.toISOString());}}
- const [rows,count,stats,team,dist,byMember]=await Promise.all([
+ if(reportFromIso){reportWhere+=' AND l.created_at>=?';reportArgs.push(reportFromIso);}
+ if(reportToIso){reportWhere+=' AND l.created_at<=?';reportArgs.push(reportToIso);}
+ // Дуудлага/тэмдэглэлийн тоог хариуцагчаар биш үйлдэл хийсэн ажилтнаар (actor) тоолно.
+ const actorScope=m.role==='agent'?{sql:' AND a.actor=?',args:[m.email] as unknown[]}:{sql:'',args:[] as unknown[]};
+ let activityWhere='1=1'+actorScope.sql,activityArgs:unknown[]=[...actorScope.args];
+ if(reportFromIso){activityWhere+=' AND a.created_at>=?';activityArgs.push(reportFromIso);}
+ if(reportToIso){activityWhere+=' AND a.created_at<=?';activityArgs.push(reportToIso);}
+ const [rows,count,stats,team,dist,byMember,byActivity]=await Promise.all([
  db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
  db().prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`).bind(...args).first(),
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),...s.args).first(),
  db().prepare(m.role==='agent'?'SELECT email,name,role,active FROM members WHERE email=?':'SELECT email,name,role,active FROM members ORDER BY active DESC,name').bind(...(m.role==='agent'?[m.email]:[])).all(),
  db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE ${reportWhere} GROUP BY status`).bind(...reportArgs).all(),
- db().prepare(`SELECT owner,COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status='lost'),0) lost,COALESCE(SUM(status NOT IN ('won','lost','invalid')),0) active FROM leads l WHERE ${reportWhere} AND owner!='__sheet_unassigned__' GROUP BY owner`).bind(...reportArgs).all()]);
- return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:byMember.results,page},{headers:{'Cache-Control':'no-store'}});
+ db().prepare(`SELECT owner,COUNT(*) total,${Object.keys(stages).map(k=>`COALESCE(SUM(status='${k}'),0) c_${k}`).join(',')} FROM leads l WHERE ${reportWhere} AND owner!='__sheet_unassigned__' GROUP BY owner`).bind(...reportArgs).all(),
+ db().prepare(`SELECT a.actor,COUNT(*) count FROM activities a WHERE ${activityWhere} AND a.actor!='Google Sheets' GROUP BY a.actor`).bind(...activityArgs).all()]);
+ // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
+ const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
+ const activityMap=new Map(byActivity.results.map((r:Record<string,unknown>)=>[r.actor as string,r.count as number]));
+ const reportMembers=(team.results as Member[]).filter(t=>t.active||byMemberMap.has(t.email)).map(t=>{
+ const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
+ return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
+ });
+ return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
