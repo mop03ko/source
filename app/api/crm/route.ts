@@ -347,8 +347,8 @@ export async function GET(req: Request) {
       db()
         .prepare(
           m.role === "agent"
-            ? "SELECT email,name,role,active FROM members WHERE email=?"
-            : "SELECT email,name,role,active FROM members ORDER BY active DESC,name",
+            ? "SELECT email,name,role,active,phone,avatar FROM members WHERE email=?"
+            : "SELECT email,name,role,active,phone,avatar FROM members ORDER BY active DESC,name",
         )
         .bind(...(m.role === "agent" ? [m.email] : []))
         .all(),
@@ -422,7 +422,7 @@ export async function GET(req: Request) {
         : Promise.resolve(null),
       db()
         .prepare(
-          "SELECT email,name,role,active,last_seen FROM members WHERE active=1 ORDER BY name",
+          "SELECT email,name,role,active,last_seen,phone,avatar FROM members WHERE active=1 ORDER BY name",
         )
         .all(),
     ]);
