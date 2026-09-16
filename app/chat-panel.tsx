@@ -25,7 +25,9 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const loadConversations=useCallback(async()=>{try{const [c,s]=await Promise.all([request() as Promise<{items:Conversation[]}>,request(undefined,'?summary=1') as Promise<Summary>]);setConversations(c.items);setSummary(s);}catch(e){setError((e as Error).message);}},[]);
  const loadThread=useCallback(async(p:string)=>{try{const d=await request(undefined,p===TEAM?'?team=1':'?peer='+encodeURIComponent(p)) as {items:Msg[]};setThread(d.items);}catch(e){setError((e as Error).message);}},[]);
  useEffect(()=>{void loadConversations().finally(()=>setLoading(false));const timer=setInterval(loadConversations,8000);return()=>clearInterval(timer);},[loadConversations]);
- useEffect(()=>{if(!peer)return;void loadThread(peer);request(peer===TEAM?{action:'read_team'}:{action:'read',peer}).then(()=>{void loadConversations();onRead();}).catch(()=>{});const timer=setInterval(()=>void loadThread(peer),4000);return()=>clearInterval(timer);},[peer,loadThread,loadConversations,onRead]);
+ // Нээлттэй харилцан яриаг л 4 секунд тутам дахин уншсан гэж тэмдэглэнэ; эс бөгөөс дараа ирсэн мессеж
+ // уншаагүй хэвээр үлдэж, хонх (bell) харсан мессежид дахин дахин дуугарах алдаа гарна.
+ useEffect(()=>{if(!peer)return;let first=true;const tick=async()=>{await loadThread(peer);try{await request(peer===TEAM?{action:'read_team'}:{action:'read',peer});await loadConversations();if(first){first=false;onRead();}}catch{}};void tick();const timer=setInterval(()=>void tick(),4000);return()=>clearInterval(timer);},[peer,loadThread,loadConversations,onRead]);
  useEffect(()=>{bottomRef.current?.scrollIntoView({block:'nearest'});},[thread]);
  const submit=async(e:FormEvent)=>{e.preventDefault();const text=body.trim();if(!text||!peer)return;setBusy(true);setBody('');try{await request(peer===TEAM?{action:'send_team',body:text}:{action:'send',peer,body:text});await Promise.all([loadThread(peer),loadConversations()]);}catch(e){setError((e as Error).message);setBody(text);}finally{setBusy(false);}};
  const name=(email:string)=>email===TEAM?'Бүх ажилчид':members.find(p=>p.email===email)?.name||email;
