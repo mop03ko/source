@@ -43,6 +43,13 @@
       "when": 1789525759751,
       "tag": "0005_nebulous_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789531561121,
+      "tag": "0006_gifted_legion",
+      "breakpoints": true
     }
   ]
 }

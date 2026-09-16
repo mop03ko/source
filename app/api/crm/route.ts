@@ -1,4 +1,4 @@
-import {assignmentNotice} from '@/lib/notifications';
+import {assignmentNotice,newLeadNotice} from '@/lib/notifications';
 import {env} from '@/lib/runtime';
 import {member,Failure} from '@/lib/access';
 import {z} from 'zod';
@@ -48,7 +48,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  // бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
  const isReports=view==='reports';
  const empty=Promise.resolve({results:[] as Record<string,unknown>[]});
- const [rows,count,stats,team,dist,byMember,byActivity,settings,candidateGroups]=await Promise.all([
+ const [rows,count,stats,team,dist,byMember,byActivity,settings,candidateGroups,unreadMsg]=await Promise.all([
  db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
  db().prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`).bind(...args).first(),
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),new Date().toISOString(),...s.args).first(),
@@ -59,7 +59,8 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  getSettings(),
  // 4 бүлгийн тоог одоогийн эрхийн хамрах хүрээгээр гаргана; статус/хайлт/хариуцагч шүүлтээс үл хамааран
  // тухайн таб дээрх ерөнхий эх суурийг харуулна (гарын авлагын "Эх тоо" баганатай адил).
- isCandidates?db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE 1=1${s.sql}${candidateCond} GROUP BY status`).bind(...s.args,...candidateStatuses).all():empty]);
+ isCandidates?db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE 1=1${s.sql}${candidateCond} GROUP BY status`).bind(...s.args,...candidateStatuses).all():empty,
+ db().prepare('SELECT COUNT(*) total FROM messages WHERE recipient=? AND read_at IS NULL').bind(m.email).first<{total:number}>()]);
  // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
  const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
  const activityMap=new Map(byActivity.results.map((r:Record<string,unknown>)=>[r.actor as string,r.count as number]));
@@ -68,7 +69,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
  return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
  }):[];
- return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,page},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,unreadMessages:unreadMsg?.total||0,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -86,8 +87,8 @@ export async function POST(req:Request){try{
  const seen=new Set<string>();const valid:typeof incoming=[];let skipped=0;
  for(const d of incoming){await validOwner(d.owner,m);if(!closed.includes(d.status)&&d.status!=='review'&&(!d.next_at||!d.next_action))throw new Failure('Идэвхтэй хүсэлтэд дараагийн тов, үйлдэл заавал оруулна.');if(await db().prepare('SELECT 1 FROM suppressions WHERE phone=?').bind(d.phone).first()){if(b.action==='create')throw new Failure('Дахин холбогдохгүй дугаар байна: '+d.phone);skipped++;continue;}
  if(seen.has(d.phone)||await db().prepare('SELECT 1 FROM leads WHERE phone=?').bind(d.phone).first()){if(b.action==='create')throw new Failure('Энэ дугаараар хүсэлт бүртгэгдсэн. Одоо байгаа хүсэлтийг хайж нээнэ үү.',409);skipped++;continue;}seen.add(d.phone);valid.push(d);}
- const statements=[];let firstId='';for(const d of valid){const id=crypto.randomUUID();firstId=id;statements.push(db().prepare('INSERT INTO leads(id,name,phone,product,source,owner,status,next_at,next_action,created_at,updated_at,op,registration,registration_manual) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM leads WHERE phone=?)').bind(id,d.name,d.phone,d.product,d.source,d.owner,d.status,closed.includes(d.status)||d.status==='review'?null:d.next_at,d.next_action,now,now,id,d.registration||'',d.registration?1:0,d.phone));statements.push(db().prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'update','Хүсэлт бүртгэв',?,? FROM leads WHERE id=?").bind(crypto.randomUUID(),m.email,now,id));statements.push(assignmentNotice(id,id,now));}
- const results=statements.length?await db().batch(statements):[];const added=results.filter((_,i)=>i%3===0).reduce((n,r)=>n+r.meta.changes,0);return Response.json({ok:true,id:firstId,added,skipped:incoming.length-added});
+ const statements=[];let firstId='';for(const d of valid){const id=crypto.randomUUID();firstId=id;statements.push(db().prepare('INSERT INTO leads(id,name,phone,product,source,owner,status,next_at,next_action,created_at,updated_at,op,registration,registration_manual) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM leads WHERE phone=?)').bind(id,d.name,d.phone,d.product,d.source,d.owner,d.status,closed.includes(d.status)||d.status==='review'?null:d.next_at,d.next_action,now,now,id,d.registration||'',d.registration?1:0,d.phone));statements.push(db().prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'update','Хүсэлт бүртгэв',?,? FROM leads WHERE id=?").bind(crypto.randomUUID(),m.email,now,id));statements.push(assignmentNotice(id,id,now));statements.push(newLeadNotice(id,id,now));}
+ const results=statements.length?await db().batch(statements):[];const added=results.filter((_,i)=>i%4===0).reduce((n,r)=>n+r.meta.changes,0);return Response.json({ok:true,id:firstId,added,skipped:incoming.length-added});
  }
  if(!b.id||!b.version)throw new Failure('Хүсэлтийн хувилбар дутуу.');const l=await getLead(b.id,m);if(l.version!==b.version)throw new Failure('Өөр ажилтан шинэчилсэн байна. Хүсэлтийг дахин нээнэ үү.',409);
  let d={...l}; let kind:string=b.action,note='';

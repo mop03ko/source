@@ -4,7 +4,12 @@ const db=()=>env.DB!;
 export function assignmentNotice(id:string,op:string,at:string,previousOwner=''){
  return db().prepare(`INSERT OR IGNORE INTO notifications(id,recipient,lead_id,kind,created_at) SELECT 'assignment:'||?||':'||l.owner,l.owner,l.id,'assignment',? FROM leads l JOIN members m ON m.email=l.owner AND m.active=1 WHERE l.id=? AND l.op=? AND l.owner!=? AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)`).bind(op,at,id,op,previousOwner);
 }
-const visible=`l.owner=n.recipient AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (n.kind!='due' OR (n.due_at=l.next_at AND l.next_at<=? AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days'))))`;
+// Шинэ хүсэлт (гараар бүртгэсэн, импортолсон, Google Sheets-ээс орж ирсэн) бүрд удирдлага/админд нэг мэдэгдэл;
+// l.id=? AND l.op=? нөхцөл нь тухайн бичлэг яг л энэ INSERT/UPDATE-ээр амжилттай орсон үед л мэдэгдэл үүсгэнэ.
+export function newLeadNotice(id:string,op:string,at:string){
+ return db().prepare(`INSERT OR IGNORE INTO notifications(id,recipient,lead_id,kind,created_at) SELECT 'newlead:'||?||':'||m.email,m.email,l.id,'new_lead',? FROM leads l JOIN members m ON m.role IN ('admin','manager') AND m.active=1 WHERE l.id=? AND l.op=?`).bind(op,at,id,op);
+}
+const visible=`(n.kind='new_lead' OR l.owner=n.recipient) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (n.kind!='due' OR (n.due_at=l.next_at AND l.next_at<=? AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days'))))`;
 export async function refreshNotices(email:string){const at=new Date().toISOString();await db().prepare(`INSERT OR IGNORE INTO notifications(id,recipient,lead_id,kind,created_at,due_at) SELECT 'due:'||l.id||':'||l.owner||':'||l.next_at,l.owner,l.id,'due',?,l.next_at FROM leads l WHERE l.owner=? AND l.next_at<=? AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days'))`).bind(at,email,at).run();}
 export async function listNotices(email:string,page=1,unreadOnly=false){const at=new Date().toISOString();const filter=unreadOnly?' AND n.read_at IS NULL':'';const [rows,count,unread]=await Promise.all([
  db().prepare(`SELECT n.*,l.name,l.product,l.next_action FROM notifications n JOIN leads l ON l.id=n.lead_id WHERE n.recipient=? AND ${visible} ${filter} ORDER BY n.created_at DESC,n.id DESC LIMIT 20 OFFSET ?`).bind(email,at,(page-1)*20).all(),
