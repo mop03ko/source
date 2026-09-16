@@ -7,6 +7,8 @@ import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
 import {dateLabel} from '@/lib/crm';
 import type {Member} from '@/lib/crm';
 const TEAM='__team__';
+// Идэвхтэй ажилтан бүр 30 секунд тутамд ямар нэг API-г polling хийдэг тул 90 секундийн цонх л хангалттай.
+const ONLINE_MS=90000;
 const EMOJIS=['😀','😁','😂','🤣','😊','🙂','😉','😍','😘','😎','🤔','😅','😢','😭','😡','😱','👍','👎','👏','🙏','💪','🔥','🎉','✅','❌','❤️','💯','🙌','👌','🤝','📌','⏰','📞','💬','😴','🥳','🤗','😐','🙄','🤩'];
 type Conversation={peer:string;body:string;created_at:string;mine:boolean;unread:number};
 type Msg={id:string;sender:string;recipient?:string;body:string;created_at:string};
@@ -27,14 +29,15 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  useEffect(()=>{bottomRef.current?.scrollIntoView({block:'nearest'});},[thread]);
  const submit=async(e:FormEvent)=>{e.preventDefault();const text=body.trim();if(!text||!peer)return;setBusy(true);setBody('');try{await request(peer===TEAM?{action:'send_team',body:text}:{action:'send',peer,body:text});await Promise.all([loadThread(peer),loadConversations()]);}catch(e){setError((e as Error).message);setBody(text);}finally{setBusy(false);}};
  const name=(email:string)=>email===TEAM?'Бүх ажилчид':members.find(p=>p.email===email)?.name||email;
+ const online=(email:string)=>{const p=members.find(x=>x.email===email);return !!p?.last_seen&&Date.now()-new Date(p.last_seen).getTime()<ONLINE_MS;};
  return <div className="chat-layout">
  <aside className="chat-list"><div className="chat-list-head"><h2>Чат</h2>{loading&&<Loader2 size={15} className="spin muted"/>}</div>
  <div className="chat-list-scroll">
  <button className={'chat-peer'+(peer===TEAM?' active':'')} onClick={()=>setPeer(TEAM)}><span className="chat-avatar chat-avatar-team"><Users size={16}/></span><span className="chat-peer-info"><strong>Бүх ажилчид</strong>{summary?.lastTeam&&<small>{summary.lastTeam.sender===me.email?'Та: ':''}{summary.lastTeam.body}</small>}</span>{!!summary?.team&&<b className="chat-unread">{summary.team}</b>}</button>
- {peers.map(p=>{const c=conversations.find(x=>x.peer===p.email);return <button key={p.email} className={'chat-peer'+(peer===p.email?' active':'')} onClick={()=>setPeer(p.email)}><span className="chat-avatar">{p.name.slice(0,1)}</span><span className="chat-peer-info"><strong>{p.name}</strong>{c&&<small>{c.mine?'Та: ':''}{c.body}</small>}</span>{!!c?.unread&&<b className="chat-unread">{c.unread}</b>}</button>;})}
+ {peers.map(p=>{const c=conversations.find(x=>x.peer===p.email);return <button key={p.email} className={'chat-peer'+(peer===p.email?' active':'')} onClick={()=>setPeer(p.email)}><span className="chat-avatar">{p.name.slice(0,1)}<i className={'chat-status'+(online(p.email)?' online':'')}/></span><span className="chat-peer-info"><strong>{p.name}</strong>{c&&<small>{c.mine?'Та: ':''}{c.body}</small>}</span>{!!c?.unread&&<b className="chat-unread">{c.unread}</b>}</button>;})}
  {!peers.length&&<p className="muted chat-empty-list">Идэвхтэй бусад ажилтан алга.</p>}</div></aside>
  <section className="chat-thread">{!peer?<div className="chat-empty"><MessageSquare size={28}/><strong>Ажилтан сонгоно уу</strong><p>Зүүн талаас ажилтнаа эсвэл "Бүх ажилчид" сувгийг сонгоод чат эхлүүлээрэй.</p></div>:<>
- <div className="chat-thread-head"><strong>{name(peer)}</strong></div>
+ <div className="chat-thread-head"><strong>{name(peer)}</strong>{peer!==TEAM&&<small>{online(peer)?'Онлайн':'Идэвхгүй'}</small>}</div>
  {error&&<div role="alert" className="error-box">{error}</div>}
  <div className="chat-messages">{!thread.length&&<p className="muted chat-empty-list">Мессеж алга. Эхний мессежээ бичээрэй.</p>}{thread.map(msg=><div key={msg.id} className={'chat-bubble'+(msg.sender===me.email?' mine':'')}>{peer===TEAM&&msg.sender!==me.email&&<small>{name(msg.sender)}</small>}<p>{msg.body}</p><time>{dateLabel(msg.created_at)}</time></div>)}<div ref={bottomRef}/></div>
  <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" disabled={busy||!body.trim()}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>

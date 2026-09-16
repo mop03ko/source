@@ -63,7 +63,8 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  db().prepare('SELECT COUNT(*) total FROM messages WHERE recipient=? AND read_at IS NULL').bind(m.email).first<{total:number}>(),
  db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=?),'')`).bind(m.email,m.email).first<{total:number}>(),
  // Чатын хамтрагчийн жагсаалт: role-оор хязгаарлагдаагүй, идэвхтэй бүх ажилтан (owner-ийн scoped members-ээс тусад нь).
- db().prepare('SELECT email,name,role,active FROM members WHERE active=1 ORDER BY name').all()]);
+ // last_seen нь онлайн төлөв харуулахад ашиглагдана (lib/access.ts-ийн member() бүр request тутамд шинэчилнэ).
+ db().prepare('SELECT email,name,role,active,last_seen FROM members WHERE active=1 ORDER BY name').all()]);
  // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
  const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
  const activityMap=new Map(byActivity.results.map((r:Record<string,unknown>)=>[r.actor as string,r.count as number]));

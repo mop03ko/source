@@ -1,0 +1,1 @@
+ALTER TABLE `members` ADD `last_seen` text;
