@@ -26,3 +26,24 @@ export async function send(sender:string,recipient:string,body:string){
 export async function markRead(email:string,peer:string){
  await db().prepare('UPDATE messages SET read_at=? WHERE recipient=? AND sender=? AND read_at IS NULL').bind(new Date().toISOString(),email,peer).run();
 }
+export type TeamMessage={id:string;sender:string;body:string;created_at:string};
+export async function teamMessages(){
+ const r=await db().prepare('SELECT * FROM team_messages ORDER BY created_at ASC LIMIT 200').all<TeamMessage>();
+ return r.results;
+}
+export async function lastTeamMessage(){
+ return db().prepare('SELECT sender,body,created_at FROM team_messages ORDER BY created_at DESC LIMIT 1').first<{sender:string;body:string;created_at:string}>();
+}
+export async function sendTeam(sender:string,body:string){
+ const id=crypto.randomUUID(),now=new Date().toISOString();
+ await db().prepare('INSERT INTO team_messages(id,sender,body,created_at) VALUES(?,?,?,?)').bind(id,sender,body,now).run();
+ return {id,created_at:now};
+}
+export async function markTeamRead(email:string){
+ await db().prepare('INSERT INTO team_reads(email,last_read_at) VALUES(?,?) ON CONFLICT(email) DO UPDATE SET last_read_at=excluded.last_read_at').bind(email,new Date().toISOString()).run();
+}
+// Мессеж тус бүрээр уншсан тэмдэг хадгалахгүй тул илгээгч бус хүн бүрийн сүүлд уншсан цагаас хойшхи мессежийг тоолно.
+export async function teamUnread(email:string){
+ const r=await db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=?),'')`).bind(email,email).first<{total:number}>();
+ return r?.total||0;
+}

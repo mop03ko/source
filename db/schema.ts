@@ -12,3 +12,6 @@ export const notifications=sqliteTable('notifications',{id:text('id').primaryKey
 // Ганц түлхүүр-утгын хүснэгт: цаашид админы тохиргоо нэмэхэд шинэ багана биш, зөвхөн шинэ key ашиглана.
 export const appSettings=sqliteTable('app_settings',{key:text('key').primaryKey(),value:text('value').notNull(),updatedAt:text('updated_at').notNull()});
 export const messages=sqliteTable('messages',{id:text('id').primaryKey(),pairKey:text('pair_key').notNull(),sender:text('sender').notNull(),recipient:text('recipient').notNull(),body:text('body').notNull(),createdAt:text('created_at').notNull(),readAt:text('read_at')},t=>[index('messages_pair').on(t.pairKey,t.createdAt),index('messages_recipient_read').on(t.recipient,t.readAt)]);
+// Бүх идэвхтэй ажилтанд нээлттэй нэг дундын суваг; уншсан эсэхийг мессеж бүрээр биш, хүн тус бүрийн сүүлд уншсан цагаар хэмжинэ.
+export const teamMessages=sqliteTable('team_messages',{id:text('id').primaryKey(),sender:text('sender').notNull(),body:text('body').notNull(),createdAt:text('created_at').notNull()},t=>[index('team_messages_created').on(t.createdAt)]);
+export const teamReads=sqliteTable('team_reads',{email:text('email').primaryKey(),lastReadAt:text('last_read_at').notNull()});
