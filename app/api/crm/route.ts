@@ -7,8 +7,11 @@ import {getSettings} from '@/lib/settings';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const scope=(m:Member)=>m.role==='agent'?{sql:' AND l.owner=?',args:[m.email]}:{sql:'',args:[] as string[]};
+// Recycle хөтөлбөрийн гарын авлагын 4 бүлэг (Уулзалт товлосон/Материал/Шийдвэр хүлээж буй/Холбогдоогүй);
+// GET (candidates таб) болон POST (bulk_recycle) хоёулаа ашигладаг тул модулийн түвшинд байна.
+const candidateStatuses=['appointment','materials','pending','unreachable'];
 async function getLead(id:string,m:Member){const s=scope(m);const l=await db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked,(SELECT COUNT(*) FROM activities WHERE phone=l.phone AND kind='no_answer' AND created_at>=?) attempts FROM leads l WHERE l.id=? ${s.sql}`).bind(new Date(Date.now()-14*86400000).toISOString(),id,...s.args).first<Lead>();if(!l)throw new Failure('Хүсэлт олдсонгүй эсвэл хандах эрхгүй.',404);return l;}
-const bodySchema=z.object({action:z.enum(['create','update','activity','recycle','optout','member','import']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
+const bodySchema=z.object({action:z.enum(['create','update','activity','recycle','optout','member','import','bulk_recycle']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
 const leadSchema=z.object({name:z.string().trim().min(1).max(100),phone:z.string().transform((v,ctx)=>{try{return normalizePhone(v)}catch{ctx.addIssue({code:z.ZodIssueCode.custom,message:'8 оронтой утасны дугаар оруулна уу.'});return z.NEVER;}}),registration:z.string().max(40).transform((v,ctx)=>{try{return normalizeRegistration(v)}catch{ctx.addIssue({code:z.ZodIssueCode.custom,message:"Регистрийн дугаар 2 кирилл үсэг, 8 цифртэй байна."});return z.NEVER;}}).optional(),product:z.string().trim().min(1).max(160),source:z.string().min(1).max(60),owner:z.union([z.string().email(),z.literal('__sheet_unassigned__')]),status:z.string().refine(v=>Object.hasOwn(stages,v)),next_at:z.string().datetime().nullable(),next_action:z.string().trim().max(200)});
 function err(e:unknown){if(e instanceof Failure)return Response.json({error:e.message},{status:e.status});if(e instanceof z.ZodError)return Response.json({error:'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.path.join('.')+' '+i.message).join('; ')},{status:400});console.error('CRM request failed',e instanceof Error?e.message:'error');return Response.json({error:'Хадгалж чадсангүй. Дахин оролдоно уу.'},{status:500});}
 async function validOwner(email:string,m:Member){if(m.role==='agent'&&email!==m.email)throw new Failure('Зөвхөн өөртөө хүсэлт хуваарилна.',403);if(!await db().prepare('SELECT email FROM members WHERE email=? AND active=1').bind(email).first())throw new Failure('Идэвхтэй хариуцагч сонгоно уу.');}
@@ -21,11 +24,14 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  // Дараагийн тов биш, харилцагчийн ирсэн огноогоор шүүнэ (Улаанбаатар цагийн бүсээр).
  if(/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)){const t=new Date(dateFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime())){where+=' AND l.created_at>=?';args.push(t.toISOString());}}
  if(/^\d{4}-\d{2}-\d{2}$/.test(dateTo)){const t=new Date(dateTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){where+=' AND l.created_at<=?';args.push(t.toISOString());}}
- if(view==='today'){where+=" AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.owner!='__sheet_unassigned__' AND l.next_at<=?";args.push(new Date().toISOString());}
+ // Улаанбаатарын өнөөдрийн хуанлийн өдрийн эхлэл/төгсгөл (сервер ямар цагийн бүст ажиллаж байсан ч адилхан гарна).
+ const ubDateStr=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+ const todayStartUB=new Date(ubDateStr+'T00:00:00+08:00').toISOString(),todayEndUB=new Date(ubDateStr+'T23:59:59+08:00').toISOString();
+ // Зөвхөн хугацаа хэтэрснийг бус, өнөөдрийн үлдсэн товыг бүгдийг харуулж, клиент талд хугацаагаар (хэтэрсэн/1 цагийн дотор/үлдсэн цаг) бүлэглэнэ.
+ if(view==='today'){where+=" AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.owner!='__sheet_unassigned__' AND l.next_at<=?";args.push(todayEndUB);}
+ const isToday=view==='today';
  if(view==='recycle'){where+=" AND l.recycle_at IS NOT NULL AND l.next_at IS NOT NULL AND (l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)";}
- // Recycle хөтөлбөрийн гарын авлагын 4 бүлэг (Уулзалт товлосон/Материал/Шийдвэр хүлээж буй/Холбогдоогүй):
  // "Recycle эхлүүлэх"-ээр аль хэдийн мөчлөгт орсныг (recycle_at) давхар санал болгохгүй.
- const candidateStatuses=['appointment','materials','pending','unreachable'];
  const candidateCond=` AND l.status IN (${candidateStatuses.map(()=>'?').join(',')}) AND l.recycle_at IS NULL AND l.owner!='__sheet_unassigned__' AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)`;
  if(view==='candidates'){where+=candidateCond;args.push(...candidateStatuses);}
  const isCandidates=view==='candidates';
@@ -48,7 +54,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  // бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
  const isReports=view==='reports';
  const empty=Promise.resolve({results:[] as Record<string,unknown>[]});
- const [rows,count,stats,team,dist,byMember,byActivity,settings,candidateGroups,unreadMsg,unreadTeamMsg,directory]=await Promise.all([
+ const [rows,count,stats,team,dist,byMember,byActivity,settings,candidateGroups,unreadMsg,unreadTeamMsg,myToday,directory]=await Promise.all([
  db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
  db().prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`).bind(...args).first(),
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),new Date().toISOString(),...s.args).first(),
@@ -64,6 +70,9 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=?),'')`).bind(m.email,m.email).first<{total:number}>(),
  // Чатын хамтрагчийн жагсаалт: role-оор хязгаарлагдаагүй, идэвхтэй бүх ажилтан (owner-ийн scoped members-ээс тусад нь).
  // last_seen нь онлайн төлөв харуулахад ашиглагдана (lib/access.ts-ийн member() бүр request тутамд шинэчилнэ).
+ // Зөвхөн "Өнөөдрийн ажил" таб дээр л ажиллуулна: тухайн ажилтны (эсвэл удирдлагын хувьд бүх багийн) өнөөдөр
+ // хийсэн үйлдлийн товч тойм (миний гүйцэтгэл), activity_actor индексээр хямд.
+ isToday?db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(kind='connected'),0) connected,COALESCE(SUM(kind='no_answer'),0) no_answer,COALESCE(SUM(kind='message'),0) message FROM activities WHERE actor=? AND created_at>=? AND created_at<=?`).bind(m.email,todayStartUB,todayEndUB).first<{total:number;connected:number;no_answer:number;message:number}>():Promise.resolve(null),
  db().prepare('SELECT email,name,role,active,last_seen FROM members WHERE active=1 ORDER BY name').all()]);
  // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
  const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
@@ -73,7 +82,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
  return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
  }):[];
- return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,unreadMessages:unreadMsg?.total||0,unreadTeam:unreadTeamMsg?.total||0,directory:directory.results,page},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,unreadMessages:unreadMsg?.total||0,unreadTeam:unreadTeamMsg?.total||0,directory:directory.results,myToday:myToday?{total:myToday.total||0,connected:myToday.connected||0,no_answer:myToday.no_answer||0,message:myToday.message||0}:null,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -93,6 +102,28 @@ export async function POST(req:Request){try{
  if(seen.has(d.phone)||await db().prepare('SELECT 1 FROM leads WHERE phone=?').bind(d.phone).first()){if(b.action==='create')throw new Failure('Энэ дугаараар хүсэлт бүртгэгдсэн. Одоо байгаа хүсэлтийг хайж нээнэ үү.',409);skipped++;continue;}seen.add(d.phone);valid.push(d);}
  const statements=[];let firstId='';for(const d of valid){const id=crypto.randomUUID();firstId=id;statements.push(db().prepare('INSERT INTO leads(id,name,phone,product,source,owner,status,next_at,next_action,created_at,updated_at,op,registration,registration_manual) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM leads WHERE phone=?)').bind(id,d.name,d.phone,d.product,d.source,d.owner,d.status,closed.includes(d.status)||d.status==='review'?null:d.next_at,d.next_action,now,now,id,d.registration||'',d.registration?1:0,d.phone));statements.push(db().prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'update','Хүсэлт бүртгэв',?,? FROM leads WHERE id=?").bind(crypto.randomUUID(),m.email,now,id));statements.push(assignmentNotice(id,id,now));statements.push(newLeadNotice(id,id,now));}
  const results=statements.length?await db().batch(statements):[];const added=results.filter((_,i)=>i%4===0).reduce((n,r)=>n+r.meta.changes,0);return Response.json({ok:true,id:firstId,added,skipped:incoming.length-added});
+ }
+ if(b.action==='bulk_recycle'){
+ if(m.role==='agent')throw new Failure('Зөвхөн удирдлага, админ багцаар Recycle эхлүүлнэ.',403);
+ const s=scope(m);
+ const d=z.object({status:z.string().refine(v=>candidateStatuses.includes(v)).optional(),from:z.string().max(10).optional(),to:z.string().max(10).optional()}).parse(b.data);
+ const statuses=d.status?[d.status]:candidateStatuses;
+ let bwhere='1=1'+s.sql,bargs:unknown[]=[...s.args];
+ bwhere+=` AND status IN (${statuses.map(()=>'?').join(',')}) AND recycle_at IS NULL AND owner!='__sheet_unassigned__' AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone)`;bargs.push(...statuses);
+ if(d.from&&/^\d{4}-\d{2}-\d{2}$/.test(d.from)){const t=new Date(d.from+'T00:00:00+08:00');if(!Number.isNaN(t.getTime())){bwhere+=' AND created_at>=?';bargs.push(t.toISOString());}}
+ if(d.to&&/^\d{4}-\d{2}-\d{2}$/.test(d.to)){const t=new Date(d.to+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){bwhere+=' AND created_at<=?';bargs.push(t.toISOString());}}
+ // Ганц хүсэлтийн Recycle-тэй ижил дүрэм: 14 хоногт 3 хариу аваагүй дуудлагатай бол багцад оруулахгүй.
+ bwhere+=" AND (SELECT COUNT(*) FROM activities WHERE phone=leads.phone AND kind='no_answer' AND created_at>=?)<3";bargs.push(new Date(Date.now()-14*86400000).toISOString());
+ const rows=await db().prepare(`SELECT id,phone,status,version FROM leads WHERE ${bwhere} LIMIT 1000`).bind(...bargs).all<{id:string;phone:string;status:string;version:number}>();
+ let updated=0;
+ for(let i=0;i<rows.results.length;i+=100){
+ const chunk=rows.results.slice(i,i+100);const statements=[];
+ for(const l of chunk){const op=crypto.randomUUID();const note='14 хоногийн Recycle мөчлөг эхлүүлэв. Эх бүлэг: '+(stages[l.status]||l.status);
+ statements.push(db().prepare('UPDATE leads SET recycle_at=?,next_at=?,next_action=?,updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND recycle_at IS NULL').bind(now,now,'Recycle • Эхний дуудлага',now,op,l.id,l.version));
+ statements.push(db().prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'recycle',?,?,? FROM leads WHERE id=? AND op=?").bind(crypto.randomUUID(),note,m.email,now,l.id,op));}
+ const chunkResults=await db().batch(statements);updated+=chunkResults.filter((_,idx)=>idx%2===0).reduce((n,r)=>n+r.meta.changes,0);
+ }
+ return Response.json({ok:true,matched:rows.results.length,updated});
  }
  if(!b.id||!b.version)throw new Failure('Хүсэлтийн хувилбар дутуу.');const l=await getLead(b.id,m);if(l.version!==b.version)throw new Failure('Өөр ажилтан шинэчилсэн байна. Хүсэлтийг дахин нээнэ үү.',409);
  let d={...l}; let kind:string=b.action,note='';
