@@ -23,6 +23,12 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  if(/^\d{4}-\d{2}-\d{2}$/.test(dateTo)){const t=new Date(dateTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime())){where+=' AND l.created_at<=?';args.push(t.toISOString());}}
  if(view==='today'){where+=" AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.owner!='__sheet_unassigned__' AND l.next_at<=?";args.push(new Date().toISOString());}
  if(view==='recycle'){where+=" AND l.recycle_at IS NOT NULL AND l.next_at IS NOT NULL AND (l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)";}
+ // Recycle хөтөлбөрийн гарын авлагын 4 бүлэг (Уулзалт товлосон/Материал/Шийдвэр хүлээж буй/Холбогдоогүй):
+ // "Recycle эхлүүлэх"-ээр аль хэдийн мөчлөгт орсныг (recycle_at) давхар санал болгохгүй.
+ const candidateStatuses=['appointment','materials','pending','unreachable'];
+ const candidateCond=` AND l.status IN (${candidateStatuses.map(()=>'?').join(',')}) AND l.recycle_at IS NULL AND l.owner!='__sheet_unassigned__' AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)`;
+ if(view==='candidates'){where+=candidateCond;args.push(...candidateStatuses);}
+ const isCandidates=view==='candidates';
  // "Бүх хүсэлт" таб шинэ хүсэлтийг эхэнд харуулна; ажлын дараалалтай (today/recycle) табууд тов-оор эрэмбэлнэ.
  const order=view==='all'?'l.created_at DESC':'l.next_at IS NULL,l.next_at ASC,l.created_at DESC';
  // Тайлангийн хугацааны хүрээ нь жагсаалтын шүүлтээс тусдаа: ирсэн огноогоор (УБ цагийн бүсээр) хязгаарлана.
@@ -42,7 +48,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  // бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
  const isReports=view==='reports';
  const empty=Promise.resolve({results:[] as Record<string,unknown>[]});
- const [rows,count,stats,team,dist,byMember,byActivity,settings]=await Promise.all([
+ const [rows,count,stats,team,dist,byMember,byActivity,settings,candidateGroups]=await Promise.all([
  db().prepare(`SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
  db().prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`).bind(...args).first(),
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),...s.args).first(),
@@ -50,7 +56,10 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  isReports?db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE ${reportWhere} GROUP BY status`).bind(...reportArgs).all():empty,
  isReports?db().prepare(`SELECT owner,COUNT(*) total,${Object.keys(stages).map(k=>`COALESCE(SUM(status='${k}'),0) c_${k}`).join(',')} FROM leads l WHERE ${reportWhere} AND owner!='__sheet_unassigned__' GROUP BY owner`).bind(...reportArgs).all():empty,
  isReports?db().prepare(`SELECT a.actor,COUNT(*) count FROM activities a WHERE ${activityWhere} AND a.actor!='Google Sheets' GROUP BY a.actor`).bind(...activityArgs).all():empty,
- getSettings()]);
+ getSettings(),
+ // 4 бүлгийн тоог одоогийн эрхийн хамрах хүрээгээр гаргана; статус/хайлт/хариуцагч шүүлтээс үл хамааран
+ // тухайн таб дээрх ерөнхий эх суурийг харуулна (гарын авлагын "Эх тоо" баганатай адил).
+ isCandidates?db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE 1=1${s.sql}${candidateCond} GROUP BY status`).bind(...s.args,...candidateStatuses).all():empty]);
  // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
  const byMemberMap=new Map(byMember.results.map((r:Record<string,unknown>)=>[r.owner as string,r]));
  const activityMap=new Map(byActivity.results.map((r:Record<string,unknown>)=>[r.actor as string,r.count as number]));
@@ -59,7 +68,7 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
  return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
  }):[];
- return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,page},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
