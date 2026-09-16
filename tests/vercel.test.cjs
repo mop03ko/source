@@ -9,7 +9,7 @@ function load(p){const out=ts.transpileModule(fs.readFileSync(p,'utf8'),{compile
  execFileSync(process.execPath,['scripts/migrate.mjs'],{env:process.env});
  execFileSync(process.execPath,['scripts/migrate.mjs'],{env:process.env});
  const database=load('lib/database.ts');const {DB}=database;
- assert.equal((await DB.prepare('SELECT count(*) n FROM crm_migrations').first()).n,4);
+ assert.equal((await DB.prepare('SELECT count(*) n FROM crm_migrations').first()).n,fs.readdirSync('drizzle').filter(p=>p.endsWith('.sql')).length);
  await DB.prepare('CREATE TABLE probe(id TEXT PRIMARY KEY, value TEXT)').run();
  await DB.prepare('INSERT INTO probe VALUES(?,?)').bind('one','Монгол').run();
  await assert.rejects(()=>DB.batch([DB.prepare('INSERT INTO probe VALUES(?,?)').bind('two','rollback'),DB.prepare('INSERT INTO probe VALUES(?,?)').bind('one','duplicate')]));
@@ -34,6 +34,8 @@ function load(p){const out=ts.transpileModule(fs.readFileSync(p,'utf8'),{compile
  user={...user,userId:'google:imposter'};await assert.rejects(member,e=>e.status===403);
  user={...user,userId:'google:agent'};await DB.prepare("UPDATE members SET active=0 WHERE email='agent@example.test'").run();await assert.rejects(member,e=>e.status===403);
  user=null;await assert.rejects(member,e=>e.status===401);
- database.getClient().close();fs.rmSync(temp,{recursive:true,force:true});
+ await database.getClient().close();
+ // Windows дээр sqlite файлын handle шууд суллагдахгүй байж болох тул түр хугацааны файлыг цэвэрлэж чадаагүй ч тестийн үр дүнд нөлөөлөхгүй.
+ try{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}catch{}
  console.log('PASS: real libSQL migration replay, transaction rollback, RETURNING, parameter safety, verified Google identity, explicit owner bootstrap, member linking and revoked access.');
 })().catch(e=>{console.error(e);process.exit(1)});

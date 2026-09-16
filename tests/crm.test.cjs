@@ -7,7 +7,7 @@ const DB={prepare:s=>new Statement(s),batch:async statements=>{sqlite.exec('BEGI
 let user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
 const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=>user}};
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
-deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;const route=load('app/api/crm/route.ts');deps['../crm/route']=route;const noticesRoute=load('app/api/notifications/route.ts');
+deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const route=load('app/api/crm/route.ts');deps['../crm/route']=route;const noticesRoute=load('app/api/notifications/route.ts');
 async function notice(action,ids,origin='https://crm.test'){const r=await noticesRoute.POST(new Request('https://crm.test/api/notifications',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({action,ids})}));return [r.status,await r.json()];}
 async function get(query=''){const r=await route.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()]}
 async function post(action,data,id,version,origin='https://crm.test'){const r=await route.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})}));return [r.status,await r.json()]}
@@ -59,7 +59,8 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal(sqlite.prepare('SELECT COUNT(*) c FROM notifications').get().c,before);
  detail=(await get('?id='+notificationLead))[1];
  assert.equal((await post('update',leadData('66112233','agent@example.test'),notificationLead,detail.lead.version))[0],200);
- assert.equal((await notifications.listNotices(user.email)).items.filter(n=>n.lead_id===notificationLead).length,0);
+ // new_lead мэдэгдэл нь эзэмшигч (admin) рүү лидийн хариуцагчаас үл хамааран очдог тул энэ шалгалтад тооцохгүй.
+ assert.equal((await notifications.listNotices(user.email)).items.filter(n=>n.lead_id===notificationLead&&n.kind!=='new_lead').length,0);
  const agentFeed=await notifications.listNotices('agent@example.test');assert.equal(agentFeed.items.length,1);const assignment=agentFeed.items[0];
  await notice('read',[assignment.id]);assert.equal((await notifications.listNotices('agent@example.test')).items[0].read_at,null);
  user={userId:'agent',email:'agent@example.test',displayName:'Agent'};
