@@ -72,7 +72,9 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review FROM leads l WHERE 1=1 ${s.sql}`).bind(new Date().toISOString(),new Date().toISOString(),...s.args).first(),
  db().prepare(m.role==='agent'?'SELECT email,name,role,active FROM members WHERE email=?':'SELECT email,name,role,active FROM members ORDER BY active DESC,name').bind(...(m.role==='agent'?[m.email]:[])).all(),
  isReports?db().prepare(`SELECT status,COUNT(*) count FROM leads l WHERE ${reportWhere} GROUP BY status`).bind(...reportArgs).all():empty,
- isReports?db().prepare(`SELECT owner,COUNT(*) total,${Object.keys(stages).map(k=>`COALESCE(SUM(status='${k}'),0) c_${k}`).join(',')} FROM leads l WHERE ${reportWhere} AND owner!='__sheet_unassigned__' GROUP BY owner`).bind(...reportArgs).all():empty,
+ // '__sheet_unassigned__'-г цаашид тусад нь "Хуваарилаагүй" мөр болгож харуулах тул энд хассангүй;
+ // эс бөгөөс тэдгээр (ялангуяа аль хэдийн "Худалдан авсан" статустай) хүсэлтүүд тайланд алга болно.
+ isReports?db().prepare(`SELECT owner,COUNT(*) total,${Object.keys(stages).map(k=>`COALESCE(SUM(status='${k}'),0) c_${k}`).join(',')} FROM leads l WHERE ${reportWhere} GROUP BY owner`).bind(...reportArgs).all():empty,
  isReports?db().prepare(`SELECT a.actor,COUNT(*) count FROM activities a WHERE ${activityWhere} AND a.actor!='Google Sheets' GROUP BY a.actor`).bind(...activityArgs).all():empty,
  getSettings(),
  // 4 бүлгийн тоог одоогийн эрхийн хамрах хүрээгээр гаргана; статус/хайлт/хариуцагч шүүлтээс үл хамааран
@@ -94,6 +96,10 @@ export async function GET(req:Request){try{const m=await member(),url=new URL(re
  const b=byMemberMap.get(t.email)as Record<string,number>|undefined;
  return {email:t.email,name:t.name,total:b?.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,b?.[`c_${k}`]||0])),activities:activityMap.get(t.email)||0};
  }):[];
+ // Sheet-ийн ажилтны нэр CRM-тэй таарч чадаагүй тул хариуцагчгүй үлдсэн (жишээ нь худалдан авсан ч холбогдох
+ // ажилтангүй) хүсэлтийг тусад нь мөр болгож, тайлангийн нийт тоо ажилтнуудын нийлбэртэй зөрөхгүй байлгана.
+ const unassignedReport=isReports?byMemberMap.get('__sheet_unassigned__')as Record<string,number>|undefined:undefined;
+ if(isReports&&unassignedReport?.total)reportMembers.push({email:'__sheet_unassigned__',name:'Хуваарилаагүй',total:unassignedReport.total||0,counts:Object.fromEntries(Object.keys(stages).map(k=>[k,unassignedReport[`c_${k}`]||0])),activities:0});
  return Response.json({me:m,leads:rows.results,count:(count as {count:number}).count,stats,members:team.results,distribution:dist.results,byMember:reportMembers,settings,candidateGroups:candidateGroups.results,unreadMessages:unreadMsg?.total||0,unreadTeam:unreadTeamMsg?.total||0,directory:directory.results,myToday:myToday?{total:myToday.total||0,connected:myToday.connected||0,no_answer:myToday.no_answer||0,message:myToday.message||0}:null,page},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return err(e);}}
 export async function POST(req:Request){try{
