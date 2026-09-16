@@ -11,6 +11,7 @@ import {
   type Lead,
 } from "@/lib/crm";
 import { getSettings } from "@/lib/settings";
+import { sendSms } from "@/lib/sms";
 export const dynamic = "force-dynamic";
 const db = () => env.DB!;
 const scope = (m: Member) =>
@@ -939,6 +940,42 @@ export async function POST(req: Request) {
         "Хүсэлт шинэчлэгдсэн эсвэл холбоо барих хязгаар үйлчилж байна. Дахин нээнэ үү.",
         409,
       );
+    // Худалдан авалт баталгаажих мөчид (won болох) харилцагч руу баталгаажуулах SMS илгээнэ.
+    // SMS амжилтгүй болсон ч хүсэлтийн шинэчлэлт аль хэдийн батлагдсан тул алдаа шидэхгүй, зөвхөн түүхэнд тэмдэглэнэ.
+    if (d.status === "won" && l.status !== "won") {
+      try {
+        await sendSms(l.phone, "Таны хүсэлт амжилттай баталгаажлаа.");
+        await db()
+          .prepare(
+            "INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,?,?)",
+          )
+          .bind(
+            crypto.randomUUID(),
+            l.id,
+            l.phone,
+            "note",
+            "Худалдан авалт баталгаажсан тул харилцагч руу баталгаажуулах SMS илгээв.",
+            "AntMall SMS",
+            now,
+          )
+          .run();
+      } catch (e) {
+        await db()
+          .prepare(
+            "INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,?,?)",
+          )
+          .bind(
+            crypto.randomUUID(),
+            l.id,
+            l.phone,
+            "note",
+            "SMS илгээхэд алдаа гарлаа: " + (e as Error).message.slice(0, 200),
+            "AntMall SMS",
+            now,
+          )
+          .run();
+      }
+    }
     return Response.json({ ok: true });
   } catch (e) {
     return err(e);
