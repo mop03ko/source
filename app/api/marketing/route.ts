@@ -59,6 +59,34 @@ export async function GET(req:Request){try{
   const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM marketing_tasks WHERE ${where} AND due_at>=? AND due_at<?) WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
   return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
  }
+ // Тайлан горим: сонгосон хугацаанд (rfrom/rto, ирсэн огноогоор) үндэслэсэн төлөв/суваг/хариуцагч/төсвийн задаргаа.
+ // rfrom/rto хоёул сонголттой бөгөөд буруу форматтай ирвэл (Календарь горимоос ялгаатай) 400 биш зүгээр үл тоомсорлоно.
+ if(url.searchParams.get('report')==='1'){
+  const rFrom=(url.searchParams.get('rfrom')||'').slice(0,10),rTo=(url.searchParams.get('rto')||'').slice(0,10);
+  let rFromIso='',rToIso='';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime()))rFromIso=t.toISOString();}
+  if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime()))rToIso=t.toISOString();}
+  let rWhere='1=1',rArgs:unknown[]=[];
+  if(rFromIso){rWhere+=' AND created_at>=?';rArgs.push(rFromIso);}
+  if(rToIso){rWhere+=' AND created_at<=?';rArgs.push(rToIso);}
+  const [statusRows,channelRows,ownerRows,budgetRow]=await Promise.all([
+   db().prepare(`SELECT status,COUNT(*) count FROM marketing_tasks WHERE ${rWhere} GROUP BY status`).bind(...rArgs).all<{status:string;count:number}>(),
+   db().prepare(`SELECT channel,COUNT(*) count,COALESCE(SUM(budget),0) budget FROM marketing_tasks WHERE ${rWhere} GROUP BY channel`).bind(...rArgs).all<{channel:string;count:number;budget:number}>(),
+   db().prepare(`SELECT owner,COUNT(*) total,COALESCE(SUM(status='done'),0) done FROM marketing_tasks WHERE ${rWhere} GROUP BY owner`).bind(...rArgs).all<{owner:string;total:number;done:number}>(),
+   db().prepare(`SELECT COALESCE(SUM(budget),0) total,COALESCE(SUM(CASE WHEN approved_at IS NOT NULL THEN budget ELSE 0 END),0) approved FROM marketing_tasks WHERE ${rWhere}`).bind(...rArgs).first<{total:number;approved:number}>(),
+  ]);
+  const total=statusRows.results.reduce((n,r)=>n+r.count,0);
+  const statusMap=new Map(statusRows.results.map(r=>[r.status,r.count]));
+  const channelMap=new Map(channelRows.results.map(r=>[r.channel,r]));
+  const budgetTotal=budgetRow?.total||0,budgetApproved=budgetRow?.approved||0;
+  return Response.json({
+   total,
+   byStatus:Object.keys(marketingStages).map(k=>({status:k,count:statusMap.get(k)||0})),
+   byChannel:marketingChannels.map(c=>({channel:c,count:channelMap.get(c)?.count||0})),
+   byOwner:ownerRows.results,
+   budget:{total:budgetTotal,approved:budgetApproved,unapproved:budgetTotal-budgetApproved,byChannel:marketingChannels.map(c=>({channel:c,budget:channelMap.get(c)?.budget||0}))},
+  },{headers:{'Cache-Control':'no-store'}});
+ }
  const [rows,count,stats]=await Promise.all([
   db().prepare(`SELECT * FROM marketing_tasks WHERE ${where} ORDER BY (due_at IS NULL),due_at ASC,created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
   db().prepare(`SELECT COUNT(*) count FROM marketing_tasks WHERE ${where}`).bind(...args).first<{count:number}>(),

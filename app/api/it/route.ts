@@ -58,6 +58,31 @@ export async function GET(req:Request){try{
   const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM it_tasks WHERE ${where} AND due_at>=? AND due_at<?) WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
   return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
  }
+ // Тайлан горим: сонгосон хугацаанд (rfrom/rto, ирсэн огноогоор) үндэслэсэн төлөв/систем/хариуцагчийн задаргаа.
+ // rfrom/rto хоёул сонголттой бөгөөд буруу форматтай ирвэл (Календарь горимоос ялгаатай) 400 биш зүгээр үл тоомсорлоно.
+ if(url.searchParams.get('report')==='1'){
+  const rFrom=(url.searchParams.get('rfrom')||'').slice(0,10),rTo=(url.searchParams.get('rto')||'').slice(0,10);
+  let rFromIso='',rToIso='';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime()))rFromIso=t.toISOString();}
+  if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime()))rToIso=t.toISOString();}
+  let rWhere='1=1',rArgs:unknown[]=[];
+  if(rFromIso){rWhere+=' AND created_at>=?';rArgs.push(rFromIso);}
+  if(rToIso){rWhere+=' AND created_at<=?';rArgs.push(rToIso);}
+  const [statusRows,areaRows,ownerRows]=await Promise.all([
+   db().prepare(`SELECT status,COUNT(*) count FROM it_tasks WHERE ${rWhere} GROUP BY status`).bind(...rArgs).all<{status:string;count:number}>(),
+   db().prepare(`SELECT system_area,COUNT(*) count FROM it_tasks WHERE ${rWhere} GROUP BY system_area`).bind(...rArgs).all<{system_area:string;count:number}>(),
+   db().prepare(`SELECT owner,COUNT(*) total,COALESCE(SUM(status='done'),0) done FROM it_tasks WHERE ${rWhere} GROUP BY owner`).bind(...rArgs).all<{owner:string;total:number;done:number}>(),
+  ]);
+  const total=statusRows.results.reduce((n,r)=>n+r.count,0);
+  const statusMap=new Map(statusRows.results.map(r=>[r.status,r.count]));
+  const areaMap=new Map(areaRows.results.map(r=>[r.system_area,r.count]));
+  return Response.json({
+   total,
+   byStatus:Object.keys(itStages).map(k=>({status:k,count:statusMap.get(k)||0})),
+   bySystemArea:itSystemAreas.map(a=>({system_area:a,count:areaMap.get(a)||0})),
+   byOwner:ownerRows.results,
+  },{headers:{'Cache-Control':'no-store'}});
+ }
  const [rows,count,stats]=await Promise.all([
   db().prepare(`SELECT * FROM it_tasks WHERE ${where} ORDER BY (due_at IS NULL),due_at ASC,created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
   db().prepare(`SELECT COUNT(*) count FROM it_tasks WHERE ${where}`).bind(...args).first<{count:number}>(),

@@ -51,5 +51,37 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  [calStatus,calData]=await mGet('?calendar=1&month='+nextMonth);
  assert.equal(calStatus,200);assert.equal(calData.items.some(i=>i.id===calCreate.id),false);
  assert.equal((await mGet('?calendar=1&month=bad'))[0],400);
- console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging and calendar filtering.');
+ // Тайлан горим: статус/суваг/хариуцагчийн задаргаа, төсвийн баталгаажилтын нийлбэр зөв тооцоологдоно.
+ // Одоогийн байдал: id (done,Facebook,150000), calCreate (planned,Facebook,150000) хоёул owner=marketing@example.test.
+ const [,tApproved]=await mPost('create',taskData({title:'Батлагдсан төсөвтэй',channel:'Google хайлтын сурталчилгаа',budget:200000,owner:'agent@example.test',status:'in_progress'}));
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ assert.equal((await mPost('approve',undefined,tApproved.id,1))[0],200);
+ user={userId:'m',email:'marketing@example.test',displayName:'Marketing'};
+ await mPost('create',taskData({title:'Батлагдаагүй төсөвтэй',channel:'Google хайлтын сурталчилгаа',budget:50000,owner:'agent@example.test',status:'cancelled'}));
+ let [repStatus,rep]=await mGet('?report=1');
+ assert.equal(repStatus,200);
+ assert.equal(rep.total,4);
+ assert.equal(rep.byStatus.length,Object.keys(common.marketingStages).length);
+ assert.equal(rep.byStatus.find(s=>s.status==='done').count,1);
+ assert.equal(rep.byStatus.find(s=>s.status==='planned').count,1);
+ assert.equal(rep.byStatus.find(s=>s.status==='in_progress').count,1);
+ assert.equal(rep.byStatus.find(s=>s.status==='cancelled').count,1);
+ assert.equal(rep.byChannel.find(c=>c.channel==='Facebook').count,2);
+ assert.equal(rep.byChannel.find(c=>c.channel==='Google хайлтын сурталчилгаа').count,2);
+ const ownerMarketing=rep.byOwner.find(o=>o.owner==='marketing@example.test');
+ assert.equal(ownerMarketing.total,2);assert.equal(ownerMarketing.done,1);
+ const ownerAgent=rep.byOwner.find(o=>o.owner==='agent@example.test');
+ assert.equal(ownerAgent.total,2);assert.equal(ownerAgent.done,0);
+ assert.equal(rep.budget.total,550000);
+ assert.equal(rep.budget.approved,200000);
+ assert.equal(rep.budget.unapproved,350000);
+ assert.equal(rep.budget.byChannel.find(c=>c.channel==='Facebook').budget,300000);
+ assert.equal(rep.budget.byChannel.find(c=>c.channel==='Google хайлтын сурталчилгаа').budget,250000);
+ // Ирээдүйн rfrom-той бол хоосон тайлан буцна; буруу форматтай rfrom/rto-г Календарь горимоос ялгаатай, 400 биш зүгээр үл тоомсорлоно.
+ const future=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+ let [futStatus,futRep]=await mGet('?report=1&rfrom='+future);
+ assert.equal(futStatus,200);assert.equal(futRep.total,0);assert.equal(futRep.budget.total,0);
+ let [badStatus,badRep]=await mGet('?report=1&rfrom=not-a-date&rto=also-bad');
+ assert.equal(badStatus,200);assert.equal(badRep.total,4);
+ console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering and report breakdown (status/channel/owner/budget).');
 })().catch(e=>{console.error(e);process.exit(1)});

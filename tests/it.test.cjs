@@ -70,5 +70,29 @@ const taskData=(overrides={})=>({title:'Нэвтрэх хуудасны алда
  const skewItems=calData.items.filter(i=>new Date(new Date(i.due_at).getTime()+8*3600000).toISOString().slice(0,10)===skewDateKey);
  assert.equal(skewItems.length,5);assert.ok(skewItems.every(i=>i.day_count===6));
  if(otherMonth===skewMonth)assert.ok(calData.items.some(i=>i.id===otherCreate.id));
- console.log('PASS: IT role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging and calendar filtering (incl. per-day cap regression).');
+ // Тайлан горим: статус/систем/хариуцагчийн задаргаа зөв тооцоологдоно. Одоогийн (report-affecting) бүртгэл:
+ // id (done,Вэбсайт/Frontend,owner=it@example.test) + 8 ширхэг календарийн туршилт (бүгд planned,Вэбсайт/Frontend,owner=it@example.test).
+ await iPost('create',taskData({title:'Backend ажил',system_area:'Backend / Server',owner:'director@example.test',status:'in_progress'}));
+ await iPost('create',taskData({title:'Цуцалсан ажил',system_area:'Backend / Server',owner:'director@example.test',status:'cancelled'}));
+ let [repStatus,rep]=await iGet('?report=1');
+ assert.equal(repStatus,200);
+ assert.equal(rep.total,11);
+ assert.equal(rep.byStatus.length,Object.keys(common.itStages).length);
+ assert.equal(rep.byStatus.find(s=>s.status==='done').count,1);
+ assert.equal(rep.byStatus.find(s=>s.status==='planned').count,8);
+ assert.equal(rep.byStatus.find(s=>s.status==='in_progress').count,1);
+ assert.equal(rep.byStatus.find(s=>s.status==='cancelled').count,1);
+ assert.equal(rep.bySystemArea.find(a=>a.system_area==='Вэбсайт / Frontend').count,9);
+ assert.equal(rep.bySystemArea.find(a=>a.system_area==='Backend / Server').count,2);
+ const ownerIt=rep.byOwner.find(o=>o.owner==='it@example.test');
+ assert.equal(ownerIt.total,9);assert.equal(ownerIt.done,1);
+ const ownerDirector=rep.byOwner.find(o=>o.owner==='director@example.test');
+ assert.equal(ownerDirector.total,2);assert.equal(ownerDirector.done,0);
+ // Ирээдүйн rfrom-той бол хоосон тайлан буцна; буруу форматтай rfrom/rto-г Календарь горимоос ялгаатай, 400 биш зүгээр үл тоомсорлоно.
+ const future=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+ let [futStatus,futRep]=await iGet('?report=1&rfrom='+future);
+ assert.equal(futStatus,200);assert.equal(futRep.total,0);
+ let [badStatus,badRep]=await iGet('?report=1&rfrom=not-a-date&rto=also-bad');
+ assert.equal(badStatus,200);assert.equal(badRep.total,11);
+ console.log('PASS: IT role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering (incl. per-day cap regression) and report breakdown (status/system area/owner).');
 })().catch(e=>{console.error(e);process.exit(1)});
