@@ -42,6 +42,12 @@ export async function sendTeam(sender:string,body:string){
 export async function markTeamRead(email:string){
  await db().prepare('INSERT INTO team_reads(email,last_read_at) VALUES(?,?) ON CONFLICT(email) DO UPDATE SET last_read_at=excluded.last_read_at').bind(email,new Date().toISOString()).run();
 }
+// Багийн мессеж бүрт хэн уншсаныг тус тусад нь хадгалдаггүй тул идэвхтэй гишүүн бүрийн сүүлд уншсан
+// цагийг буцааж, клиент талд мессеж бүрийн "үзсэн" тоог тооцоолно.
+export async function teamReadState(exclude:string){
+ const r=await db().prepare('SELECT tr.email,tr.last_read_at FROM team_reads tr JOIN members m ON m.email=tr.email WHERE m.active=1 AND tr.email!=?').bind(exclude).all<{email:string;last_read_at:string}>();
+ return r.results;
+}
 // Мессеж тус бүрээр уншсан тэмдэг хадгалахгүй тул илгээгч бус хүн бүрийн сүүлд уншсан цагаас хойшхи мессежийг тоолно.
 export async function teamUnread(email:string){
  const r=await db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=?),'')`).bind(email,email).first<{total:number}>();

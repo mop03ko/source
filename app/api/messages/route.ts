@@ -1,6 +1,6 @@
 import {member,Failure} from '@/lib/access';
 import {env} from '@/lib/runtime';
-import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread} from '@/lib/messages';
+import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState} from '@/lib/messages';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
@@ -8,7 +8,7 @@ const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'М
 export async function GET(req:Request){try{
  const m=await member(),url=new URL(req.url);
  if(url.searchParams.get('summary')==='1'){const [dm,team,last]=await Promise.all([unreadTotal(m.email),teamUnread(m.email),lastTeamMessage()]);return Response.json({dm,team,total:dm+team,lastTeam:last||null},{headers:{'Cache-Control':'no-store'}});}
- if(url.searchParams.get('team')==='1')return Response.json({items:await teamMessages()},{headers:{'Cache-Control':'no-store'}});
+ if(url.searchParams.get('team')==='1'){const [items,reads]=await Promise.all([teamMessages(),teamReadState(m.email)]);return Response.json({items,reads},{headers:{'Cache-Control':'no-store'}});}
  const peer=(url.searchParams.get('peer')||'').trim().toLowerCase();
  if(peer)return Response.json({items:await thread(m.email,peer)},{headers:{'Cache-Control':'no-store'}});
  return Response.json({items:await conversations(m.email)},{headers:{'Cache-Control':'no-store'}});
