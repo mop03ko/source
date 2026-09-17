@@ -7,7 +7,7 @@ const DB={prepare:s=>new Statement(s),batch:async statements=>{sqlite.exec('BEGI
 let user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
 const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=>user}};
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
-deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const sms=load('lib/sms.ts');deps['@/lib/sms']=sms;const crmRoute=load('app/api/crm/route.ts');deps['../crm/route']=crmRoute;const msgLib=load('lib/messages.ts');deps['@/lib/messages']=msgLib;deps['./messages']=msgLib;const route=load('app/api/messages/route.ts');
+deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;deps['./crm']=common;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const sms=load('lib/sms.ts');deps['@/lib/sms']=sms;const crmRoute=load('app/api/crm/route.ts');deps['../crm/route']=crmRoute;const msgLib=load('lib/messages.ts');deps['@/lib/messages']=msgLib;deps['./messages']=msgLib;const route=load('app/api/messages/route.ts');
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function get(query=''){const r=await route.GET(new Request('https://crm.test/api/messages'+query));return [r.status,await r.json()];}
 async function post(body){const r=await route.POST(new Request('https://crm.test/api/messages',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify(body)}));return [r.status,await r.json()];}
@@ -35,20 +35,49 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?peer=owner@example.test');assert.deepEqual(d.items.find(m=>m.id===msgId).reactions,[{emoji:'👍',count:1,mine:true,actors:['agent@example.test']}]);
  [status,d]=await post({action:'react',kind:'dm',messageId:msgId,emoji:'👍'});assert.equal(d.reacted,false);
  [status,d]=await get('?peer=owner@example.test');assert.deepEqual(d.items.find(m=>m.id===msgId).reactions,[]);
- // Багийн суваг: бүх идэвхтэй ажилтан унших, хариулах, reaction нэмэх боломжтой.
- [status,d]=await post({action:'send_team',body:'Team hello'});assert.equal(status,200);const teamId=d.id;
- [status,d]=await post({action:'send_team',body:'reply',replyTo:teamId});assert.equal(status,200);
- [status,d]=await get('?team=1');const teamReply=d.items.find(m=>m.body==='reply');assert.equal(teamReply.reply_to_id,teamId);assert.equal(teamReply.reply_to_sender,'agent@example.test');
+ // Багийн "all" суваг: бүх идэвхтэй ажилтан унших, хариулах, reaction нэмэх боломжтой.
+ [status,d]=await post({action:'send_team',channel:'all',body:'Team hello'});assert.equal(status,200);const teamId=d.id;
+ [status,d]=await post({action:'send_team',channel:'all',body:'reply',replyTo:teamId});assert.equal(status,200);
+ [status,d]=await get('?team=1&channel=all');const teamReply=d.items.find(m=>m.body==='reply');assert.equal(teamReply.reply_to_id,teamId);assert.equal(teamReply.reply_to_sender,'agent@example.test');
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  assert.equal((await post({action:'react',kind:'team',messageId:teamId,emoji:'🔥'}))[0],200);
- [status,d]=await get('?team=1');assert.deepEqual(d.items.find(m=>m.id===teamId).reactions,[{emoji:'🔥',count:1,mine:true,actors:['owner@example.test']}]);
+ [status,d]=await get('?team=1&channel=all');assert.deepEqual(d.items.find(m=>m.id===teamId).reactions,[{emoji:'🔥',count:1,mine:true,actors:['owner@example.test']}]);
  // Reaction actors: хэд хэдэн хүн ижил emoji-гоор reaction хийхэд бүгд actors жагсаалтад орно (хэн реакц хийснийг харуулах tooltip-д ашиглана).
  user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  assert.equal((await post({action:'react',kind:'team',messageId:teamId,emoji:'🔥'}))[0],200);
- [status,d]=await get('?team=1');const fireReaction=d.items.find(m=>m.id===teamId).reactions.find(r=>r.emoji==='🔥');
+ [status,d]=await get('?team=1&channel=all');const fireReaction=d.items.find(m=>m.id===teamId).reactions.find(r=>r.emoji==='🔥');
  assert.equal(fireReaction.count,2);assert.deepEqual(fireReaction.actors.slice().sort(),['agent@example.test','owner@example.test']);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  assert.equal((await post({action:'react',kind:'team',messageId:'missing',emoji:'🔥'}))[0],404);
  assert.equal((await post({action:'react',kind:'dm',messageId:msgId,emoji:'toolongemoji123'}))[0],400);
- console.log('PASS: DM send/read/thread, reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react.');
+ // Сувгийн эрх: Удирдлага (director) "Бүх ажилчид"-д огт ордоггүй, харин Маркетинг/Борлуулалт хоёуланд нь
+ // хяналтын үүднээс хандана; Маркетинг эрхтэй хүн зөвхөн Маркетинг сувагт, агент зөвхөн Борлуулалт сувагт.
+ assert.equal((await crmPost('member',{email:'director@example.test',name:'Director',role:'director',active:true}))[0],200);
+ assert.equal((await crmPost('member',{email:'marketer@example.test',name:'Marketer',role:'marketing',active:true}))[0],200);
+ user={userId:'d',email:'director@example.test',displayName:'Director'};
+ assert.equal((await post({action:'send_team',channel:'all',body:'x'}))[0],403);
+ assert.equal((await get('?team=1&channel=all'))[0],403);
+ assert.equal((await post({action:'send_team',channel:'marketing',body:'Director in marketing'}))[0],200);
+ assert.equal((await post({action:'send_team',channel:'sales',body:'Director in sales'}))[0],200);
+ user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
+ assert.equal((await post({action:'send_team',channel:'all',body:'ok'}))[0],200);
+ assert.equal((await post({action:'send_team',channel:'marketing',body:'ok'}))[0],200);
+ assert.equal((await post({action:'send_team',channel:'sales',body:'nope'}))[0],403);
+ assert.equal((await get('?team=1&channel=sales'))[0],403);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post({action:'send_team',channel:'sales',body:'ok'}))[0],200);
+ assert.equal((await post({action:'send_team',channel:'marketing',body:'nope'}))[0],403);
+ assert.equal((await post({action:'read_team',channel:'marketing'}))[0],403);
+ // Суваг руу хариулах (reply) зөвхөн тухайн сувагт эрхтэй хүнд л ажиллана.
+ user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
+ [status,d]=await get('?team=1&channel=marketing');const marketingMsgId=d.items[0].id;
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post({action:'send_team',channel:'sales',body:'stolen quote',replyTo:marketingMsgId}))[0],400);
+ // Хураангуй (summary): хүн бүр зөвхөн channelsForRole-оороо тодорхойлогдсон сувгуудын мэдээллийг л авна.
+ user={userId:'d',email:'director@example.test',displayName:'Director'};
+ [status,d]=await get('?summary=1');assert.equal(status,200);
+ assert.deepEqual(d.channels.map(c=>c.channel).sort(),['marketing','sales']);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ [status,d]=await get('?summary=1');assert.deepEqual(d.channels.map(c=>c.channel).sort(),['all','marketing','sales']);
+ console.log('PASS: DM send/read/thread, reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control.');
 })().catch(e=>{console.error(e);process.exit(1)});

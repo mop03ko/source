@@ -6,6 +6,16 @@ export const roles:Record<string,string>={admin:'Админ',director:'Удир�
 export const isAdminLike=(role:string)=>role==='admin'||role==='director';
 // Маркетинг, IT хоёр хоёулаа борлуулалтын хүсэлт (leads)-тэй огт харьцдаггүй, тусад нь модультай эрхүүд.
 export const isIsolatedRole=(role:string)=>role==='marketing'||role==='it';
+export const teamChannels:Record<string,string>={all:'Бүх ажилчид',marketing:'Маркетинг',sales:'Борлуулалт'};
+// Удирдлага (director) "Бүх ажилчид" сувагт огт ордоггүй (зөвхөн тусгай сувгуудаар хяналт тавина);
+// admin/director хоёул Маркетинг, Борлуулалт хоёр сувгийг аль алиныг нь хянах зорилгоор хардаг.
+export function channelsForRole(role:string):string[]{
+ const list:string[]=[];
+ if(role!=='director')list.push('all');
+ if(role==='marketing'||role==='admin'||role==='director')list.push('marketing');
+ if(role==='agent'||role==='manager'||role==='admin'||role==='director')list.push('sales');
+ return list;
+}
 export const marketingStages:Record<string,string>={planned:'Төлөвлөсөн',in_progress:'Хийгдэж байгаа',pending:'Хүлээгдэж буй',paused:'Түр зогссон',done:'Дууссан',cancelled:'Цуцалсан'};
 export const marketingClosed=['done','cancelled'];
 export const marketingChannels=['Meta / гүйцэтгэлд суурилсан сурталчилгаа','Дахин чиглүүлэх сурталчилгаа','Google хайлтын сурталчилгаа','TikTok / Reels богино видео','OOH / DOOH гадна сурталчилгаа','Нөлөөлөгч / контент бүтээгч','Контент үйлдвэрлэл','CRM / зээлийн хүсэлт сэргээх','A/B тест ба өсгөх нөөц','Facebook','Instagram','Вэбсайт','Email','Бусад'];
