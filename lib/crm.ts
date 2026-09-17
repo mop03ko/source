@@ -1,15 +1,25 @@
 export const stages: Record<string,string> = {review:'Мэдээлэл шалгах',new:'Шинэ хүсэлт',contacted:'Холбогдсон',materials:'Материал бүрдүүлж буй',pending:'Шийдвэр хүлээж буй',appointment:'Уулзалт товлосон',unreachable:'Холбогдоогүй',won:'Худалдан авсан',lost:'Татгалзсан',invalid:'Буруу дугаар'};
 export const sources=['Facebook','Instagram','Утас','Вэбсайт','Дэлгүүр','Байгууллага','Бусад'];
-export const roles:Record<string,string>={admin:'Админ',manager:'Удирдлага',agent:'Борлуулалтын ажилтан',marketing:'Маркетинг'};
+export const roles:Record<string,string>={admin:'Админ',director:'Удирдлага',manager:'Ахлах',agent:'Борлуулалтын ажилтан',marketing:'Маркетинг',it:'IT'};
+// "Удирдлага" (director) нь админтай адил эрхтэй (гишүүн удирдах, тайлан, төсөв батлах г.м); зөвхөн жинхэнэ
+// эзэмшигчийн бүртгэлийг хамгаалах логик (owner protection) л 'admin'-ийг өөрөө шаарддаг тул үүнд хамаарахгүй.
+export const isAdminLike=(role:string)=>role==='admin'||role==='director';
+// Маркетинг, IT хоёр хоёулаа борлуулалтын хүсэлт (leads)-тэй огт харьцдаггүй, тусад нь модультай эрхүүд.
+export const isIsolatedRole=(role:string)=>role==='marketing'||role==='it';
 export const marketingStages:Record<string,string>={planned:'Төлөвлөсөн',in_progress:'Хийгдэж байгаа',pending:'Хүлээгдэж буй',paused:'Түр зогссон',done:'Дууссан',cancelled:'Цуцалсан'};
 export const marketingClosed=['done','cancelled'];
 export const marketingChannels=['Meta / гүйцэтгэлд суурилсан сурталчилгаа','Дахин чиглүүлэх сурталчилгаа','Google хайлтын сурталчилгаа','TikTok / Reels богино видео','OOH / DOOH гадна сурталчилгаа','Нөлөөлөгч / контент бүтээгч','Контент үйлдвэрлэл','CRM / зээлийн хүсэлт сэргээх','A/B тест ба өсгөх нөөц','Facebook','Instagram','Вэбсайт','Email','Бусад'];
+export const itStages:Record<string,string>={planned:'Төлөвлөсөн',in_progress:'Хийгдэж байгаа',pending:'Хүлээгдэж буй',paused:'Түр зогссон',done:'Дууссан',cancelled:'Цуцалсан'};
+export const itClosed=['done','cancelled'];
+export const itSystemAreas=['Вэбсайт / Frontend','Backend / Server','Мэдээллийн сан','Мобайл апп','Дотоод систем / CRM','Сүлжээ / Инфраструктур','Аюулгүй байдал','Дэмжлэг / Bug fix','Бусад'];
 export const kinds:Record<string,string>={sheet_update:'Sheet мэдээлэл шинэчлэгдсэн',sheet_import:'Google Sheets импорт',sheet_assignment:'Sheet хуваарилалт шинэчлэгдсэн',connected:'Холбогдсон дуудлага',no_answer:'Дуудлагад хариулаагүй',message:'SMS / Messenger бүртгэх',note:'Тэмдэглэл',update:'Мэдээлэл шинэчилсэн',recycle:'Recycle эхлүүлсэн',optout:'Дахин холбогдохгүй',assign:'Гараар хуваарилсан',delete:'Устгасан'};
 export type Member={email:string;user_id:string|null;name:string;role:string;active:number;last_seen?:string|null;phone?:string|null;avatar?:string|null};
 export type Lead={id:string;name:string;phone:string;registration?:string;registration_manual?:number;product:string;source:string;owner:string;status:string;next_at:string|null;next_action:string;recycle_at:string|null;connected:number;created_at:string;updated_at:string;version:number;blocked?:number;attempts?:number;deleted_at?:string|null};
 export type Activity={id:string;kind:string;note:string;actor:string;created_at:string};
-export type MarketingTask={id:string;title:string;channel:string;budget:number;owner:string;status:string;due_at:string|null;note:string;created_by:string;created_at:string;updated_at:string;version:number};
+export type MarketingTask={id:string;title:string;channel:string;budget:number;owner:string;status:string;due_at:string|null;note:string;created_by:string;created_at:string;updated_at:string;version:number;approved_at:string|null;approved_by:string|null};
 export type MarketingActivity={id:string;task_id:string;note:string;actor:string;created_at:string};
+export type ItTask={id:string;title:string;system_area:string;owner:string;status:string;due_at:string|null;note:string;created_by:string;created_at:string;updated_at:string;version:number};
+export type ItActivity={id:string;task_id:string;note:string;actor:string;created_at:string};
 export const closed=['won','lost','invalid'];
 export function normalizePhone(v:string){let p=v.replace(/[\s()+-]/g,'');if(p.startsWith('976')&&p.length===11)p=p.slice(3);if(!/^\d{8}$/.test(p))throw new Error('Монголын 8 оронтой утасны дугаар оруулна уу.');return p;}
 export function dateLabel(v:string|null){return v?new Intl.DateTimeFormat('mn-MN',{timeZone:'Asia/Ulaanbaatar',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(v)):'Товгүй';}

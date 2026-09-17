@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,ImagePlus,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Switch} from '@/components/ui/switch';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import type {Member} from '@/lib/crm';
+import {useEffect,useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,ImagePlus,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Switch} from '@/components/ui/switch';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';
 type Settings={notification_sound:string;sms_enabled:string};
 type Profile={phone?:string|null;avatar?:string|null};
 // Зурган аватарыг 192x192 квадрат болгож шахна: DB-д base64 маягаар хадгалахад хэт том болохоос сэргийлнэ.
@@ -45,7 +45,7 @@ export default function SettingsPanel({me,initial,onSaved,onProfileSaved}:{me:Me
  <div className="form-grid"><label className="field"><span>Утасны дугаар</span><Input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label></div>
  <div className="row"><Button className="primary" disabled={phoneBusy||phone===(me.phone||'')} onClick={savePhone}>{phoneBusy?<Loader2 className="spin" size={16}/>:<Save size={16}/>}Хадгалах</Button></div>
  </section>
- {me.role==='admin'&&<>
+ {isAdminLike(me.role)&&<>
  <section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
  <div className="sound-options">{Object.entries(soundPresets).map(([k,v])=><label key={k} className={'sound-option'+(sound===k?' active':'')}><input type="radio" name="sound" value={k} checked={sound===k} onChange={()=>setSound(k)}/><Volume2 size={16}/><span>{v}</span><Button type="button" variant="ghost" size="icon" aria-label={v+' сонсох'} disabled={k==='none'} onClick={()=>playNotificationSound(k)}><PlayCircle size={17}/></Button></label>)}</div>
