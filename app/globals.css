@@ -146,6 +146,7 @@ body {
 @media(prefers-reduced-motion:reduce){.spin{animation:none}*{scroll-behavior:auto!important}}
 .sales-tabs{margin-bottom:22px}.sales-tabs [data-slot=tabs-list]{font-size:13px}.sales-tabs button{font-size:13px;padding:0 16px}
 .settings-tabs{margin-bottom:22px}.settings-tabs [data-slot=tabs-list]{font-size:13px}.settings-tabs button{font-size:13px;padding:0 16px}
+.sms-rules-list{display:flex;flex-direction:column;gap:14px;margin:20px 0}.sms-rule-row{border:1px solid #e7e1eb;border-radius:9px;padding:14px 16px}.sms-rule-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.sms-rule-head strong{flex:1;font-size:13px}.sms-rule-row textarea{width:100%;border:1px solid #ded8e5;border-radius:7px;padding:10px;font-size:13px;resize:vertical}.sms-rule-add{border-top:1px solid #eee8f3;padding-top:20px;margin-top:20px}
 .approved-icon{color:#4c9b80;margin-left:6px;vertical-align:middle}.unapproved-icon{color:#c1504f;margin-left:6px;vertical-align:middle}
 .view-toggle{display:flex;gap:6px;margin-left:auto}.view-toggle button{font-size:11px}
 .month-cal{margin-top:2px}.month-cal-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}.month-cal-head strong{font-size:15px;min-width:150px;text-align:center;text-transform:capitalize}.month-cal-loading{font-size:11px;color:#8a739c;margin-left:auto}

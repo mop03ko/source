@@ -120,6 +120,13 @@
       "when": 1789637807894,
       "tag": "0016_high_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1789639543521,
+      "tag": "0017_square_shape",
+      "breakpoints": true
     }
   ]
 }

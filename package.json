@@ -11,7 +11,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
-    "test": "node tests/crm.test.cjs && node tests/it.test.cjs && node tests/marketing.test.cjs && node tests/messages.test.cjs && node tests/sheets.test.cjs && node tests/vercel.test.cjs",
+    "test": "node tests/crm.test.cjs && node tests/it.test.cjs && node tests/marketing.test.cjs && node tests/messages.test.cjs && node tests/sheets.test.cjs && node tests/sms-rules.test.cjs && node tests/vercel.test.cjs",
     "test:production": "node tests/production.mjs"
   },
   "dependencies": {

@@ -216,8 +216,8 @@ export async function GET(req: Request) {
         .slice(0, 120),
       dateFrom = (url.searchParams.get("from") || "").slice(0, 10),
       dateTo = (url.searchParams.get("to") || "").slice(0, 10);
-    let where = "l.deleted_at IS NULL" + s.sql,
-      args: unknown[] = [...s.args];
+    let where = "l.deleted_at IS NULL" + s.sql;
+    const args: unknown[] = [...s.args];
     if (q) {
       where += " AND (l.name LIKE ? OR l.phone LIKE ? OR l.product LIKE ?)";
       args.push(...Array(3).fill("%" + q + "%"));
@@ -323,8 +323,8 @@ export async function GET(req: Request) {
       const t = new Date(rTo + "T23:59:59+08:00");
       if (!Number.isNaN(t.getTime())) reportToIso = t.toISOString();
     }
-    let reportWhere = "l.deleted_at IS NULL" + s.sql,
-      reportArgs: unknown[] = [...s.args];
+    let reportWhere = "l.deleted_at IS NULL" + s.sql;
+    const reportArgs: unknown[] = [...s.args];
     if (reportFromIso) {
       reportWhere += " AND l.created_at>=?";
       reportArgs.push(reportFromIso);
@@ -340,8 +340,8 @@ export async function GET(req: Request) {
         : isIsolatedRole(m.role)
           ? { sql: " AND 1=0", args: [] as unknown[] }
           : { sql: "", args: [] as unknown[] };
-    let activityWhere = "1=1" + actorScope.sql,
-      activityArgs: unknown[] = [...actorScope.args];
+    let activityWhere = "1=1" + actorScope.sql;
+    const activityArgs: unknown[] = [...actorScope.args];
     if (reportFromIso) {
       activityWhere += " AND a.created_at>=?";
       activityArgs.push(reportFromIso);
@@ -350,11 +350,11 @@ export async function GET(req: Request) {
       activityWhere += " AND a.created_at<=?";
       activityArgs.push(reportToIso);
     }
-    // Тайлангийн 3 query (dist/byMember/byActivity) хямд биш тул зөвхөн "Тайлан" таб дээр л ажиллуулна;
-    // бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
-    const isReports = view === "reports";
-    // "Тайлан" табанд өөрийн (rfrom/rto) хугацааны хүрээ байдаг тул статистик картууд үүнийг, бусад
-    // табанд жагсаалтын шүүлтүүрийг (from/to) ашиглана.
+    // Тайлангийн 3 query (dist/byMember/byActivity) хямд биш тул зөвхөн "Тайлан", "Хяналтын самбар" табан дээр
+    // л ажиллуулна; бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
+    const isReports = view === "reports" || view === "dashboard";
+    // "Тайлан", "Хяналтын самбар" табанд өөрийн (rfrom/rto) хугацааны хүрээ байдаг тул статистик картууд
+    // үүнийг, бусад табанд жагсаалтын шүүлтүүрийг (from/to) ашиглана.
     const statsWhere = isReports ? reportWhere : baseWhere,
       statsArgs = isReports ? reportArgs : baseArgs;
     const empty = Promise.resolve({ results: [] as Record<string, unknown>[] });
@@ -613,7 +613,6 @@ export async function POST(req: Request) {
           : [leadSchema.parse(b.data)];
       const seen = new Set<string>();
       const valid: typeof incoming = [];
-      let skipped = 0;
       for (const d of incoming) {
         await validOwner(d.owner, m);
         if (
@@ -632,7 +631,6 @@ export async function POST(req: Request) {
         ) {
           if (b.action === "create")
             throw new Failure("Дахин холбогдохгүй дугаар байна: " + d.phone);
-          skipped++;
           continue;
         }
         if (
@@ -647,7 +645,6 @@ export async function POST(req: Request) {
               "Энэ дугаараар хүсэлт бүртгэгдсэн. Одоо байгаа хүсэлтийг хайж нээнэ үү.",
               409,
             );
-          skipped++;
           continue;
         }
         seen.add(d.phone);
@@ -722,8 +719,8 @@ export async function POST(req: Request) {
         })
         .parse(b.data);
       const statuses = d.status ? [d.status] : candidateStatuses;
-      let bwhere = "deleted_at IS NULL" + s.sql,
-        bargs: unknown[] = [...s.args];
+      let bwhere = "deleted_at IS NULL" + s.sql;
+      const bargs: unknown[] = [...s.args];
       bwhere += ` AND status IN (${statuses.map(() => "?").join(",")}) AND recycle_at IS NULL AND owner!='__sheet_unassigned__' AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone)`;
       bargs.push(...statuses);
       if (d.from && /^\d{4}-\d{2}-\d{2}$/.test(d.from)) {
@@ -1021,12 +1018,17 @@ export async function POST(req: Request) {
         "Хүсэлт шинэчлэгдсэн эсвэл холбоо барих хязгаар үйлчилж байна. Дахин нээнэ үү.",
         409,
       );
-    // Худалдан авалт баталгаажих мөчид (won болох) харилцагч руу баталгаажуулах SMS илгээнэ; админ
-    // Тохиргоо-с энэ функцийг унтраасан бол алгасана. SMS амжилтгүй болсон ч хүсэлтийн шинэчлэлт аль хэдийн
-    // батлагдсан тул алдаа шидэхгүй, зөвхөн түүхэнд тэмдэглэнэ.
-    if (d.status === "won" && l.status !== "won" && (await getSettings()).sms_enabled === "on") {
+    // Төлөв өөрчлөгдөх мөчид тухайн шинэ төлөвт тохирсон, асаалттай автомат SMS дүрэм байвал
+    // харилцагч руу илгээнэ (Тохиргоо > SMS тохиргоо-оос удирдана). SMS амжилтгүй болсон ч
+    // хүсэлтийн шинэчлэлт аль хэдийн батлагдсан тул алдаа шидэхгүй, зөвхөн түүхэнд тэмдэглэнэ.
+    if (d.status !== l.status) {
+      const rule = await db()
+        .prepare("SELECT message FROM sms_rules WHERE status=? AND enabled=1")
+        .bind(d.status)
+        .first<{ message: string }>();
+      if (rule) {
       try {
-        await sendSms(l.phone, "Таны хүсэлт амжилттай баталгаажлаа.");
+        await sendSms(l.phone, rule.message);
         await db()
           .prepare(
             "INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,?,?)",
@@ -1036,7 +1038,7 @@ export async function POST(req: Request) {
             l.id,
             l.phone,
             "note",
-            "Худалдан авалт баталгаажсан тул харилцагч руу баталгаажуулах SMS илгээв.",
+            "Төлөв " + (stages[d.status] || d.status) + " болсон тул харилцагч руу автомат SMS илгээв.",
             "AntMall SMS",
             now,
           )
@@ -1056,6 +1058,7 @@ export async function POST(req: Request) {
             now,
           )
           .run();
+      }
       }
     }
     return Response.json({ ok: true });

@@ -1,7 +1,7 @@
 'use client';
 import AvatarImage from 'next/image';
-import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Switch} from '@/components/ui/switch';import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';
-type Settings={notification_sound:string;sms_enabled:string};
+import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';import SmsRulesPanel from './sms-rules-panel';
+type Settings={notification_sound:string};
 type Profile={phone?:string|null;avatar?:string|null};
 // Зурган аватарыг 192x192 квадрат болгож шахна: DB-д base64 маягаар хадгалахад хэт том болохоос сэргийлнэ.
 function resizeAvatar(file:File):Promise<string>{
@@ -27,19 +27,16 @@ function resizeAvatar(file:File):Promise<string>{
 // DB тал lib/settings.ts-ийн key/value хэлбэрээр өргөтгөгдөнө, схем өөрчлөгдөхгүй.
 export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved}:{me:Member;members:Member[];initial:Settings;onSaved:(v:Settings)=>void;onProfileSaved:(p:Profile)=>void}){
  const [sound,setSound]=useState(initial.notification_sound),[busy,setBusy]=useState(false),[error,setError]=useState(''),dirty=sound!==initial.notification_sound;
- const [smsEnabled,setSmsEnabled]=useState(initial.sms_enabled==='on'),[smsBusy,setSmsBusy]=useState(false);
  const [to,setTo]=useState(''),[message,setMessage]=useState(''),[sendBusy,setSendBusy]=useState(false),[sendError,setSendError]=useState('');
  const [phone,setPhone]=useState(me.phone||''),[phoneBusy,setPhoneBusy]=useState(false),[avatarBusy,setAvatarBusy]=useState(false),[profileError,setProfileError]=useState('');
  const [tab,setTab]=useState('profile');
- const [previous,setPrevious]=useState({sound:initial.notification_sound,sms:initial.sms_enabled,phone:me.phone});
- if(previous.sound!==initial.notification_sound||previous.sms!==initial.sms_enabled||previous.phone!==me.phone){
- setPrevious({sound:initial.notification_sound,sms:initial.sms_enabled,phone:me.phone});
+ const [previous,setPrevious]=useState({sound:initial.notification_sound,phone:me.phone});
+ if(previous.sound!==initial.notification_sound||previous.phone!==me.phone){
+ setPrevious({sound:initial.notification_sound,phone:me.phone});
  if(previous.sound!==initial.notification_sound)setSound(initial.notification_sound);
- if(previous.sms!==initial.sms_enabled)setSmsEnabled(initial.sms_enabled==='on');
  if(previous.phone!==me.phone)setPhone(me.phone||'');
  }
  const save=async()=>{setBusy(true);setError('');try{const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notification_sound:sound})});const d=await r.json() as Settings&{error?:string};if(!r.ok)throw new Error(d.error||'Хадгалж чадсангүй.');onSaved(d);toast.success('Тохиргоо хадгалагдлаа.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
- const toggleSms=async(checked:boolean)=>{setSmsEnabled(checked);setSmsBusy(true);try{const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sms_enabled:checked?'on':'off'})});const d=await r.json() as Settings&{error?:string};if(!r.ok)throw new Error(d.error||'Хадгалж чадсангүй.');onSaved(d);toast.success(checked?'Автомат SMS асаалттай боллоо.':'Автомат SMS унтраалттай боллоо.');}catch(e){setSmsEnabled(!checked);toast.error((e as Error).message);}finally{setSmsBusy(false);}};
  const sendManual=async(e:FormEvent)=>{e.preventDefault();setSendBusy(true);setSendError('');try{const r=await fetch('/api/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,message})});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error||'Илгээж чадсангүй.');toast.success('SMS илгээгдлээ.');setTo('');setMessage('');}catch(e){setSendError((e as Error).message);}finally{setSendBusy(false);}};
  const saveProfile=async(patch:Profile)=>{const r=await fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});const d=await r.json() as Profile&{error?:string};if(!r.ok)throw new Error(d.error||'Хадгалж чадсангүй.');onProfileSaved(d);return d;};
  const savePhone=async()=>{setPhoneBusy(true);setProfileError('');try{await saveProfile({phone});toast.success('Утасны дугаар хадгалагдлаа.');}catch(e){setProfileError((e as Error).message);}finally{setPhoneBusy(false);}};
@@ -60,9 +57,7 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  <div className="row"><Button className="primary" disabled={busy||!dirty} onClick={save}><Save size={16}/>Хадгалах</Button>{dirty&&<Button variant="ghost" onClick={()=>setSound(initial.notification_sound)}>Цуцлах</Button>}</div>
  </section>}
  {tab==='sms'&&admin&&<>
- <section className="panel"><div className="eyebrow">SMS ТОХИРГОО</div><h2>Автомат баталгаажуулах SMS</h2><p className="muted">Хүсэлтийн төлөв &quot;Худалдан авсан&quot; болоход харилцагч руу автоматаар баталгаажуулах SMS илгээх эсэхийг тохируулна.</p>
- <label className="sms-toggle"><Switch checked={smsEnabled} disabled={smsBusy} onCheckedChange={toggleSms}/><span>{smsEnabled?'Асаалттай — Худалдан авсан болоход SMS илгээнэ':'Унтраалттай — SMS илгээхгүй'}</span></label>
- </section>
+ <SmsRulesPanel/>
  <section className="panel"><div className="eyebrow">ГАРААР SMS ИЛГЭЭХ</div><h2>Дурын дугаарт мессеж илгээх</h2><p className="muted">Утасны дугаар, мессежийг гараар оруулж шууд илгээнэ.</p>
  {sendError&&<div role="alert" className="error-box">{sendError}</div>}
  <form className="form-stack" onSubmit={sendManual}><label className="field"><span>Утасны дугаар</span><Input required value={to} onChange={e=>setTo(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label><label className="field"><span>Мессеж</span><textarea required rows={4} maxLength={600} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Илгээх мессежээ бичнэ үү…"/></label><Button className="primary" type="submit" disabled={sendBusy}>{sendBusy?<Loader2 className="spin" size={16}/>:<Send size={16}/>}Илгээх</Button></form>
