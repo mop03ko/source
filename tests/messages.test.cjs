@@ -32,7 +32,7 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  assert.equal((await post({action:'react',kind:'dm',messageId:msgId,emoji:'👍'}))[0],404);
  user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  [status,d]=await post({action:'react',kind:'dm',messageId:msgId,emoji:'👍'});assert.equal(status,200);assert.equal(d.reacted,true);
- [status,d]=await get('?peer=owner@example.test');assert.deepEqual(d.items.find(m=>m.id===msgId).reactions,[{emoji:'👍',count:1,mine:true}]);
+ [status,d]=await get('?peer=owner@example.test');assert.deepEqual(d.items.find(m=>m.id===msgId).reactions,[{emoji:'👍',count:1,mine:true,actors:['agent@example.test']}]);
  [status,d]=await post({action:'react',kind:'dm',messageId:msgId,emoji:'👍'});assert.equal(d.reacted,false);
  [status,d]=await get('?peer=owner@example.test');assert.deepEqual(d.items.find(m=>m.id===msgId).reactions,[]);
  // Багийн суваг: бүх идэвхтэй ажилтан унших, хариулах, reaction нэмэх боломжтой.
@@ -41,7 +41,13 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?team=1');const teamReply=d.items.find(m=>m.body==='reply');assert.equal(teamReply.reply_to_id,teamId);assert.equal(teamReply.reply_to_sender,'agent@example.test');
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  assert.equal((await post({action:'react',kind:'team',messageId:teamId,emoji:'🔥'}))[0],200);
- [status,d]=await get('?team=1');assert.deepEqual(d.items.find(m=>m.id===teamId).reactions,[{emoji:'🔥',count:1,mine:true}]);
+ [status,d]=await get('?team=1');assert.deepEqual(d.items.find(m=>m.id===teamId).reactions,[{emoji:'🔥',count:1,mine:true,actors:['owner@example.test']}]);
+ // Reaction actors: хэд хэдэн хүн ижил emoji-гоор reaction хийхэд бүгд actors жагсаалтад орно (хэн реакц хийснийг харуулах tooltip-д ашиглана).
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post({action:'react',kind:'team',messageId:teamId,emoji:'🔥'}))[0],200);
+ [status,d]=await get('?team=1');const fireReaction=d.items.find(m=>m.id===teamId).reactions.find(r=>r.emoji==='🔥');
+ assert.equal(fireReaction.count,2);assert.deepEqual(fireReaction.actors.slice().sort(),['agent@example.test','owner@example.test']);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  assert.equal((await post({action:'react',kind:'team',messageId:'missing',emoji:'🔥'}))[0],404);
  assert.equal((await post({action:'react',kind:'dm',messageId:msgId,emoji:'toolongemoji123'}))[0],400);
  console.log('PASS: DM send/read/thread, reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react.');

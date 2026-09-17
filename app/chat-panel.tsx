@@ -12,7 +12,7 @@ const ONLINE_MS=90000;
 const EMOJIS=['😀','😁','😂','🤣','😊','🙂','😉','😍','😘','😎','🤔','😅','😢','😭','😡','😱','👍','👎','👏','🙏','💪','🔥','🎉','✅','❌','❤️','💯','🙌','👌','🤝','📌','⏰','📞','💬','😴','🥳','🤗','😐','🙄','🤩'];
 const REACT_EMOJIS=['👍','❤️','😂','😮','😢','🙏'];
 type Conversation={peer:string;body:string;created_at:string;mine:boolean;unread:number};
-type Reaction={emoji:string;count:number;mine:boolean};
+type Reaction={emoji:string;count:number;mine:boolean;actors:string[]};
 type Msg={id:string;sender:string;recipient?:string;body:string;created_at:string;read_at?:string|null;reply_to_id?:string|null;reply_to_sender?:string|null;reply_to_body?:string|null;reactions?:Reaction[]};
 type TeamRead={email:string;last_read_at:string};
 type Summary={dm:number;team:number;total:number;lastTeam:{sender:string;body:string;created_at:string}|null};
@@ -34,6 +34,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const loadConversations=useCallback(async()=>{try{const [c,s]=await Promise.all([request() as Promise<{items:Conversation[]}>,request(undefined,'?summary=1') as Promise<Summary>]);setConversations(c.items);setSummary(s);}catch(e){setError((e as Error).message);}},[]);
  const loadThread=useCallback(async(p:string)=>{try{if(p===TEAM){const d=await request(undefined,'?team=1') as {items:Msg[];reads:TeamRead[]};setThread(d.items);setTeamReads(d.reads);}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};setThread(d.items);}}catch(e){setError((e as Error).message);}},[]);
  const seenCount=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).length;
+ const seenBy=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).map(r=>r.email);
  // Идэвхгүй tab дээр polling зогсоож сервер рүү дэмий хүсэлт явуулахгүй.
  useEffect(()=>{let stopped=false;const run=()=>{if(document.visibilityState==='visible')void loadConversations();};void loadConversations().finally(()=>{if(!stopped)setLoading(false);});const timer=setInterval(run,8000);document.addEventListener('visibilitychange',run);return()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',run);};},[loadConversations]);
  useEffect(()=>{setThread([]);setReplyTarget(null);},[peer]);
@@ -50,8 +51,8 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
    if(m.id!==msg.id)return m;
    const list=m.reactions?[...m.reactions]:[];
    const idx=list.findIndex(r=>r.emoji===emoji);
-   if(idx>=0){const cur=list[idx];if(cur.mine){if(cur.count<=1)list.splice(idx,1);else list[idx]={...cur,count:cur.count-1,mine:false};}else list[idx]={...cur,count:cur.count+1,mine:true};}
-   else list.push({emoji,count:1,mine:true});
+   if(idx>=0){const cur=list[idx];if(cur.mine){if(cur.count<=1)list.splice(idx,1);else list[idx]={...cur,count:cur.count-1,mine:false,actors:cur.actors.filter(a=>a!==me.email)};}else list[idx]={...cur,count:cur.count+1,mine:true,actors:[...cur.actors,me.email]};}
+   else list.push({emoji,count:1,mine:true,actors:[me.email]});
    return {...m,reactions:list};
   }));
   try{await request({action:'react',kind,messageId:msg.id,emoji});}catch(e){setError((e as Error).message);void loadThread(peer);}
@@ -72,11 +73,11 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  {peer===TEAM&&!mine&&<small><span className="chat-avatar chat-avatar-tiny">{avatarOf(msg.sender)?<img src={avatarOf(msg.sender)!} alt=""/>:name(msg.sender).slice(0,1)}</span>{name(msg.sender)}</small>}
  {msg.reply_to_id&&<div className="chat-reply-quote"><strong>{name(msg.reply_to_sender||'')}</strong><span>{snippet(msg.reply_to_body||'')}</span></div>}
  <p>{msg.body}</p>
- {!!msg.reactions?.length&&<div className="chat-reactions">{msg.reactions.map(r=><button type="button" key={r.emoji} className={'reaction-pill'+(r.mine?' mine':'')} onClick={()=>react(msg,r.emoji)}>{r.emoji} {r.count}</button>)}</div>}
+ {!!msg.reactions?.length&&<div className="chat-reactions">{msg.reactions.map(r=><button type="button" key={r.emoji} className={'reaction-pill'+(r.mine?' mine':'')} title={r.actors.length?r.actors.map(name).join(', '):undefined} onClick={()=>react(msg,r.emoji)}>{r.emoji} {r.count}</button>)}</div>}
  <time>{dateLabel(msg.created_at)}</time>
  <div className="bubble-actions"><ReactionPicker onPick={e=>react(msg,e)}/><button type="button" className="bubble-action" aria-label="Хариулах" onClick={()=>setReplyTarget({id:msg.id,sender:msg.sender,body:msg.body})}><Reply size={13}/></button></div>
  {isLast&&mine&&peer!==TEAM&&<small className="seen-tag">{msg.read_at?'Үзсэн':'Илгээсэн'}</small>}
- {peer===TEAM&&peers.length>0&&<small className="seen-tag">{seenCount(msg.created_at)}/{peers.length} үзсэн</small>}
+ {peer===TEAM&&peers.length>0&&<small className="seen-tag" title={seenCount(msg.created_at)?seenBy(msg.created_at).map(name).join(', '):undefined}>{seenCount(msg.created_at)}/{peers.length} үзсэн</small>}
  </div>;})}<div ref={bottomRef}/></div>
  {replyTarget&&<div className="chat-reply-banner"><Reply size={14}/><div><strong>{name(replyTarget.sender)}</strong><span>{snippet(replyTarget.body)}</span></div><button type="button" aria-label="Хариулахыг цуцлах" onClick={()=>setReplyTarget(null)}><X size={14}/></button></div>}
  <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" disabled={busy||!body.trim()}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>

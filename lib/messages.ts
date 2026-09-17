@@ -1,7 +1,7 @@
 import {env} from './runtime';
 const db=()=>env.DB!;
 export const pairKey=(a:string,b:string)=>[a,b].sort().join('|');
-export type Reaction={emoji:string;count:number;mine:boolean};
+export type Reaction={emoji:string;count:number;mine:boolean;actors:string[]};
 export type ReplySnapshot={id:string;sender:string;body:string};
 export type Message={id:string;pair_key:string;sender:string;recipient:string;body:string;created_at:string;read_at:string|null;reply_to_id:string|null;reply_to_sender:string|null;reply_to_body:string|null;reactions:Reaction[]};
 // DM болон багийн мессеж хоёуланд нь ашиглагдана; message_id-уудыг багцаар нэг query-ээр татаж
@@ -9,9 +9,10 @@ export type Message={id:string;pair_key:string;sender:string;recipient:string;bo
 async function attachReactions<T extends {id:string}>(kind:'dm'|'team',rows:T[],viewer:string):Promise<(T&{reactions:Reaction[]})[]>{
  if(!rows.length)return [];
  const ids=rows.map(r=>r.id);
- const r=await db().prepare(`SELECT message_id,emoji,COUNT(*) count,COALESCE(SUM(actor=?),0) mine FROM message_reactions WHERE message_kind=? AND message_id IN (${ids.map(()=>'?').join(',')}) GROUP BY message_id,emoji`).bind(viewer,kind,...ids).all<{message_id:string;emoji:string;count:number;mine:number}>();
+ // group_concat-аар тухайн (мессеж,emoji) хосын reaction хийсэн бүх хүний имэйлийг нэг мөрөнд авчирна (хэн гэдгийг харуулах tooltip-д ашиглана).
+ const r=await db().prepare(`SELECT message_id,emoji,COUNT(*) count,COALESCE(SUM(actor=?),0) mine,group_concat(actor) actors FROM message_reactions WHERE message_kind=? AND message_id IN (${ids.map(()=>'?').join(',')}) GROUP BY message_id,emoji`).bind(viewer,kind,...ids).all<{message_id:string;emoji:string;count:number;mine:number;actors:string}>();
  const map=new Map<string,Reaction[]>();
- for(const row of r.results){const list=map.get(row.message_id)||[];list.push({emoji:row.emoji,count:row.count,mine:!!row.mine});map.set(row.message_id,list);}
+ for(const row of r.results){const list=map.get(row.message_id)||[];list.push({emoji:row.emoji,count:row.count,mine:!!row.mine,actors:row.actors?row.actors.split(','):[]});map.set(row.message_id,list);}
  return rows.map(row=>({...row,reactions:map.get(row.id)||[]}));
 }
 // Reply болон reaction хоёулаа зөвхөн жинхэнэ оршдог, харах эрхтэй мессеж рүү л заана; клиентээс
