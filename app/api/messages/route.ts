@@ -7,6 +7,9 @@ export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'Мессежийн хүсэлт буруу.':(e as Error).message},{status:(e as {status?:number}).status||400});
 const channelSchema=z.enum(Object.keys(teamChannels) as [string,...string[]]);
+// base64-руу хөрвүүлэхэд эх файлын хэмжээ ойролцоогоор 4/3 дахин нэмэгддэг тул 5MB-ийн decode-той тааруулав.
+const MAX_IMAGE_B64=Math.ceil(5*1024*1024/3)*4+64;
+const imageSchema=z.string().refine(v=>/^data:image\/(png|jpeg|webp|gif);base64,/.test(v),'Зөвхөн PNG/JPEG/WEBP/GIF зураг оруулна уу.').refine(v=>v.length<=MAX_IMAGE_B64,'Зургийн хэмжээ 5MB-аас бага байна.');
 export async function GET(req:Request){try{
  const m=await member(),url=new URL(req.url),myChannels=channelsForRole(m.role);
  if(url.searchParams.get('summary')==='1'){
@@ -29,20 +32,22 @@ export async function GET(req:Request){try{
 }catch(e){return respondError(e);}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)return Response.json({error:'Зөвшөөрөгдөхгүй хүсэлт.'},{status:403});
- const m=await member();const text=await req.text();if(text.length>10000)return Response.json({error:'Хүсэлт хэт том.'},{status:413});
+ if(Number(req.headers.get('content-length')||0)>MAX_IMAGE_B64+10000)return Response.json({error:'Файл хэт том.'},{status:413});
+ const m=await member();const text=await req.text();if(text.length>MAX_IMAGE_B64+10000)return Response.json({error:'Хүсэлт хэт том.'},{status:413});
  const b=z.discriminatedUnion('action',[
-  z.object({action:z.literal('send'),peer:z.string().email(),body:z.string().trim().min(1).max(2000),replyTo:z.string().max(80).optional()}),
+  z.object({action:z.literal('send'),peer:z.string().email(),body:z.string().trim().max(2000).default(''),image:imageSchema.optional(),replyTo:z.string().max(80).optional()}),
   z.object({action:z.literal('read'),peer:z.string().email()}),
-  z.object({action:z.literal('send_team'),channel:channelSchema,body:z.string().trim().min(1).max(2000),replyTo:z.string().max(80).optional()}),
+  z.object({action:z.literal('send_team'),channel:channelSchema,body:z.string().trim().max(2000).default(''),image:imageSchema.optional(),replyTo:z.string().max(80).optional()}),
   z.object({action:z.literal('read_team'),channel:channelSchema}),
   z.object({action:z.literal('react'),kind:z.enum(['dm','team']),messageId:z.string().max(80),emoji:z.string().trim().min(1).max(8)}),
  ]).parse(JSON.parse(text));
+ if((b.action==='send'||b.action==='send_team')&&!b.body.trim()&&!b.image)throw new Failure('Мессеж эсвэл зураг оруулна уу.');
  const myChannels=channelsForRole(m.role);
  if(b.action==='send_team'){
   if(!myChannels.includes(b.channel))throw new Failure('Энэ сувагт бичих эрхгүй.',403);
   let replyTo=null;
   if(b.replyTo){replyTo=await messageSnapshot('team',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
-  const r=await sendTeam(m.email,b.channel,b.body,replyTo);return Response.json({ok:true,...r});
+  const r=await sendTeam(m.email,b.channel,b.body,replyTo,b.image);return Response.json({ok:true,...r});
  }
  if(b.action==='read_team'){
   if(!myChannels.includes(b.channel))throw new Failure('Энэ сувагт хандах эрхгүй.',403);
@@ -60,7 +65,7 @@ export async function POST(req:Request){try{
  if(b.action==='send'){
   let replyTo=null;
   if(b.replyTo){replyTo=await messageSnapshot('dm',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
-  const r=await send(m.email,peer,b.body,replyTo);return Response.json({ok:true,...r});
+  const r=await send(m.email,peer,b.body,replyTo,b.image);return Response.json({ok:true,...r});
  }
  await markRead(m.email,peer);return Response.json({ok:true});
 }catch(e){return respondError(e);}}

@@ -21,6 +21,12 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?peer=owner@example.test');assert.equal(status,200);assert.equal(d.items.length,1);assert.equal(d.items[0].read_at,null);
  assert.equal((await post({action:'read',peer:'owner@example.test'}))[0],200);
  [status,d]=await get('?peer=owner@example.test');assert.ok(d.items[0].read_at);
+ // Зураг илгээх: 5MB хүртэл, зөвшөөрөгдсөн MIME төрлийн base64 dataURL зөвшөөрнө; текстгүй (зурагтай ганцаараа) ч болно.
+ const tinyPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+ [status,d]=await post({action:'send',peer:'owner@example.test',image:tinyPng});assert.equal(status,200);const imgMsgId=d.id;
+ [status,d]=await get('?peer=owner@example.test');const imgMsg=d.items.find(m=>m.id===imgMsgId);assert.equal(imgMsg.image,tinyPng);assert.equal(imgMsg.body,'');
+ assert.equal((await post({action:'send',peer:'owner@example.test',image:'data:text/plain;base64,aGk='}))[0],400); // зурагны бус MIME
+ assert.equal((await post({action:'send',peer:'owner@example.test',image:'data:image/png;base64,'+'A'.repeat(7000000)}))[0],400); // 5MB-аас том
  // Reply: зөвхөн харилцан ярианы жинхэнэ оролцогч мессежийг эх сурвалж болгож чадна; сервэр өөрөө snapshot-ыг уншина.
  [status,d]=await post({action:'send',peer:'owner@example.test',body:'Тийм ээ',replyTo:msgId});assert.equal(status,200);
  [status,d]=await get('?peer=owner@example.test');const replied=d.items.find(m=>m.body==='Тийм ээ');
@@ -79,5 +85,5 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  assert.deepEqual(d.channels.map(c=>c.channel).sort(),['marketing','sales']);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  [status,d]=await get('?summary=1');assert.deepEqual(d.channels.map(c=>c.channel).sort(),['all','marketing','sales']);
- console.log('PASS: DM send/read/thread, reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control.');
+ console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control.');
 })().catch(e=>{console.error(e);process.exit(1)});
