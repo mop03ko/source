@@ -14,10 +14,14 @@ import { getSettings } from "@/lib/settings";
 import { sendSms } from "@/lib/sms";
 export const dynamic = "force-dynamic";
 const db = () => env.DB!;
+// Маркетингийн эрхтэй ажилтан борлуулалтын хүсэлт (leads)-тэй огт харьцахгүй тул уншихад ч
+// хэзээ ч мөр таарахгүй болгож хааж, зөвхөн энэ endpoint-ийн жинхэнэ shell мэдээлэл (me/directory г.м) л дамжина.
 const scope = (m: Member) =>
   m.role === "agent"
     ? { sql: " AND l.owner=?", args: [m.email] }
-    : { sql: "", args: [] as string[] };
+    : m.role === "marketing"
+      ? { sql: " AND 1=0", args: [] as string[] }
+      : { sql: "", args: [] as string[] };
 // Recycle хөтөлбөрийн гарын авлагын 4 бүлэг (Уулзалт товлосон/Материал/Шийдвэр хүлээж буй/Холбогдоогүй);
 // GET (candidates таб) болон POST (bulk_recycle) хоёулаа ашигладаг тул модулийн түвшинд байна.
 const candidateStatuses = [
@@ -109,12 +113,13 @@ function err(e: unknown) {
 async function validOwner(email: string, m: Member) {
   if (m.role === "agent" && email !== m.email)
     throw new Failure("Зөвхөн өөртөө хүсэлт хуваарилна.", 403);
-  if (
-    !(await db()
-      .prepare("SELECT email FROM members WHERE email=? AND active=1")
-      .bind(email)
-      .first())
-  )
+  // Маркетингийн эрхтэй ажилтан борлуулалтын хүсэлт (/api/crm) уншиж чадахгүй тул түүнд хүсэлт
+  // хуваарилбал хариуцагч хэзээ ч хандаж чадахгүй "гацсан" хүсэлт болно.
+  const target = await db()
+    .prepare("SELECT role FROM members WHERE email=? AND active=1")
+    .bind(email)
+    .first<{ role: string }>();
+  if (!target || target.role === "marketing")
     throw new Failure("Идэвхтэй хариуцагч сонгоно уу.");
 }
 export async function GET(req: Request) {
@@ -146,7 +151,7 @@ export async function GET(req: Request) {
     // Ижил утасны дугаартай хэд хэдэн lead-тэй бүлгүүдийг (голчлон хуучин Sheet синкийн улмаас) харуулна;
     // энд юуг ч өөрчлөхгүй, зөвхөн удирдлага/админд харагдуулж гараар нэгтгэх шийдвэр гаргахад нь тусална.
     if (view === "duplicates") {
-      if (m.role === "agent")
+      if (m.role === "agent" || m.role === "marketing")
         throw new Failure("Зөвхөн удирдлага, админ харна.", 403);
       const dpage = Math.max(
         1,
@@ -291,7 +296,9 @@ export async function GET(req: Request) {
     const actorScope =
       m.role === "agent"
         ? { sql: " AND a.actor=?", args: [m.email] as unknown[] }
-        : { sql: "", args: [] as unknown[] };
+        : m.role === "marketing"
+          ? { sql: " AND 1=0", args: [] as unknown[] }
+          : { sql: "", args: [] as unknown[] };
     let activityWhere = "1=1" + actorScope.sql,
       activityArgs: unknown[] = [...actorScope.args];
     if (reportFromIso) {
@@ -516,6 +523,10 @@ export async function POST(req: Request) {
       throw new Failure("Файл хэт том.", 413);
     const m = await member(),
       raw = await req.text();
+    // Маркетингийн эрхтэй ажилтан борлуулалтын хүсэлтэд бичих боломжгүй; тэдэнд зориулсан
+    // ажлын жагсаалт бүрэн тусдаа /api/marketing endpoint-д байрладаг.
+    if (m.role === "marketing")
+      throw new Failure("Маркетингийн эрхээр хандах боломжгүй.", 403);
     if (raw.length > 200000) throw new Failure("Мэдээлэл хэт их.", 413);
     const b = bodySchema.parse(JSON.parse(raw)),
       now = new Date().toISOString();
@@ -529,7 +540,7 @@ export async function POST(req: Request) {
             .email()
             .transform((v) => v.toLowerCase()),
           name: z.string().trim().min(1).max(100),
-          role: z.enum(["admin", "manager", "agent"]),
+          role: z.enum(["admin", "manager", "agent", "marketing"]),
           active: z.boolean(),
         })
         .parse(b.data);
