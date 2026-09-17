@@ -11,7 +11,10 @@ async function withRetry<T>(fn:()=>Promise<T>,attempts=2):Promise<T>{
  throw lastErr;
 }
 export const {handlers,auth,signIn,signOut}=NextAuth({
- providers:[Google],
+ // Auth.js/Vercel-ийн сангийн танигдсан алдаа (InvalidCheck: pkceCodeVerifier could not be parsed) заримдаа
+ // эхний нэвтрэх оролдлогыг санамсаргүй унагаадаг тул PKCE шалгалтыг унтраасан; state (CSRF хамгаалалт) хэвээр
+ // үлдэнэ. signIn callback дахь урьдчилан бүртгэсэн ажилтны и-мэйлийн шалгалт нэмэлт хамгаалалт өгнө.
+ providers:[Google({checks:['state']})],
  session:{strategy:'jwt',maxAge:8*60*60},
  pages:{signIn:'/login',error:'/login'},
  callbacks:{
