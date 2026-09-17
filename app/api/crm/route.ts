@@ -47,6 +47,7 @@ const bodySchema = z.object({
     "member",
     "import",
     "bulk_recycle",
+    "assign",
   ]),
   id: z.string().max(80).optional(),
   version: z.number().int().positive().optional(),
@@ -332,7 +333,7 @@ export async function GET(req: Request) {
         .first(),
       db()
         .prepare(
-          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won FROM leads l WHERE 1=1 ${s.sql}`,
+          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won,COALESCE(SUM(owner='__sheet_unassigned__'),0) unassigned FROM leads l WHERE 1=1 ${s.sql}`,
         )
         .bind(
           new Date().toISOString(),
@@ -854,6 +855,18 @@ export async function POST(req: Request) {
         .parse(b.data).note;
       d.next_at = null;
       d.next_action = "Дахин холбогдохгүй";
+    }
+    if (b.action === "assign") {
+      if (l.owner !== "__sheet_unassigned__")
+        throw new Failure("Энэ хүсэлт аль хэдийн хариуцагчтай байна.");
+      const v = z.object({ owner: z.string().email() }).parse(b.data);
+      await validOwner(v.owner, m);
+      d.owner = v.owner;
+      note = "Гараар хуваарилав.";
+      if (!closed.includes(d.status) && d.status !== "review") {
+        d.next_at = now;
+        d.next_action = "Хуваарилагдсан • Эхний дуудлага";
+      }
     }
     if (l.blocked) {
       d.next_at = null;
