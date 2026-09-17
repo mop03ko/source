@@ -91,5 +91,15 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal((await get())[1].stats.total,totalBefore);
  assert.equal((await get())[1].leads.some(l=>l.id===deletedId),false);
  assert.equal((await post('delete',{note:'Again'},deletedId,2))[0],404);
- console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
+ // Календарь горим: сонгосон сард next_at тохирох хөнгөн мөрүүдийг буцаана, буруу сарын формат татгалзана.
+ const [, calCreate]=await post('create',leadData('33112233'));
+ const nowUB=new Date(Date.now()+8*3600000),thisMonth=nowUB.toISOString().slice(0,7);
+ const nextMonthDate=new Date(Date.UTC(nowUB.getUTCFullYear(),nowUB.getUTCMonth()+1,1));
+ const nextMonth=nextMonthDate.getUTCFullYear()+'-'+String(nextMonthDate.getUTCMonth()+1).padStart(2,'0');
+ let [calStatus,calData]=await get('?view=all&calendar=1&month='+thisMonth);
+ assert.equal(calStatus,200);assert.ok(calData.items.some(i=>i.id===calCreate.id));
+ [calStatus,calData]=await get('?view=all&calendar=1&month='+nextMonth);
+ assert.equal(calStatus,200);assert.equal(calData.items.some(i=>i.id===calCreate.id),false);
+ assert.equal((await get('?view=all&calendar=1&month=bad'))[0],400);
+ console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -46,6 +46,17 @@ export async function GET(req:Request){try{
  if(q){where+=' AND title LIKE ?';args.push('%'+q+'%');}
  if(status&&Object.hasOwn(marketingStages,status)){where+=' AND status=?';args.push(status);}
  if(owner){where+=' AND owner=?';args.push(owner);}
+ // Календарь горим: тухайн шүүлтүүрээр хязгаарлаад, зөвхөн сонгосон сард due_at тохирох хөнгөн мөрүүдийг буцаана.
+ if(url.searchParams.get('calendar')==='1'){
+  const monthParam=(url.searchParams.get('month')||'').slice(0,7);
+  if(!/^\d{4}-\d{2}$/.test(monthParam))throw new Failure('Сар буруу.');
+  const [my,mm]=monthParam.split('-').map(Number);
+  const nextMonth=mm===12?`${my+1}-01`:`${my}-${String(mm+1).padStart(2,'0')}`;
+  const monthStartIso=new Date(monthParam+'-01T00:00:00+08:00').toISOString();
+  const monthEndIso=new Date(nextMonth+'-01T00:00:00+08:00').toISOString();
+  const cal=await db().prepare(`SELECT id,title,due_at,status FROM marketing_tasks WHERE ${where} AND due_at>=? AND due_at<? ORDER BY due_at ASC LIMIT 500`).bind(...args,monthStartIso,monthEndIso).all();
+  return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
+ }
  const [rows,count,stats]=await Promise.all([
   db().prepare(`SELECT * FROM marketing_tasks WHERE ${where} ORDER BY (due_at IS NULL),due_at ASC,created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
   db().prepare(`SELECT COUNT(*) count FROM marketing_tasks WHERE ${where}`).bind(...args).first<{count:number}>(),

@@ -41,5 +41,15 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  [status]=await mPost('activity',{note:'Кампанит ажил дууслаа, 500 click'},id,d.task.version);assert.equal(status,200);
  [status,d]=await mGet('?id='+id);assert.equal(d.activities.length,3);assert.equal(d.activities[0].note,'Кампанит ажил дууслаа, 500 click');
  assert.equal((await mPost('create',taskData({owner:'nobody@example.test'})))[0],400);
- console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking and activity logging.');
+ // Календарь горим: сонгосон сард due_at тохирох мөрүүдийг буцаана, буруу сарын формат татгалзана.
+ const [, calCreate]=await mPost('create',taskData({title:'Календарийн туршилт'}));
+ const dueUB=new Date(Date.now()+86400000+8*3600000),thisMonth=dueUB.toISOString().slice(0,7);
+ const nextMonthDate=new Date(Date.UTC(dueUB.getUTCFullYear(),dueUB.getUTCMonth()+1,1));
+ const nextMonth=nextMonthDate.getUTCFullYear()+'-'+String(nextMonthDate.getUTCMonth()+1).padStart(2,'0');
+ let [calStatus,calData]=await mGet('?calendar=1&month='+thisMonth);
+ assert.equal(calStatus,200);assert.ok(calData.items.some(i=>i.id===calCreate.id));
+ [calStatus,calData]=await mGet('?calendar=1&month='+nextMonth);
+ assert.equal(calStatus,200);assert.equal(calData.items.some(i=>i.id===calCreate.id),false);
+ assert.equal((await mGet('?calendar=1&month=bad'))[0],400);
+ console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging and calendar filtering.');
 })().catch(e=>{console.error(e);process.exit(1)});

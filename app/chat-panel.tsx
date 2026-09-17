@@ -76,7 +76,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  <time>{dateLabel(msg.created_at)}</time>
  <div className="bubble-actions"><ReactionPicker onPick={e=>react(msg,e)}/><button type="button" className="bubble-action" aria-label="Хариулах" onClick={()=>setReplyTarget({id:msg.id,sender:msg.sender,body:msg.body})}><Reply size={13}/></button></div>
  {isLast&&mine&&peer!==TEAM&&<small className="seen-tag">{msg.read_at?'Үзсэн':'Илгээсэн'}</small>}
- {mine&&peer===TEAM&&peers.length>0&&<small className="seen-tag">{seenCount(msg.created_at)}/{peers.length} үзсэн</small>}
+ {peer===TEAM&&peers.length>0&&<small className="seen-tag">{seenCount(msg.created_at)}/{peers.length} үзсэн</small>}
  </div>;})}<div ref={bottomRef}/></div>
  {replyTarget&&<div className="chat-reply-banner"><Reply size={14}/><div><strong>{name(replyTarget.sender)}</strong><span>{snippet(replyTarget.body)}</span></div><button type="button" aria-label="Хариулахыг цуцлах" onClick={()=>setReplyTarget(null)}><X size={14}/></button></div>}
  <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" disabled={busy||!body.trim()}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>

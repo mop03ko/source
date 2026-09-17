@@ -266,6 +266,34 @@ export async function GET(req: Request) {
       args.push(...candidateStatuses);
     }
     const isCandidates = view === "candidates";
+    // Календарь горим: тухайн таб (all/candidates/recycle г.м)-ийн хэрэглээтэй ижил шүүлтүүрээр
+    // (эрх, хайлт, төлөв, хариуцагч) хязгаарлаад, зөвхөн сонгосон сард next_at тохирох хөнгөн мөрүүдийг буцаана.
+    if (url.searchParams.get("calendar") === "1") {
+      const monthParam = (url.searchParams.get("month") || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(monthParam))
+        throw new Failure("Сар буруу.");
+      const [my, mm] = monthParam.split("-").map(Number);
+      const nextMonth =
+        mm === 12 ? `${my + 1}-01` : `${my}-${String(mm + 1).padStart(2, "0")}`;
+      const monthStartIso = new Date(
+        monthParam + "-01T00:00:00+08:00",
+      ).toISOString();
+      const monthEndIso = new Date(
+        nextMonth + "-01T00:00:00+08:00",
+      ).toISOString();
+      const calWhere = where + " AND l.next_at>=? AND l.next_at<?";
+      const calArgs = [...args, monthStartIso, monthEndIso];
+      const cal = await db()
+        .prepare(
+          `SELECT id,name,next_at,status FROM leads l WHERE ${calWhere} ORDER BY l.next_at ASC LIMIT 500`,
+        )
+        .bind(...calArgs)
+        .all();
+      return Response.json(
+        { items: cal.results },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     // "Бүх хүсэлт" таб шинэ хүсэлтийг эхэнд харуулна; ажлын дараалалтай (today/recycle) табууд тов-оор эрэмбэлнэ.
     const order =
       view === "all"
