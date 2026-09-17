@@ -74,5 +74,22 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  detail=(await get('?id='+notificationLead))[1];assert.equal((await post('optout',{note:'Stop'},notificationLead,detail.lead.version))[0],200);
  assert.equal((await notifications.listNotices(user.email)).items.length,0);assert.equal((await notice('claim'))[1].items.length,0);
  user=null;assert.equal((await notice('refresh'))[0],401);user={userId:'stranger',email:'stranger@example.test',displayName:'Stranger'};assert.equal((await notice('refresh'))[0],403);user=ownerUser;
- console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
+ // Зөвхөн админ хүсэлт устгана; устгасны дараа хэн ч (админ ч) дахин олж хардаггүй, статистикт орохгүй.
+ const totalBefore=(await get())[1].stats.total;
+ const [, deletedCreate]=await post('create',leadData('55112233'));const deletedId=deletedCreate.id;
+ assert.equal((await get())[1].stats.total,totalBefore+1);
+ user={userId:'agent',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post('delete',{note:'Turul'},deletedId,1))[0],404);
+ const [, ownLeadCreate]=await post('create',leadData('44112233','agent@example.test'));
+ assert.equal((await post('delete',{note:'Not admin'},ownLeadCreate.id,1))[0],403);
+ user=ownerUser;
+ assert.equal((await post('delete',{note:'cleanup'},ownLeadCreate.id,1))[0],200);
+ assert.equal((await post('delete',{note:''},deletedId,1))[0],400);
+ assert.equal((await post('delete',{note:'Test lead'},deletedId,999))[0],409);
+ assert.equal((await post('delete',{note:'Test lead, remove'},deletedId,1))[0],200);
+ assert.equal((await get('?id='+deletedId))[0],404);
+ assert.equal((await get())[1].stats.total,totalBefore);
+ assert.equal((await get())[1].leads.some(l=>l.id===deletedId),false);
+ assert.equal((await post('delete',{note:'Again'},deletedId,2))[0],404);
+ console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
 })().catch(e=>{console.error(e);process.exit(1)});

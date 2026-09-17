@@ -1,0 +1,1 @@
+ALTER TABLE `leads` ADD `deleted_at` text;

@@ -32,9 +32,10 @@ const candidateStatuses = [
 ];
 async function getLead(id: string, m: Member) {
   const s = scope(m);
+  // Устгасан хүсэлт бүрмөсөн харагдахгүй болно; админ ч дахин нээж, засаж чадахгүй.
   const l = await db()
     .prepare(
-      `SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked,(SELECT COUNT(*) FROM activities WHERE phone=l.phone AND kind='no_answer' AND created_at>=?) attempts FROM leads l WHERE l.id=? ${s.sql}`,
+      `SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked,(SELECT COUNT(*) FROM activities WHERE phone=l.phone AND kind='no_answer' AND created_at>=?) attempts FROM leads l WHERE l.id=? AND l.deleted_at IS NULL ${s.sql}`,
     )
     .bind(new Date(Date.now() - 14 * 86400000).toISOString(), id, ...s.args)
     .first<Lead>();
@@ -52,6 +53,7 @@ const bodySchema = z.object({
     "import",
     "bulk_recycle",
     "assign",
+    "delete",
   ]),
   id: z.string().max(80).optional(),
   version: z.number().int().positive().optional(),
@@ -159,12 +161,12 @@ export async function GET(req: Request) {
       );
       const groupCount = await db()
         .prepare(
-          "SELECT COUNT(*) n FROM (SELECT phone FROM leads GROUP BY phone HAVING COUNT(*)>1)",
+          "SELECT COUNT(*) n FROM (SELECT phone FROM leads WHERE deleted_at IS NULL GROUP BY phone HAVING COUNT(*)>1)",
         )
         .first<{ n: number }>();
       const phones = await db()
         .prepare(
-          "SELECT phone,COUNT(*) n FROM leads GROUP BY phone HAVING COUNT(*)>1 ORDER BY n DESC,phone LIMIT 20 OFFSET ?",
+          "SELECT phone,COUNT(*) n FROM leads WHERE deleted_at IS NULL GROUP BY phone HAVING COUNT(*)>1 ORDER BY n DESC,phone LIMIT 20 OFFSET ?",
         )
         .bind((dpage - 1) * 20)
         .all<{ phone: string; n: number }>();
@@ -172,7 +174,7 @@ export async function GET(req: Request) {
       const leadRows = phoneList.length
         ? await db()
             .prepare(
-              `SELECT id,name,phone,owner,status,created_at,source FROM leads WHERE phone IN (${phoneList.map(() => "?").join(",")}) ORDER BY phone,created_at`,
+              `SELECT id,name,phone,owner,status,created_at,source FROM leads WHERE deleted_at IS NULL AND phone IN (${phoneList.map(() => "?").join(",")}) ORDER BY phone,created_at`,
             )
             .bind(...phoneList)
             .all<{
@@ -211,7 +213,7 @@ export async function GET(req: Request) {
         .slice(0, 120),
       dateFrom = (url.searchParams.get("from") || "").slice(0, 10),
       dateTo = (url.searchParams.get("to") || "").slice(0, 10);
-    let where = "1=1" + s.sql,
+    let where = "l.deleted_at IS NULL" + s.sql,
       args: unknown[] = [...s.args];
     if (q) {
       where += " AND (l.name LIKE ? OR l.phone LIKE ? OR l.product LIKE ?)";
@@ -282,7 +284,7 @@ export async function GET(req: Request) {
       const t = new Date(rTo + "T23:59:59+08:00");
       if (!Number.isNaN(t.getTime())) reportToIso = t.toISOString();
     }
-    let reportWhere = "1=1" + s.sql,
+    let reportWhere = "l.deleted_at IS NULL" + s.sql,
       reportArgs: unknown[] = [...s.args];
     if (reportFromIso) {
       reportWhere += " AND l.created_at>=?";
@@ -340,7 +342,7 @@ export async function GET(req: Request) {
         .first(),
       db()
         .prepare(
-          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won,COALESCE(SUM(owner='__sheet_unassigned__'),0) unassigned FROM leads l WHERE 1=1 ${s.sql}`,
+          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won,COALESCE(SUM(owner='__sheet_unassigned__'),0) unassigned FROM leads l WHERE l.deleted_at IS NULL ${s.sql}`,
         )
         .bind(
           new Date().toISOString(),
@@ -394,7 +396,7 @@ export async function GET(req: Request) {
       isCandidates
         ? db()
             .prepare(
-              `SELECT status,COUNT(*) count FROM leads l WHERE 1=1${s.sql}${candidateCond} GROUP BY status`,
+              `SELECT status,COUNT(*) count FROM leads l WHERE l.deleted_at IS NULL${s.sql}${candidateCond} GROUP BY status`,
             )
             .bind(...s.args, ...candidateStatuses)
             .all()
@@ -677,7 +679,7 @@ export async function POST(req: Request) {
         })
         .parse(b.data);
       const statuses = d.status ? [d.status] : candidateStatuses;
-      let bwhere = "1=1" + s.sql,
+      let bwhere = "deleted_at IS NULL" + s.sql,
         bargs: unknown[] = [...s.args];
       bwhere += ` AND status IN (${statuses.map(() => "?").join(",")}) AND recycle_at IS NULL AND owner!='__sheet_unassigned__' AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone)`;
       bargs.push(...statuses);
@@ -879,6 +881,17 @@ export async function POST(req: Request) {
         d.next_action = "Хуваарилагдсан • Эхний дуудлага";
       }
     }
+    if (b.action === "delete") {
+      if (m.role !== "admin")
+        throw new Failure("Зөвхөн админ хүсэлт устгана.", 403);
+      kind = "delete";
+      note = z
+        .object({ note: z.string().trim().min(1).max(500) })
+        .parse(b.data).note;
+      d.deleted_at = now;
+      d.next_at = null;
+      d.next_action = "Устгасан";
+    }
     if (l.blocked) {
       d.next_at = null;
       d.next_action = "Дахин холбогдохгүй";
@@ -920,7 +933,7 @@ export async function POST(req: Request) {
     const batch = [
       db()
         .prepare(
-          `UPDATE leads SET registration=?,registration_manual=?,name=?,product=?,source=?,owner=?,status=?,next_at=?,next_action=?,recycle_at=?,connected=?,updated_at=?,version=version+1,op=? WHERE id=? AND version=? ${checks}`,
+          `UPDATE leads SET registration=?,registration_manual=?,name=?,product=?,source=?,owner=?,status=?,next_at=?,next_action=?,recycle_at=?,connected=?,updated_at=?,version=version+1,op=?,deleted_at=? WHERE id=? AND version=? ${checks}`,
         )
         .bind(
           d.registration || "",
@@ -936,6 +949,7 @@ export async function POST(req: Request) {
           d.connected,
           now,
           op,
+          d.deleted_at || null,
           l.id,
           b.version,
           ...(kind === "no_answer"
