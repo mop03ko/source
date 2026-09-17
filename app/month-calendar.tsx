@@ -1,7 +1,7 @@
 'use client';
 import {ChevronLeft,ChevronRight} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-export type CalEvent={id:string;date:string;label:string;className?:string};
+export type CalEvent={id:string;date:string;label:string;className?:string;dayCount?:number};
 const WEEKDAYS=['Да','Мя','Лх','Пү','Ба','Бя','Ня'];
 // Тухайн сарын нүднүүдийг (өмнөх/дараагийн сарын хоосон зайг оруулаад) Даваагаар эхлүүлж угсарна.
 function monthGrid(month:string){
@@ -30,7 +30,7 @@ export default function MonthCalendar({month,onMonthChange,events,onOpen,todayDa
  {cells.map((date,i)=><div key={i} className={'month-cal-day'+(!date?' empty':'')+(date===todayDate?' today':'')}>
  {date&&<><span className="month-cal-daynum">{Number(date.slice(8,10))}</span>
  <div className="month-cal-events">{(byDay.get(date)||[]).slice(0,3).map(e=><button type="button" key={e.id} className={'month-cal-event '+(e.className||'')} onClick={()=>onOpen(e.id)} title={e.label}>{e.label}</button>)}
- {(byDay.get(date)?.length||0)>3&&<span className="month-cal-more">+{(byDay.get(date)!.length)-3} илүү</span>}</div></>}
+ {(()=>{const list=byDay.get(date);if(!list?.length)return null;const total=list[0].dayCount??list.length;return total>3?<span className="month-cal-more">+{total-3} илүү</span>:null;})()}</div></>}
  </div>)}
  </div>
  {!events.length&&!loading&&<p className="muted chat-empty-list">Энэ сард тов бүхий ажил алга.</p>}

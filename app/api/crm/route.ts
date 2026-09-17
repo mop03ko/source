@@ -283,9 +283,12 @@ export async function GET(req: Request) {
       ).toISOString();
       const calWhere = where + " AND l.next_at>=? AND l.next_at<?";
       const calArgs = [...args, monthStartIso, monthEndIso];
+      // Нэг өдөрт олон зуун хүсэлт (жишээ нь Sheet синкээс) хуваарилагдсан ч бусад өдрүүд "LIMIT"-д
+      // шахагдаж алга болохгүйн тулд өдөр (УБ цагийн бүсээр) тус бүрд хамгийн ихдээ 5-ийг сонгоно;
+      // day_count-оор клиент "+N илүү" гэдгийг үнэн зөв харуулна.
       const cal = await db()
         .prepare(
-          `SELECT id,name,next_at,status FROM leads l WHERE ${calWhere} ORDER BY l.next_at ASC LIMIT 500`,
+          `SELECT id,name,next_at,status,day_count FROM (SELECT id,name,next_at,status,COUNT(*) OVER (PARTITION BY date(next_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(next_at,'+8 hours') ORDER BY next_at ASC) rn FROM leads l WHERE ${calWhere}) WHERE rn<=5 ORDER BY next_at ASC`,
         )
         .bind(...calArgs)
         .all();

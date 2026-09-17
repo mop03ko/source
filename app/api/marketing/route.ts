@@ -54,7 +54,9 @@ export async function GET(req:Request){try{
   const nextMonth=mm===12?`${my+1}-01`:`${my}-${String(mm+1).padStart(2,'0')}`;
   const monthStartIso=new Date(monthParam+'-01T00:00:00+08:00').toISOString();
   const monthEndIso=new Date(nextMonth+'-01T00:00:00+08:00').toISOString();
-  const cal=await db().prepare(`SELECT id,title,due_at,status FROM marketing_tasks WHERE ${where} AND due_at>=? AND due_at<? ORDER BY due_at ASC LIMIT 500`).bind(...args,monthStartIso,monthEndIso).all();
+  // Нэг өдөрт олон ажил байсан ч бусад өдрүүд "LIMIT"-д шахагдаж алга болохгүйн тулд өдөр (УБ цагийн
+  // бүсээр) тус бүрд хамгийн ихдээ 5-ийг сонгоно; day_count-оор клиент "+N илүү" гэдгийг үнэн зөв харуулна.
+  const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM marketing_tasks WHERE ${where} AND due_at>=? AND due_at<?) WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
   return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
  }
  const [rows,count,stats]=await Promise.all([

@@ -101,5 +101,15 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  [calStatus,calData]=await get('?view=all&calendar=1&month='+nextMonth);
  assert.equal(calStatus,200);assert.equal(calData.items.some(i=>i.id===calCreate.id),false);
  assert.equal((await get('?view=all&calendar=1&month=bad'))[0],400);
- console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
+ // Регресс: нэг өдөрт (Sheet синкийн улмаас) хэдэн зуун хүсэлт хуваарилагдсан ч дараагийн өдрүүд
+ // "LIMIT"-д шахагдаж алгa болохгүй ёстой (per-day cap + day_count).
+ for(let i=0;i<8;i++)assert.equal((await post('create',{...leadData('60'+String(i).padStart(6,'0')),next_at:thisMonth+'-05T03:00:00.000Z'}))[0],200);
+ assert.equal((await post('create',{...leadData('61000001'),next_at:thisMonth+'-25T03:00:00.000Z'}))[0],200);
+ [calStatus,calData]=await get('?view=all&calendar=1&month='+thisMonth);
+ assert.equal(calStatus,200);
+ assert.ok(calData.items.some(i=>i.next_at.startsWith(thisMonth+'-25')),'25-ны хүсэлт 5-аас олон хүсэлттэй өдрийн ард алдагдав');
+ const day5=calData.items.filter(i=>i.next_at.startsWith(thisMonth+'-05'));
+ assert.ok(day5.length<=5,'per-day cap хэтэрсэн');
+ assert.ok(day5.every(i=>i.day_count>=8),'day_count бодит нийт тоог тусгаагүй');
+ console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, calendar per-day skew, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
 })().catch(e=>{console.error(e);process.exit(1)});
