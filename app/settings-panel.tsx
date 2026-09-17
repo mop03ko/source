@@ -1,6 +1,6 @@
 'use client';
 import AvatarImage from 'next/image';
-import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Switch} from '@/components/ui/switch';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';
+import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Switch} from '@/components/ui/switch';import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';
 type Settings={notification_sound:string;sms_enabled:string};
 type Profile={phone?:string|null;avatar?:string|null};
 // Зурган аватарыг 192x192 квадрат болгож шахна: DB-д base64 маягаар хадгалахад хэт том болохоос сэргийлнэ.
@@ -30,6 +30,7 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  const [smsEnabled,setSmsEnabled]=useState(initial.sms_enabled==='on'),[smsBusy,setSmsBusy]=useState(false);
  const [to,setTo]=useState(''),[message,setMessage]=useState(''),[sendBusy,setSendBusy]=useState(false),[sendError,setSendError]=useState('');
  const [phone,setPhone]=useState(me.phone||''),[phoneBusy,setPhoneBusy]=useState(false),[avatarBusy,setAvatarBusy]=useState(false),[profileError,setProfileError]=useState('');
+ const [tab,setTab]=useState('profile');
  const [previous,setPrevious]=useState({sound:initial.notification_sound,sms:initial.sms_enabled,phone:me.phone});
  if(previous.sound!==initial.notification_sound||previous.sms!==initial.sms_enabled||previous.phone!==me.phone){
  setPrevious({sound:initial.notification_sound,sms:initial.sms_enabled,phone:me.phone});
@@ -44,19 +45,21 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  const savePhone=async()=>{setPhoneBusy(true);setProfileError('');try{await saveProfile({phone});toast.success('Утасны дугаар хадгалагдлаа.');}catch(e){setProfileError((e as Error).message);}finally{setPhoneBusy(false);}};
  const pickAvatar=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setProfileError('');if(file.size>8*1024*1024){setProfileError('Зургийн хэмжээ 8 MB-аас бага байна.');return;}setAvatarBusy(true);try{const data=await resizeAvatar(file);await saveProfile({avatar:data});toast.success('Аватар зураг хадгалагдлаа.');}catch(e){setProfileError((e as Error).message);}finally{setAvatarBusy(false);}};
  const removeAvatar=async()=>{setAvatarBusy(true);setProfileError('');try{await saveProfile({avatar:null});toast.success('Аватар зураг устгагдлаа.');}catch(e){setProfileError((e as Error).message);}finally{setAvatarBusy(false);}};
+ const admin=isAdminLike(me.role);
  return <div className="sheet-settings">
- <section className="panel"><div className="eyebrow">МИНИЙ ТОХИРГОО</div><h2>Профайл</h2><p className="muted">Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилтан бүр өөрийн профайлаа засна.</p>
+ <Tabs value={tab} onValueChange={setTab} className="settings-tabs"><TabsList><TabsTrigger value="profile">Профайл</TabsTrigger>{admin&&<TabsTrigger value="system">Системийн тохиргоо</TabsTrigger>}{admin&&<TabsTrigger value="sms">SMS тохиргоо</TabsTrigger>}{admin&&<TabsTrigger value="sheets">Google Sheets</TabsTrigger>}</TabsList></Tabs>
+ {tab==='profile'&&<section className="panel"><div className="eyebrow">МИНИЙ ТОХИРГОО</div><h2>Профайл</h2><p className="muted">Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилтан бүр өөрийн профайлаа засна.</p>
  {profileError&&<div role="alert" className="error-box">{profileError}</div>}
  <div className="profile-row"><div className="profile-avatar">{me.avatar?<AvatarImage width={192} height={192} unoptimized src={me.avatar} alt=""/>:<span>{me.name.slice(0,1)}</span>}</div><div className="profile-avatar-actions"><label className="field"><span>Аватар зураг (PNG/JPEG/WEBP, 8MB хүртэл)</span><Input type="file" accept="image/png,image/jpeg,image/webp" disabled={avatarBusy} onChange={pickAvatar}/></label>{me.avatar&&<Button type="button" variant="ghost" size="sm" disabled={avatarBusy} onClick={removeAvatar}><Trash2 size={15}/>Аватар устгах</Button>}{avatarBusy&&<Loader2 className="spin" size={16}/>}</div></div>
  <div className="form-grid"><label className="field"><span>Утасны дугаар</span><Input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label></div>
  <div className="row"><Button className="primary" disabled={phoneBusy||phone===(me.phone||'')} onClick={savePhone}>{phoneBusy?<Loader2 className="spin" size={16}/>:<Save size={16}/>}Хадгалах</Button></div>
- </section>
- {isAdminLike(me.role)&&<>
- <section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
+ </section>}
+ {tab==='system'&&admin&&<section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
  <div className="sound-options">{Object.entries(soundPresets).map(([k,v])=><label key={k} className={'sound-option'+(sound===k?' active':'')}><input type="radio" name="sound" value={k} checked={sound===k} onChange={()=>setSound(k)}/><Volume2 size={16}/><span>{v}</span><Button type="button" variant="ghost" size="icon" aria-label={v+' сонсох'} disabled={k==='none'} onClick={()=>playNotificationSound(k)}><PlayCircle size={17}/></Button></label>)}</div>
  <div className="row"><Button className="primary" disabled={busy||!dirty} onClick={save}><Save size={16}/>Хадгалах</Button>{dirty&&<Button variant="ghost" onClick={()=>setSound(initial.notification_sound)}>Цуцлах</Button>}</div>
- </section>
+ </section>}
+ {tab==='sms'&&admin&&<>
  <section className="panel"><div className="eyebrow">SMS ТОХИРГОО</div><h2>Автомат баталгаажуулах SMS</h2><p className="muted">Хүсэлтийн төлөв &quot;Худалдан авсан&quot; болоход харилцагч руу автоматаар баталгаажуулах SMS илгээх эсэхийг тохируулна.</p>
  <label className="sms-toggle"><Switch checked={smsEnabled} disabled={smsBusy} onCheckedChange={toggleSms}/><span>{smsEnabled?'Асаалттай — Худалдан авсан болоход SMS илгээнэ':'Унтраалттай — SMS илгээхгүй'}</span></label>
  </section>
@@ -64,7 +67,7 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  {sendError&&<div role="alert" className="error-box">{sendError}</div>}
  <form className="form-stack" onSubmit={sendManual}><label className="field"><span>Утасны дугаар</span><Input required value={to} onChange={e=>setTo(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label><label className="field"><span>Мессеж</span><textarea required rows={4} maxLength={600} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Илгээх мессежээ бичнэ үү…"/></label><Button className="primary" type="submit" disabled={sendBusy}>{sendBusy?<Loader2 className="spin" size={16}/>:<Send size={16}/>}Илгээх</Button></form>
  </section>
- <SheetsPanel members={members}/>
  </>}
+ {tab==='sheets'&&admin&&<SheetsPanel members={members}/>}
  </div>;
 }
