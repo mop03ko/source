@@ -46,6 +46,15 @@ export async function GET(req:Request){try{
  if(q){where+=' AND title LIKE ?';args.push('%'+q+'%');}
  if(status&&Object.hasOwn(marketingStages,status)){where+=' AND status=?';args.push(status);}
  if(owner){where+=' AND owner=?';args.push(owner);}
+ // Удирдлагын хяналтын самбар: төсөв нь одоог хүртэл баталгаажаагүй, цуцлагдаагүй бүх ажлын жагсаалт.
+ if(url.searchParams.get('pending_approvals')==='1'){
+  if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага харна.',403);
+  const [rows,sum]=await Promise.all([
+   db().prepare(`SELECT id,title,channel,budget,owner,status,due_at,version FROM marketing_tasks WHERE approved_at IS NULL AND status!='cancelled' ORDER BY (due_at IS NULL),due_at ASC,created_at ASC LIMIT 50`).all(),
+   db().prepare(`SELECT COUNT(*) count,COALESCE(SUM(budget),0) budget FROM marketing_tasks WHERE approved_at IS NULL AND status!='cancelled'`).first<{count:number;budget:number}>(),
+  ]);
+  return Response.json({items:rows.results,count:sum?.count||0,budget:sum?.budget||0},{headers:{'Cache-Control':'no-store'}});
+ }
  // Календарь горим: тухайн шүүлтүүрээр хязгаарлаад, зөвхөн сонгосон сард due_at тохирох хөнгөн мөрүүдийг буцаана.
  if(url.searchParams.get('calendar')==='1'){
   const monthParam=(url.searchParams.get('month')||'').slice(0,7);

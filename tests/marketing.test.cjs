@@ -77,11 +77,19 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  assert.equal(rep.budget.unapproved,350000);
  assert.equal(rep.budget.byChannel.find(c=>c.channel==='Facebook').budget,300000);
  assert.equal(rep.budget.byChannel.find(c=>c.channel==='Google хайлтын сурталчилгаа').budget,250000);
+ // Удирдлагын хяналтын самбар: батлагдаагүй бөгөөд цуцлагдаагүй ажлуудын жагсаалт, зөвхөн admin/director харна.
+ assert.equal((await mGet('?pending_approvals=1'))[0],403);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ let [paStatus,pa]=await mGet('?pending_approvals=1');
+ assert.equal(paStatus,200);assert.equal(pa.count,2);assert.equal(pa.budget,300000);assert.equal(pa.items.length,2);
+ assert.ok(pa.items.every(t=>t.status!=='cancelled'));
+ assert.ok(!pa.items.some(t=>t.id===tApproved.id));
+ user={userId:'m',email:'marketing@example.test',displayName:'Marketing'};
  // Ирээдүйн rfrom-той бол хоосон тайлан буцна; буруу форматтай rfrom/rto-г Календарь горимоос ялгаатай, 400 биш зүгээр үл тоомсорлоно.
  const future=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
  let [futStatus,futRep]=await mGet('?report=1&rfrom='+future);
  assert.equal(futStatus,200);assert.equal(futRep.total,0);assert.equal(futRep.budget.total,0);
  let [badStatus,badRep]=await mGet('?report=1&rfrom=not-a-date&rto=also-bad');
  assert.equal(badStatus,200);assert.equal(badRep.total,4);
- console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering and report breakdown (status/channel/owner/budget).');
+ console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering, report breakdown (status/channel/owner/budget) and admin dashboard pending-approvals access control.');
 })().catch(e=>{console.error(e);process.exit(1)});
