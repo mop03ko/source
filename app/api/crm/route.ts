@@ -242,6 +242,11 @@ export async function GET(req: Request) {
         args.push(t.toISOString());
       }
     }
+    // Дээд картуудын (Нийт/Холбогдох/Recycle/Худалдан авсан) статистик нь харагдаж буй жагсаалттай адил
+    // хайлт/төлөв/хариуцагч/огнооны шүүлтээр хязгаарлагдана, гэхдээ тухайн таб (today/candidates/recycle)-ийн
+    // нэмэлт статус хязгаарлалтыг авахгүй - эс бөгөөс due/recycled/won дэд тоонууд эвдэрнэ.
+    const baseWhere = where,
+      baseArgs = [...args];
     // Улаанбаатарын өнөөдрийн хуанлийн өдрийн эхлэл/төгсгөл (сервер ямар цагийн бүст ажиллаж байсан ч адилхан гарна).
     const ubDateStr = new Date(Date.now() + 8 * 3600000)
       .toISOString()
@@ -345,6 +350,10 @@ export async function GET(req: Request) {
     // Тайлангийн 3 query (dist/byMember/byActivity) хямд биш тул зөвхөн "Тайлан" таб дээр л ажиллуулна;
     // бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
     const isReports = view === "reports";
+    // "Тайлан" табанд өөрийн (rfrom/rto) хугацааны хүрээ байдаг тул статистик картууд үүнийг, бусад
+    // табанд жагсаалтын шүүлтүүрийг (from/to) ашиглана.
+    const statsWhere = isReports ? reportWhere : baseWhere,
+      statsArgs = isReports ? reportArgs : baseArgs;
     const empty = Promise.resolve({ results: [] as Record<string, unknown>[] });
     const [
       rows,
@@ -373,7 +382,7 @@ export async function GET(req: Request) {
         .first(),
       db()
         .prepare(
-          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won,COALESCE(SUM(owner='__sheet_unassigned__'),0) unassigned FROM leads l WHERE l.deleted_at IS NULL ${s.sql}`,
+          `SELECT COUNT(*) total,COALESCE(SUM(status='won'),0) won,COALESCE(SUM(status NOT IN ('won','lost','invalid') AND (recycle_at IS NULL OR connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND owner!='__sheet_unassigned__' AND next_at<=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) due,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycled,COALESCE(SUM(recycle_at IS NOT NULL AND next_at IS NOT NULL AND next_at<=? AND (connected=1 OR julianday(recycle_at)>=julianday('now','-14 days')) AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)),0) recycle_overdue,COALESCE(SUM(status='review'),0) review,COALESCE(SUM(created_at>=? AND created_at<=?),0) today_new,COALESCE(SUM(status='won' AND updated_at>=? AND updated_at<=?),0) today_won,COALESCE(SUM(owner='__sheet_unassigned__'),0) unassigned FROM leads l WHERE ${statsWhere}`,
         )
         .bind(
           new Date().toISOString(),
@@ -382,7 +391,7 @@ export async function GET(req: Request) {
           todayEndUB,
           todayStartUB,
           todayEndUB,
-          ...s.args,
+          ...statsArgs,
         )
         .first(),
       db()

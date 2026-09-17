@@ -111,5 +111,15 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  const day5=calData.items.filter(i=>i.next_at.startsWith(thisMonth+'-05'));
  assert.ok(day5.length<=5,'per-day cap хэтэрсэн');
  assert.ok(day5.every(i=>i.day_count>=8),'day_count бодит нийт тоог тусгаагүй');
- console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, calendar per-day skew, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
+ // Дээд статистик картууд (Нийт/Холбогдох/Recycle/Худалдан авсан) жагсаалттай адил "Ирсэн огноо" (from/to)
+ // шүүлтэд харьяалагдана; тухайн таб (candidates/recycle)-ийн нэмэлт статус хязгаарлалтад орохгүй.
+ const totalNow=(await get('?view=all'))[1].stats.total;
+ assert.ok(totalNow>0);
+ assert.equal((await get('?view=all&from='+new Date(Date.now()+86400000).toISOString().slice(0,10)))[1].stats.total,0);
+ assert.equal((await get('?view=all&to=2020-01-01'))[1].stats.total,0);
+ assert.equal((await get('?view=all&from=2020-01-01'))[1].stats.total,totalNow);
+ // 'candidates' таб дээр ч статистик нь тухайн табын статус хязгаарлалтад биш, ерөнхий шүүлтэд л хамаарна.
+ assert.equal((await get('?view=candidates&from='+new Date(Date.now()+86400000).toISOString().slice(0,10)))[1].stats.total,0);
+ assert.equal((await get('?view=candidates'))[1].stats.total,totalNow);
+ console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, calendar per-day skew, stats date-range filtering, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
 })().catch(e=>{console.error(e);process.exit(1)});
