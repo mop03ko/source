@@ -55,7 +55,19 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  // Одоогийн байдал: id (done,Facebook,150000), calCreate (planned,Facebook,150000) хоёул owner=marketing@example.test.
  const [,tApproved]=await mPost('create',taskData({title:'Батлагдсан төсөвтэй',channel:'Google хайлтын сурталчилгаа',budget:200000,owner:'agent@example.test',status:'in_progress'}));
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
- assert.equal((await mPost('approve',undefined,tApproved.id,1))[0],200);
+ assert.equal((await mPost('approve',undefined,tApproved.id,1))[0],400); // тайлбар заавал шаардана
+ assert.equal((await mPost('approve',{note:'Төсөв тохиролцсон.'},tApproved.id,1))[0],200);
+ // Батлагдсан төсвийг буцаах: зөвхөн admin/director, шалтгаан заавал бичнэ, дараа нь дахин батлах боломжтой.
+ user={userId:'m',email:'marketing@example.test',displayName:'Marketing'};
+ assert.equal((await mPost('unapprove',{note:'x'},tApproved.id,2))[0],403);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ assert.equal((await mPost('unapprove',undefined,tApproved.id,2))[0],400);
+ assert.equal((await mPost('unapprove',{note:'Төсөв дахин хянана.'},tApproved.id,2))[0],200);
+ let [,tUnapproved]=await mGet('?id='+tApproved.id);
+ assert.equal(tUnapproved.task.approved_at,null);
+ assert.ok(tUnapproved.activities[0].note.includes('буцаав'));
+ assert.equal((await mPost('unapprove',{note:'дахин'},tApproved.id,tUnapproved.task.version))[0],409); // аль хэдийн буцаагдсан
+ assert.equal((await mPost('approve',{note:'Дахин батлав.'},tApproved.id,tUnapproved.task.version))[0],200); // дахин батлах боломжтой
  user={userId:'m',email:'marketing@example.test',displayName:'Marketing'};
  await mPost('create',taskData({title:'Батлагдаагүй төсөвтэй',channel:'Google хайлтын сурталчилгаа',budget:50000,owner:'agent@example.test',status:'cancelled'}));
  let [repStatus,rep]=await mGet('?report=1');
@@ -91,5 +103,5 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  assert.equal(futStatus,200);assert.equal(futRep.total,0);assert.equal(futRep.budget.total,0);
  let [badStatus,badRep]=await mGet('?report=1&rfrom=not-a-date&rto=also-bad');
  assert.equal(badStatus,200);assert.equal(badRep.total,4);
- console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering, report breakdown (status/channel/owner/budget) and admin dashboard pending-approvals access control.');
+ console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering, report breakdown (status/channel/owner/budget), budget approve/unapprove with mandatory notes and admin dashboard pending-approvals access control.');
 })().catch(e=>{console.error(e);process.exit(1)});

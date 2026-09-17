@@ -12,7 +12,7 @@ async function getTask(id:string){
  if(!t)throw new Failure('Ажил олдсонгүй.',404);
  return t;
 }
-const bodySchema=z.object({action:z.enum(['create','update','activity','approve']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
+const bodySchema=z.object({action:z.enum(['create','update','activity','approve','unapprove']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
 const taskSchema=z.object({
  title:z.string().trim().min(1).max(160),
  channel:z.string().refine(v=>marketingChannels.includes(v)),
@@ -144,14 +144,23 @@ export async function POST(req:Request){try{
   if(!r[0].meta.changes)throw new Failure('Ажил шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
   return Response.json({ok:true});
  }
- if(b.action==='approve'){
-  // Зөвхөн Админ, Удирдлага (director) ажлын төсвийг батална.
-  if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага төсөв батална.',403);
+ if(b.action==='approve'||b.action==='unapprove'){
+  // Зөвхөн Админ, Удирдлага (director) ажлын төсвийг батлах/буцаах эрхтэй; батлах, буцаах хоёулаа шалтгаанаа бичнэ.
+  if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага төсвийн шийдвэр гаргана.',403);
+  const a=z.object({note:z.string().trim().min(1).max(2000)}).parse(b.data);
+  if(b.action==='approve'){
+   const r=await db().batch([
+    db().prepare('UPDATE marketing_tasks SET approved_at=?,approved_by=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND approved_at IS NULL').bind(now,m.email,now,t.id,b.version),
+    db().prepare('INSERT INTO marketing_activities(id,task_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,'Төсөв баталгаажлаа: '+a.note,m.email,now),
+   ]);
+   if(!r[0].meta.changes)throw new Failure('Ажил шинэчлэгдсэн эсвэл аль хэдийн баталгаажсан байна. Дахин нээнэ үү.',409);
+   return Response.json({ok:true});
+  }
   const r=await db().batch([
-   db().prepare('UPDATE marketing_tasks SET approved_at=?,approved_by=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND approved_at IS NULL').bind(now,m.email,now,t.id,b.version),
-   db().prepare('INSERT INTO marketing_activities(id,task_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,'Төсөв баталгаажлаа.',m.email,now),
+   db().prepare('UPDATE marketing_tasks SET approved_at=NULL,approved_by=NULL,updated_at=?,version=version+1 WHERE id=? AND version=? AND approved_at IS NOT NULL').bind(now,t.id,b.version),
+   db().prepare('INSERT INTO marketing_activities(id,task_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,'Төсвийн баталгаажилтыг буцаав: '+a.note,m.email,now),
   ]);
-  if(!r[0].meta.changes)throw new Failure('Ажил шинэчлэгдсэн эсвэл аль хэдийн баталгаажсан байна. Дахин нээнэ үү.',409);
+  if(!r[0].meta.changes)throw new Failure('Ажил шинэчлэгдсэн эсвэл төсөв баталгаажаагүй байна. Дахин нээнэ үү.',409);
   return Response.json({ok:true});
  }
  throw new Failure('Тодорхойгүй үйлдэл.');
