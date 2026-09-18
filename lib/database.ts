@@ -16,13 +16,31 @@ function arg(v:unknown):InValue {
 }
 function result<T=Record<string,unknown>>(r:ResultSet){return {results:r.rows.map(row=>Object.fromEntries(r.columns.map(c=>[c,row[c]]))) as T[],meta:{changes:r.rowsAffected},success:true};}
 export class Statement {
- constructor(readonly sql:string,readonly args:InValue[]=[]){ }
- bind(...args:unknown[]){return new Statement(this.sql,args.map(arg));}
- async all<T=Record<string,unknown>>(){return result<T>(await getClient().execute({sql:this.sql,args:this.args}));}
+ constructor(readonly sql:string,readonly args:InValue[]=[],private readonly executor?:Pick<Client,'execute'>){ }
+ bind(...args:unknown[]){return new Statement(this.sql,args.map(arg),this.executor);}
+ async all<T=Record<string,unknown>>(){return result<T>(await (this.executor||getClient()).execute({sql:this.sql,args:this.args}));}
  async first<T=Record<string,unknown>>(){return (await this.all<T>()).results[0]??null;}
  async run(){return this.all();}
 }
-export const DB={prepare:(sql:string)=>new Statement(sql),async batch(statements:Statement[]){
+export type DatabaseSession={prepare:(sql:string)=>Statement;batch:(statements:Statement[])=>Promise<ReturnType<typeof result>[]>};
+async function beginWrite(){
+ // Local SQLite can reject BEGIN IMMEDIATE while another request owns the write lock.
+ // Retry acquisition only: never replay a callback or an uncertain commit.
+ for(let attempt=0;;attempt++){
+  try{return await getClient().transaction('write');}
+  catch(error){
+   if(attempt>=12||!error||typeof error!=='object'||!('code' in error)||error.code!=='SQLITE_BUSY')throw error;
+   await new Promise(resolve=>setTimeout(resolve,Math.min(25*2**attempt,250)));
+  }
+ }
+}
+export const DB={prepare:(sql:string)=>new Statement(sql),async transaction<T>(work:(db:DatabaseSession)=>Promise<T>):Promise<T>{
+ const tx=await beginWrite();
+ try{
+  const value=await work({prepare:sql=>new Statement(sql,[],tx),batch:async statements=>statements.length?(await tx.batch(statements.map(s=>({sql:s.sql,args:s.args})))).map(r=>result(r)):[]});
+  await tx.commit();return value;
+ }catch(error){if(!tx.closed)await tx.rollback();throw error;}finally{tx.close();}
+},async batch(statements:Statement[]){
  if(!statements.length)return [];
  return (await getClient().batch(statements.map(s=>({sql:s.sql,args:s.args})),'write')).map(r=>result(r));
 }};

@@ -148,6 +148,13 @@
       "when": 1789718226959,
       "tag": "0020_gifted_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1789721114216,
+      "tag": "0021_kind_jackal",
+      "breakpoints": true
     }
   ]
 }

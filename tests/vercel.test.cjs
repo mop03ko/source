@@ -17,6 +17,12 @@ function load(p){const out=ts.transpileModule(fs.readFileSync(p,'utf8'),{compile
  assert.equal((await DB.prepare('UPDATE probe SET value=? WHERE id=? RETURNING value').bind('Шинэ','one').all()).results[0].value,'Шинэ');
  assert.equal((await DB.prepare('UPDATE probe SET value=? WHERE id=?').bind('Шинэ','missing').run()).meta.changes,0);
  assert.throws(()=>DB.prepare('SELECT ?').bind(undefined));
+ await assert.rejects(()=>DB.transaction(async tx=>{await tx.prepare('INSERT INTO probe VALUES(?,?)').bind('atomic','rollback').run();throw new Error('reject after write');}));
+ assert.equal(await DB.prepare('SELECT * FROM probe WHERE id=?').bind('atomic').first(),null);
+ await DB.transaction(async tx=>{await tx.prepare('INSERT INTO probe VALUES(?,?)').bind('atomic','committed').run();assert.equal((await tx.prepare('SELECT value FROM probe WHERE id=?').bind('atomic').first()).value,'committed');});
+ await DB.prepare('INSERT INTO probe VALUES(?,?)').bind('last-unit','1').run();
+ const takeLast=()=>DB.transaction(async tx=>{const row=await tx.prepare('SELECT value FROM probe WHERE id=?').bind('last-unit').first();if(row.value==='0')return false;await tx.prepare('UPDATE probe SET value=? WHERE id=?').bind('0','last-unit').run();return true;});
+ assert.deepEqual((await Promise.all([takeLast(),takeLast()])).sort(),[false,true]);
  const policy=load('lib/auth-policy.ts');
  assert.equal(policy.googleIdentity('google',{sub:'123',email:'a@b.mn',email_verified:false}),null);
  assert.equal(policy.googleIdentity('credentials',{sub:'123',email:'a@b.mn',email_verified:true}),null);

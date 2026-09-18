@@ -1,132 +1,177 @@
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
-import {z} from 'zod';
 import {isIsolatedRole,type Member} from '@/lib/crm';
+import {z} from 'zod';
+import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds} from '@/lib/inventory';
+import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
-const db=()=>env.DB!;
-// Маркетинг, IT хоёул борлуулалтын барааны нөөцтэй хамааралгүй тул хаана; агент, ахлах, удирдлага,
-// админ дөрвүүлээ бараа, орлого, зарлагыг бүрэн ашиглана (Борлуулалт таб доторх Тооллого sub-tab).
-function assertAccess(m:Member){if(isIsolatedRole(m.role))throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
-function err(e:unknown){
+export const maxDuration=60;
+const db=()=>env.DB;
+function access(m:Member){if(isIsolatedRole(m.role))throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
+function error(e:unknown){
  if(e instanceof Failure)return Response.json({error:e.message},{status:e.status});
- if(e instanceof z.ZodError)return Response.json({error:'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.path.join('.')+' '+i.message).join('; ')},{status:400});
+ if(e instanceof z.ZodError)return Response.json({error:e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ')},{status:400});
+ if(e instanceof SyntaxError)return Response.json({error:'Хүсэлтийн бүтэц буруу.'},{status:400});
  console.error('Inventory request failed',e instanceof Error?e.message:'error');
  return Response.json({error:'Хадгалж чадсангүй. Дахин оролдоно уу.'},{status:500});
 }
-async function warehouseName(id:string){
- const w=await db().prepare('SELECT name FROM inventory_warehouses WHERE id=?').bind(id).first<{name:string}>();
- if(!w)throw new Failure('Агуулах олдсонгүй.',404);
- return w.name;
+const json=(value:unknown)=>Response.json(value,{headers:{'Cache-Control':'no-store'}});
+async function requireRow(d:DatabaseSession,table:'inventory_items'|'inventory_warehouses'|'inventory_purchases',id:string){
+ const row=await d.prepare(`SELECT * FROM ${table} WHERE id=?`).bind(id).first();
+ if(!row)throw new Failure('Бүртгэл олдсонгүй.',404);return row;
 }
-async function itemRow(id:string){
- const it=await db().prepare('SELECT * FROM inventory_items WHERE id=?').bind(id).first();
- if(!it)throw new Failure('Бараа олдсонгүй.',404);
- return it;
-}
-// Тухайн барааны нийт үлдэгдэл (бүх агуулахаар) эсвэл нэг агуулахын үлдэгдлийг stock_moves-ийн
-// нийлбэрээр тооцоолно; тусдаа "одоогийн тоо" багана байхгүй тул дандаа бодит зөрөхгүй тоо гарна.
-async function itemStock(itemId:string,warehouseId?:string){
- const r=warehouseId
-  ?await db().prepare('SELECT COALESCE(SUM(qty_delta),0) qty FROM inventory_stock_moves WHERE item_id=? AND warehouse_id=?').bind(itemId,warehouseId).first<{qty:number}>()
-  :await db().prepare('SELECT COALESCE(SUM(qty_delta),0) qty FROM inventory_stock_moves WHERE item_id=?').bind(itemId).first<{qty:number}>();
- return r?.qty||0;
-}
-const itemSchema=z.object({code:z.string().trim().max(80).optional(),brand:z.string().trim().max(120).optional(),name:z.string().trim().min(1).max(200),variant:z.string().trim().max(120).optional(),imei:z.string().trim().max(80).optional(),sale_price:z.number().int().min(0).max(1000000000000).optional()});
-const purchaseSchema=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:z.number().int().min(1).max(1000000),unit_cost:z.number().int().min(0).max(1000000000000).optional(),ordered_at:z.string().datetime().nullable().optional(),received_at:z.string().datetime().nullable().optional(),payment_status:z.string().trim().max(60).optional(),note:z.string().trim().max(2000).optional()});
-const saleSchema=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:z.number().int().min(1).max(1000000),unit_price:z.number().int().min(0).max(1000000000000).optional(),customer_name:z.string().trim().max(160).optional(),customer_phone:z.string().trim().max(40).optional(),platform:z.string().trim().max(80).optional(),sold_at:z.string().datetime().nullable().optional(),note:z.string().trim().max(2000).optional()});
 export async function GET(req:Request){try{
- const m=await member();assertAccess(m);
- const url=new URL(req.url);
- const view=url.searchParams.get('view')||'items';
- if(view==='warehouses'){
-  const rows=await db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all();
-  return Response.json({items:rows.results},{headers:{'Cache-Control':'no-store'}});
+ access(await member());
+ const p=new URL(req.url).searchParams,view=p.get('view')||'items';
+ const page=Math.max(1,Math.min(10000,Math.floor(Number(p.get('page'))||1))),limit=p.get('export')==='1'?5000:50;
+ const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'';
+ if(view==='warehouses')return json({items:(await db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all()).results});
+ if(view==='options'){
+  const [warehouses,brands,channels]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all()]);
+  return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results});
  }
- const id=url.searchParams.get('id');
- if(view==='items'&&id){
-  const it=await itemRow(id);
-  const [byWarehouse,moves]=await Promise.all([
-   db().prepare('SELECT w.id warehouse_id,w.name warehouse_name,COALESCE(SUM(sm.qty_delta),0) qty FROM inventory_warehouses w LEFT JOIN inventory_stock_moves sm ON sm.warehouse_id=w.id AND sm.item_id=? GROUP BY w.id HAVING qty!=0 ORDER BY w.name').bind(id).all(),
-   db().prepare('SELECT * FROM inventory_stock_moves WHERE item_id=? ORDER BY created_at DESC LIMIT 50').bind(id).all(),
-  ]);
-  return Response.json({item:it,byWarehouse:byWarehouse.results,moves:moves.results},{headers:{'Cache-Control':'no-store'}});
+ if(view==='items'&&p.get('id')){
+  const item=await requireRow(db(),'inventory_items',p.get('id')!);
+  const [byWarehouse,moves,stock]=await Promise.all([
+   db().prepare('SELECT w.id warehouse_id,w.name warehouse_name,COALESCE(SUM(m.qty_delta),0) qty,COALESCE(SUM(m.value_cents),0) value_cents,COALESCE(MAX(m.cost_estimated),0) cost_estimated FROM inventory_warehouses w LEFT JOIN inventory_stock_moves m ON m.warehouse_id=w.id AND m.item_id=? GROUP BY w.id ORDER BY w.name').bind(item.id).all(),
+   db().prepare('SELECT m.*,w.name warehouse_name FROM inventory_stock_moves m JOIN inventory_warehouses w ON w.id=m.warehouse_id WHERE m.item_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 100').bind(item.id).all(),
+   db().prepare('SELECT COALESCE(SUM(qty_delta),0) stock,COALESCE(SUM(value_cents),0) value_cents FROM inventory_stock_moves WHERE item_id=?').bind(item.id).first(),
+  ]);return json({item:{...item,...stock},byWarehouse:byWarehouse.results,moves:moves.results});
  }
- if(view==='items'){
-  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
-  const q=(url.searchParams.get('q')||'').slice(0,100);
-  let where='1=1';const args:unknown[]=[];
-  if(q){where+=' AND (code LIKE ? OR brand LIKE ? OR name LIKE ? OR variant LIKE ? OR imei LIKE ?)';args.push(...Array(5).fill('%'+q+'%'));}
-  const [rows,count]=await Promise.all([
-   db().prepare(`SELECT it.*,COALESCE((SELECT SUM(qty_delta) FROM inventory_stock_moves sm WHERE sm.item_id=it.id),0) stock FROM inventory_items it WHERE ${where} ORDER BY it.name LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
-   db().prepare(`SELECT COUNT(*) count FROM inventory_items WHERE ${where}`).bind(...args).first<{count:number}>(),
-  ]);
-  return Response.json({items:rows.results,count:count?.count||0,page},{headers:{'Cache-Control':'no-store'}});
+ if(view==='items'||view==='balance'){
+  const args:unknown[]=[];let where='1=1';
+  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ?)';args.push(...Array(4).fill('%'+q+'%'));}
+  if(brand){where+=' AND it.brand=?';args.push(brand);}
+  const moveArgs:unknown[]=warehouse?[warehouse]:[];let cte='';
+  if(view==='balance'){
+   const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+   const [from,to]=dayBounds(p.get('from')||today.slice(0,7)+'-01',p.get('to')||today);
+   cte=`WITH totals AS (SELECT item_id,SUM(CASE WHEN occurred_at<? THEN qty_delta ELSE 0 END) opening_qty,SUM(CASE WHEN occurred_at<? THEN value_cents ELSE 0 END) opening_cents,SUM(CASE WHEN occurred_at>=? AND qty_delta>0 THEN qty_delta ELSE 0 END) in_qty,SUM(CASE WHEN occurred_at>=? AND qty_delta>0 THEN value_cents ELSE 0 END) in_cents,SUM(CASE WHEN occurred_at>=? AND qty_delta<0 THEN -qty_delta ELSE 0 END) out_qty,SUM(CASE WHEN occurred_at>=? AND qty_delta<0 THEN -value_cents ELSE 0 END) out_cents,SUM(qty_delta) stock,SUM(value_cents) value_cents,MAX(cost_estimated) cost_estimated FROM inventory_stock_moves WHERE occurred_at<? ${warehouse?'AND warehouse_id=?':''} GROUP BY item_id)`;
+   moveArgs.unshift(from,from,from,from,from,from,to);
+  }else cte=`WITH totals AS (SELECT item_id,SUM(qty_delta) stock,SUM(value_cents) value_cents,MAX(cost_estimated) cost_estimated FROM inventory_stock_moves ${warehouse?'WHERE warehouse_id=?':''} GROUP BY item_id)`;
+  const stock=p.get('stock')||'';
+  if(stock==='positive')where+=' AND COALESCE(t.stock,0)>0';
+  if(stock==='empty')where+=' AND COALESCE(t.stock,0)<=0';
+  if(stock==='low')where+=' AND COALESCE(t.stock,0)<=it.min_stock';
+  const extra=view==='balance'?',COALESCE(t.opening_qty,0) opening_qty,COALESCE(t.opening_cents,0) opening_cents,COALESCE(t.in_qty,0) in_qty,COALESCE(t.in_cents,0) in_cents,COALESCE(t.out_qty,0) out_qty,COALESCE(t.out_cents,0) out_cents':'';
+  const [rows,summary]=await Promise.all([
+   db().prepare(`${cte} SELECT it.*,COALESCE(t.stock,0) stock,COALESCE(t.value_cents,0) value_cents,COALESCE(t.cost_estimated,0) cost_estimated${extra} FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} ORDER BY it.name,it.id LIMIT ? OFFSET ?`).bind(...moveArgs,...args,limit,limit===5000?0:(page-1)*50).all(),
+   db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(t.stock),0) units,COALESCE(SUM(t.value_cents),0) value_cents,COALESCE(SUM(COALESCE(t.stock,0)<=it.min_stock),0) low_stock,COALESCE(MAX(t.cost_estimated),0) cost_estimated FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where}`).bind(...moveArgs,...args).first(),
+  ]);return json({items:rows.results,count:summary?.count||0,page,summary,truncated:Number(summary?.count)>limit&&limit===5000});
  }
- if(view==='purchases'||view==='sales'){
-  const table=view==='purchases'?'inventory_purchases':'inventory_sales';
-  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
-  const q=(url.searchParams.get('q')||'').slice(0,100);
-  let where='1=1';const args:unknown[]=[];
-  if(q){where+=' AND EXISTS(SELECT 1 FROM inventory_items it WHERE it.id=t.item_id AND (it.name LIKE ? OR it.code LIKE ?))';args.push('%'+q+'%','%'+q+'%');}
-  const [rows,count]=await Promise.all([
-   db().prepare(`SELECT t.*,it.name item_name,it.code item_code,w.name warehouse_name FROM ${table} t JOIN inventory_items it ON it.id=t.item_id JOIN inventory_warehouses w ON w.id=t.warehouse_id WHERE ${where} ORDER BY t.created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
-   db().prepare(`SELECT COUNT(*) count FROM ${table} t WHERE ${where}`).bind(...args).first<{count:number}>(),
-  ]);
-  return Response.json({items:rows.results,count:count?.count||0,page},{headers:{'Cache-Control':'no-store'}});
+ if(view==='purchases'||view==='sales'||view==='moves'){
+  const table=view==='purchases'?'inventory_purchases':view==='sales'?'inventory_sales':'inventory_stock_moves';
+  const args:unknown[]=[];let where='1=1';
+  if(warehouse){where+=' AND t.warehouse_id=?';args.push(warehouse);}
+  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ?)';args.push('%'+q+'%','%'+q+'%');}
+  if(view==='purchases'&&p.get('status')){where+=' AND t.status=?';args.push(p.get('status'));}
+  const date=view==='purchases'?'COALESCE(t.received_at,t.ordered_at,t.created_at)':view==='sales'?'COALESCE(t.sold_at,t.created_at)':'t.occurred_at';
+  if(p.get('from')&&p.get('to')){const [from,to]=dayBounds(p.get('from')!,p.get('to')!);where+=` AND ${date}>=? AND ${date}<?`;args.push(from,to);}
+  const rows=await db().prepare(`SELECT t.*,it.name item_name,it.code item_code,w.name warehouse_name ${view==='sales'?',CAST(ROUND(t.total_price*100) AS INTEGER)-t.cost_cents-t.commission_cents-t.tax_cents profit_cents':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id JOIN inventory_warehouses w ON w.id=t.warehouse_id WHERE ${where} ORDER BY ${date} DESC,t.id DESC LIMIT ? OFFSET ?`).bind(...args,limit,limit===5000?0:(page-1)*50).all();
+  const summary=await db().prepare(`SELECT COUNT(*) count ${view==='sales'?',COALESCE(SUM(ROUND(t.total_price*100)),0) revenue_cents,COALESCE(SUM(t.cost_cents),0) cost_cents,COALESCE(SUM(t.commission_cents),0) commission_cents,COALESCE(SUM(t.tax_cents),0) tax_cents,COALESCE(SUM(ROUND(t.total_price*100)-t.cost_cents-t.commission_cents-t.tax_cents),0) profit_cents,COALESCE(MAX(t.cost_estimated),0) cost_estimated':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id WHERE ${where}`).bind(...args).first();
+  return json({items:rows.results,count:summary?.count||0,summary,page,truncated:Number(summary?.count)>limit&&limit===5000});
  }
  throw new Failure('Тодорхойгүй харагдац.');
-}catch(e){return err(e);}}
+}catch(e){return error(e);}}
+
+const bodySchema=z.object({action:z.enum(['create_item','update_item','create_warehouse','record_purchase','receive_purchase','return_purchase','record_sale','transfer','save_channel','preview_import','import_opening']),id:z.string().max(100).optional(),request_id:z.string().uuid().optional(),data:z.unknown()});
+const purchaseSchema=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,unit_cost:money.default(0),additional_cost:money.default(0),order_number:z.string().trim().max(120).default(''),status:z.enum(['ordered','received']).default('received'),ordered_at:z.string().datetime().nullish(),received_at:z.string().datetime().nullish(),payment_status:z.string().trim().max(60).default(''),note:z.string().trim().max(2000).default('')});
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
- if(Number(req.headers.get('content-length')||0)>50000)throw new Failure('Файл хэт том.',413);
- const m=await member();assertAccess(m);
- const raw=await req.text();
- if(raw.length>50000)throw new Failure('Мэдээлэл хэт их.',413);
- const b=z.object({action:z.enum(['create_item','update_item','create_warehouse','record_purchase','record_sale']),id:z.string().max(80).optional(),data:z.unknown()}).parse(JSON.parse(raw));
- const now=new Date().toISOString();
- if(b.action==='create_warehouse'){
-  const d=z.object({name:z.string().trim().min(1).max(120)}).parse(b.data);
-  if(await db().prepare('SELECT 1 FROM inventory_warehouses WHERE name=?').bind(d.name).first())throw new Failure('Ийм нэртэй агуулах аль хэдийн бүртгэлтэй байна.');
-  const id=crypto.randomUUID();
-  await db().prepare('INSERT INTO inventory_warehouses(id,name,created_at) VALUES(?,?,?)').bind(id,d.name,now).run();
-  return Response.json({ok:true,id});
- }
- if(b.action==='create_item'){
-  const d=itemSchema.parse(b.data);
-  const id=crypto.randomUUID();
-  await db().prepare('INSERT INTO inventory_items(id,code,brand,name,variant,imei,sale_price,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?,?)').bind(id,d.code||'',d.brand||'',d.name,d.variant||'',d.imei||null,d.sale_price||0,m.email,now,now).run();
-  return Response.json({ok:true,id});
- }
- if(b.action==='update_item'){
-  if(!b.id)throw new Failure('Барааны ID дутуу.');
-  const d=itemSchema.parse(b.data);
-  await itemRow(b.id);
-  await db().prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,updated_at=? WHERE id=?').bind(d.code||'',d.brand||'',d.name,d.variant||'',d.imei||null,d.sale_price||0,now,b.id).run();
-  return Response.json({ok:true});
- }
- if(b.action==='record_purchase'){
-  const d=purchaseSchema.parse(b.data);
-  await itemRow(d.item_id);await warehouseName(d.warehouse_id);
-  const totalCost=(d.unit_cost||0)*d.qty;
-  const id=crypto.randomUUID();
-  await db().batch([
-   db().prepare('INSERT INTO inventory_purchases(id,item_id,warehouse_id,qty,unit_cost,total_cost,ordered_at,received_at,payment_status,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,d.item_id,d.warehouse_id,d.qty,d.unit_cost||0,totalCost,d.ordered_at||null,d.received_at||null,d.payment_status||'',d.note||'',m.email,now),
-   db().prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),d.item_id,d.warehouse_id,'purchase',d.qty,d.unit_cost||0,id,d.note||'',m.email,now),
-  ]);
-  return Response.json({ok:true,id});
- }
- if(b.action==='record_sale'){
-  const d=saleSchema.parse(b.data);
-  await itemRow(d.item_id);await warehouseName(d.warehouse_id);
-  const current=await itemStock(d.item_id,d.warehouse_id);
-  if(current<d.qty)throw new Failure(`Тухайн агуулахад ${current.toLocaleString()} үлдэгдэлтэй байхад ${d.qty.toLocaleString()} зарах боломжгүй.`);
-  const totalPrice=(d.unit_price||0)*d.qty;
-  const id=crypto.randomUUID();
-  await db().batch([
-   db().prepare('INSERT INTO inventory_sales(id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,d.item_id,d.warehouse_id,d.qty,d.unit_price||0,totalPrice,d.customer_name||'',d.customer_phone||'',d.platform||'',d.sold_at||null,d.note||'',m.email,now),
-   db().prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),d.item_id,d.warehouse_id,'sale',-d.qty,null,id,d.note||'',m.email,now),
-  ]);
-  return Response.json({ok:true,id});
- }
- throw new Failure('Тодорхойгүй үйлдэл.');
-}catch(e){return err(e);}}
+ const m=await member();access(m);
+ if(Number(req.headers.get('content-length')||0)>5_000_000)throw new Failure('Файл хэт том.',413);
+ const raw=await req.text();if(raw.length>5_000_000)throw new Failure('Файл хэт том.',413);
+ const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
+ const result=await db().transaction(async d=>{
+  const payload=JSON.stringify({action:b.action,id:b.id,data:b.data});
+  if(b.request_id){const prev=await d.prepare('SELECT * FROM inventory_requests WHERE id=?').bind(b.request_id).first();if(prev){if(prev.payload!==payload)throw new Failure('Давтан хүсэлтийн өгөгдөл өөрчлөгдсөн.',409);return JSON.parse(String(prev.response));}}
+  const run=async()=>{
+   if(b.action==='create_warehouse'){
+    const input=z.object({name:z.string().trim().min(1).max(120)}).parse(b.data);
+    if(await d.prepare('SELECT 1 FROM inventory_warehouses WHERE name=?').bind(input.name).first())throw new Failure('Ийм нэртэй агуулах бүртгэлтэй.');
+    const id=crypto.randomUUID();await d.prepare('INSERT INTO inventory_warehouses(id,name,created_at) VALUES(?,?,?)').bind(id,input.name,now).run();return {ok:true,id};
+   }
+   if(b.action==='create_item'||b.action==='update_item'){
+    const input=itemSchema.parse(b.data),id=b.action==='create_item'?crypto.randomUUID():b.id!;
+    if(!id)throw new Failure('Барааны ID дутуу.');
+    if(input.code&&await d.prepare('SELECT 1 FROM inventory_items WHERE code=? AND id!=?').bind(input.code,id).first())throw new Failure('Барааны код давхардсан.',409);
+    if(input.imei&&await d.prepare('SELECT 1 FROM inventory_items WHERE imei=? AND id!=?').bind(input.imei,id).first())throw new Failure('IMEI / сериал давхардсан.',409);
+    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock];
+    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
+    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
+    return {ok:true,id};
+   }
+   if(b.action==='save_channel'){
+    if(!['admin','director','manager'].includes(m.role))throw new Failure('Тохиргоо өөрчлөх эрхгүй.',403);
+    const c=z.object({name:z.string().trim().min(1).max(80),commission_rate:z.number().min(0).max(100),account:z.string().trim().max(80).default('')}).parse(b.data);
+    await d.prepare('INSERT INTO inventory_channels(name,commission_rate,account) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET commission_rate=excluded.commission_rate,account=excluded.account').bind(c.name,c.commission_rate,c.account).run();return {ok:true};
+   }
+   if(b.action==='record_purchase'){
+    const input=purchaseSchema.parse(b.data),id=crypto.randomUUID();
+    await requireRow(d,'inventory_items',input.item_id);await requireRow(d,'inventory_warehouses',input.warehouse_id);
+    const total=safeTotal(cents(input.unit_cost)*input.qty+cents(input.additional_cost));
+    await d.prepare('INSERT INTO inventory_purchases(id,item_id,warehouse_id,qty,unit_cost,total_cost,ordered_at,received_at,payment_status,note,created_by,created_at,order_number,status,base_unit_cost,additional_cost) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,input.item_id,input.warehouse_id,input.qty,total/input.qty/100,total/100,input.ordered_at||null,input.status==='received'?(input.received_at||now):null,input.payment_status,input.note,m.email,now,input.order_number,input.status,input.unit_cost,input.additional_cost).run();
+    if(input.status==='received')await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'purchase',qty:input.qty,value:total,ref:id,actor:m.email,at:input.received_at||now,note:input.note});
+    return {ok:true,id};
+   }
+   if(b.action==='receive_purchase'||b.action==='return_purchase'){
+    if(!b.id)throw new Failure('Орлогын ID дутуу.');
+    const purchase=await requireRow(d,'inventory_purchases',b.id),item=String(purchase.item_id),warehouse=String(purchase.warehouse_id);
+    if(b.action==='receive_purchase'){
+     if(purchase.status!=='ordered')throw new Failure('Зөвхөн хүлээгдэж буй захиалгыг хүлээн авна.',409);
+     await d.prepare("UPDATE inventory_purchases SET status='received',received_at=? WHERE id=?").bind(now,b.id).run();
+     await movement(d,{item,warehouse,kind:'purchase',qty:Number(purchase.qty),value:cents(Number(purchase.total_cost)),ref:b.id,actor:m.email,at:now});
+    }else{
+     const input=z.object({qty:quantity,note:z.string().trim().min(1).max(2000)}).parse(b.data);
+     if(purchase.status==='ordered'||Number(purchase.qty)-Number(purchase.returned_qty)<input.qty)throw new Failure('Буцаах боломжтой тооноос их байна.',409);
+     const stock=await stockAt(d,item,warehouse),value=withdrawal(stock,input.qty);
+     await d.prepare("UPDATE inventory_purchases SET returned_qty=returned_qty+?,status=CASE WHEN returned_qty+?=qty THEN 'returned' ELSE 'partial_return' END WHERE id=?").bind(input.qty,input.qty,b.id).run();
+     await movement(d,{item,warehouse,kind:'purchase_return',qty:-input.qty,value:-value,estimated:stock.cost_estimated,ref:b.id,actor:m.email,at:now,note:input.note});
+    }return {ok:true,id:b.id};
+   }
+   if(b.action==='record_sale'||b.action==='transfer'){
+    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
+    await requireRow(d,'inventory_items',input.item_id);await requireRow(d,'inventory_warehouses',input.warehouse_id);
+    const stock=await stockAt(d,input.item_id,input.warehouse_id),cost=withdrawal(stock,input.qty),id=crypto.randomUUID();
+    if(b.action==='transfer'){
+     if(!input.to_warehouse_id||input.to_warehouse_id===input.warehouse_id)throw new Failure('Өөр хүлээн авах агуулах сонгоно уу.');
+     await requireRow(d,'inventory_warehouses',input.to_warehouse_id);
+     for(const [warehouse,sign] of [[input.warehouse_id,-1],[input.to_warehouse_id,1]] as const)await movement(d,{item:input.item_id,warehouse,kind:sign<0?'transfer_out':'transfer_in',qty:sign*input.qty,value:sign*cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:now,note:input.note});
+    }else{
+     const channel=await d.prepare('SELECT * FROM inventory_channels WHERE name=?').bind(input.platform).first();
+     const rate=input.commission_rate??Number(channel?.commission_rate||0),total=safeTotal(cents(input.unit_price)*input.qty),commission=Math.round(total*rate/100),tax=cents(input.tax_amount);
+     await d.prepare('INSERT INTO inventory_sales(id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at,bill_number,account,commission_rate,commission_cents,tax_cents,cost_cents,cost_estimated,vat_issued) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,input.item_id,input.warehouse_id,input.qty,input.unit_price,total/100,input.customer_name,input.customer_phone,input.platform,input.sold_at||now,input.note,m.email,now,input.bill_number,input.account||String(channel?.account||''),rate,commission,tax,cost,stock.cost_estimated,input.vat_issued?1:0).run();
+     await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'sale',qty:-input.qty,value:-cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:input.note});
+    }return {ok:true,id};
+   }
+   if(b.action==='preview_import'||b.action==='import_opening'){
+    if(!['admin','director','manager'].includes(m.role))throw new Failure('Импорт хийх эрхгүй.',403);
+    const input=z.object({rows:z.array(openingSchema).min(1).max(5000),as_of:z.string().datetime()}).parse(b.data);
+    const existing=(await d.prepare('SELECT code FROM inventory_items').all<{code:string}>()).results;
+    const codes=new Set(existing.map(i=>i.code)),seen=new Set<string>(),issues:string[]=[];
+    for(const [i,row] of input.rows.entries()){
+     if(codes.has(row.code)||seen.has(row.code))issues.push(`${i+2}-р мөр: код давхардсан (${row.code}).`);
+     if(row.qty===0&&(row.total_cost||0)!==0)issues.push(`${i+2}-р мөр: үлдэгдэлгүй барааны өртөг тэг байх ёстой.`);
+     safeTotal(row.total_cost!==undefined?cents(row.total_cost):cents(row.unit_cost)*row.qty);seen.add(row.code);
+    }
+    const summary={rows:input.rows.length,units:input.rows.reduce((n,r)=>n+r.qty,0),warehouses:new Set(input.rows.map(r=>r.warehouse)).size,issues:issues.slice(0,100),issue_count:issues.length};
+    if(b.action==='preview_import')return {ok:true,...summary};
+    if(issues.length)throw new Failure('Импортын зөрчлийг эхлээд засна уу. '+issues[0],409);
+    const warehouses=new Map((await d.prepare('SELECT id,name FROM inventory_warehouses').all<{id:string;name:string}>()).results.map(w=>[w.name,w.id]));
+    const statements:ReturnType<DatabaseSession['prepare']>[]=[];
+    for(const row of input.rows){
+     if(!warehouses.has(row.warehouse)){const id=crypto.randomUUID();warehouses.set(row.warehouse,id);statements.push(d.prepare('INSERT INTO inventory_warehouses(id,name,created_at) VALUES(?,?,?)').bind(id,row.warehouse,now));}
+     const id=crypto.randomUUID(),value=row.total_cost!==undefined?cents(row.total_cost):safeTotal(cents(row.unit_cost)*row.qty);
+     statements.push(d.prepare('INSERT INTO inventory_items(id,code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.code,row.brand,row.name,row.variant,row.imei||null,row.sale_price,row.capacity,row.color,row.supplier,row.min_stock,m.email,now,now));
+     if(row.qty)statements.push(d.prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,value_cents,cost_estimated,occurred_at,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),id,warehouses.get(row.warehouse)!,'opening',row.qty,value/row.qty/100,value,0,input.as_of,b.request_id||id,'Excel Balance эхний үлдэгдэл',m.email,now));
+    }
+    for(let i=0;i<statements.length;i+=150)await d.batch(statements.slice(i,i+150));
+    return {ok:true,...summary};
+   }
+   throw new Failure('Тодорхойгүй үйлдэл.');
+  };
+  const value=await run();
+  if(b.request_id&&b.action!=='preview_import')await d.prepare('INSERT INTO inventory_requests(id,action,payload,response,created_at) VALUES(?,?,?,?,?)').bind(b.request_id,b.action,payload,JSON.stringify(value),now).run();
+  return value;
+ });return json(result);
+}catch(e){return error(e);}}

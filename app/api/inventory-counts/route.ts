@@ -1,3 +1,5 @@
+import {stockAt,movement} from '@/lib/inventory';
+import type {DatabaseSession} from '@/lib/database';
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
@@ -7,13 +9,13 @@ const db=()=>env.DB!;
 // Маркетинг, IT хоёул агуулахын үйл ажиллагаатай хамааралгүй тул хаана; Удирдлага, Ахлах, Админ,
 // агент бүгд агуулахын тооллогод хамрагдана.
 function assertAccess(m:Member){if(isIsolatedRole(m.role))throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
-async function getCount(id:string){
- const t=await db().prepare('SELECT * FROM inventory_counts WHERE id=?').bind(id).first<InventoryCount>();
+async function getCount(id:string,source:DatabaseSession=db()){
+ const t=await source.prepare('SELECT * FROM inventory_counts WHERE id=?').bind(id).first<InventoryCount>();
  if(!t)throw new Failure('Тооллого олдсонгүй.',404);
  return t;
 }
-async function warehouseName(id:string){
- const w=await db().prepare('SELECT name FROM inventory_warehouses WHERE id=?').bind(id).first<{name:string}>();
+async function warehouseName(id:string,source:DatabaseSession=db()){
+ const w=await source.prepare('SELECT name FROM inventory_warehouses WHERE id=?').bind(id).first<{name:string}>();
  if(!w)throw new Failure('Агуулах олдсонгүй.',404);
  return w.name;
 }
@@ -26,8 +28,8 @@ const taskSchema=z.object({
  due_at:z.string().datetime().nullable(),
  note:z.string().trim().max(2000).optional(),
 });
-async function validOwner(email:string){
- if(!await db().prepare('SELECT email FROM members WHERE email=? AND active=1').bind(email).first())throw new Failure('Идэвхтэй ажилтан сонгоно уу.');
+async function validOwner(email:string,source:DatabaseSession=db()){
+ if(!await source.prepare("SELECT email FROM members WHERE email=? AND active=1 AND role NOT IN ('marketing','it')").bind(email).first())throw new Failure('Агуулахад хандах эрхтэй идэвхтэй ажилтан сонгоно уу.');
 }
 function err(e:unknown){
  if(e instanceof Failure)return Response.json({error:e.message},{status:e.status});
@@ -57,7 +59,7 @@ export async function GET(req:Request){try{
  // Календарь горим: тухайн шүүлтүүрээр хязгаарлаад, зөвхөн сонгосон сард due_at тохирох хөнгөн мөрүүдийг буцаана.
  if(url.searchParams.get('calendar')==='1'){
   const monthParam=(url.searchParams.get('month')||'').slice(0,7);
-  if(!/^\d{4}-\d{2}$/.test(monthParam))throw new Failure('Сар буруу.');
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam))throw new Failure('Сар буруу.');
   const [my,mm]=monthParam.split('-').map(Number);
   const nextMonth=mm===12?`${my+1}-01`:`${my}-${String(mm+1).padStart(2,'0')}`;
   const monthStartIso=new Date(monthParam+'-01T00:00:00+08:00').toISOString();
@@ -91,26 +93,33 @@ export async function POST(req:Request){try{
  const raw=await req.text();
  if(raw.length>200000)throw new Failure('Мэдээлэл хэт их.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
+ return await env.DB.transaction(async tx=>{
+ const db=()=>tx;
  if(b.action==='create'){
   const d=taskSchema.parse(b.data);
-  await validOwner(d.owner);
-  await warehouseName(d.warehouse_id);
+  if(d.status==='done')throw new Failure('Тоолсон дүнгээ баталгаажуулж дуусгана уу.');
+  await validOwner(d.owner,tx);
+  await warehouseName(d.warehouse_id,tx);
   const id=crypto.randomUUID();
+  const revision=await db().prepare('SELECT COALESCE(MAX(rowid),0) revision FROM inventory_stock_moves WHERE warehouse_id=?').bind(d.warehouse_id).first<{revision:number}>();
   // Тухайн агуулахад одоогоор тэг биш үлдэгдэлтэй бүх барааг тооллогын мөр болгож урьдчилж үүсгэнэ.
   const stockRows=await db().prepare(`SELECT item_id,COALESCE(SUM(qty_delta),0) qty FROM inventory_stock_moves WHERE warehouse_id=? GROUP BY item_id HAVING qty!=0`).bind(d.warehouse_id).all<{item_id:string;qty:number}>();
   await db().batch([
-   db().prepare('INSERT INTO inventory_counts(id,title,category,owner,status,due_at,note,created_by,created_at,updated_at,warehouse_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,d.title,'',d.owner,d.status,d.due_at,d.note||'',m.email,now,now,d.warehouse_id),
+   db().prepare('INSERT INTO inventory_counts(id,title,category,owner,status,due_at,note,created_by,created_at,updated_at,warehouse_id,stock_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,d.title,'',d.owner,d.status,d.due_at,d.note||'',m.email,now,now,d.warehouse_id,revision!.revision),
    db().prepare('INSERT INTO inventory_count_activities(id,count_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,`Тооллого бүртгэж, ${stockRows.results.length} бараа мөр үүсгэв.`,m.email,now),
    ...stockRows.results.map(r=>db().prepare('INSERT INTO inventory_count_lines(id,count_id,item_id,expected_qty) VALUES(?,?,?,?)').bind(crypto.randomUUID(),id,r.item_id,r.qty)),
   ]);
   return Response.json({ok:true,id});
  }
  if(!b.id||!b.version)throw new Failure('Тооллогын хувилбар дутуу.');
- const t=await getCount(b.id);
+ const t=await getCount(b.id,tx);
+ if(b.action==='finalize'&&t.status==='done')return Response.json({ok:true,adjusted:0,already_finalized:true});
+ if(b.action!=='activity'&&(t.status==='done'||t.status==='cancelled'))throw new Failure('Хаагдсан тооллогыг өөрчлөх боломжгүй.',409);
  if(t.version!==b.version)throw new Failure('Өөр хүн шинэчилсэн байна. Дахин нээнэ үү.',409);
  if(b.action==='update'){
   const d=taskSchema.parse(b.data);
-  await validOwner(d.owner);
+  if(d.status==='done')throw new Failure('Тоолсон дүнгээ баталгаажуулж дуусгана уу.');
+  await validOwner(d.owner,tx);
   // Тооллого үүссэний дараа агуулахыг өөрчилвөл мөрүүд буруу болох тул зөвхөн бусад талбарыг шинэчилнэ.
   const r=await db().batch([
    db().prepare('UPDATE inventory_counts SET title=?,owner=?,status=?,due_at=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?').bind(d.title,d.owner,d.status,d.due_at,d.note||'',now,t.id,b.version),
@@ -130,6 +139,9 @@ export async function POST(req:Request){try{
  }
  if(b.action==='save_lines'){
   const d=z.object({lines:z.array(z.object({line_id:z.string().min(1),counted_qty:z.number().int().min(0).max(1000000).nullable()})).min(1).max(5000)}).parse(b.data);
+  const ids=new Set(d.lines.map(l=>l.line_id));
+  const existing=(await db().prepare('SELECT id FROM inventory_count_lines WHERE count_id=?').bind(t.id).all<{id:string}>()).results;
+  if(ids.size!==d.lines.length||d.lines.some(l=>!existing.some(e=>e.id===l.line_id)))throw new Failure('Тооллогын мөр буруу.');
   const r=await db().batch([
    db().prepare('UPDATE inventory_counts SET updated_at=?,version=version+1 WHERE id=? AND version=?').bind(now,t.id,b.version),
    ...d.lines.map(l=>db().prepare('UPDATE inventory_count_lines SET counted_qty=? WHERE id=? AND count_id=?').bind(l.counted_qty,l.line_id,t.id)),
@@ -138,16 +150,21 @@ export async function POST(req:Request){try{
   return Response.json({ok:true});
  }
  if(b.action==='finalize'){
-  // Тоолсон бүх мөрийн зөрүүг агуулахын үлдэгдэлд шууд тохируулж, тооллогыг "Дууссан" болгоно.
-  const lines=await db().prepare('SELECT item_id,expected_qty,counted_qty FROM inventory_count_lines WHERE count_id=? AND counted_qty IS NOT NULL').bind(t.id).all<{item_id:string;expected_qty:number;counted_qty:number}>();
+  const lines=await db().prepare('SELECT item_id,expected_qty,counted_qty FROM inventory_count_lines WHERE count_id=?').bind(t.id).all<{item_id:string;expected_qty:number;counted_qty:number|null}>();
+  if(!lines.results.length||lines.results.some(l=>l.counted_qty===null))throw new Failure('Бүх барааг тоолж дүнг оруулсны дараа дуусгана уу.');
+  const revision=await db().prepare('SELECT COALESCE(MAX(rowid),0) revision FROM inventory_stock_moves WHERE warehouse_id=?').bind(t.warehouse_id).first<{revision:number}>();
+  if(t.stock_revision!==revision!.revision)throw new Failure('Тооллого эхэлснээс хойш агуулахын хөдөлгөөн өөрчлөгдсөн. Шинэ тооллого үүсгэн дахин тулгана уу.',409);
   const adjustments=lines.results.filter(l=>l.counted_qty!==l.expected_qty);
-  const r=await db().batch([
-   db().prepare('UPDATE inventory_counts SET status=?,updated_at=?,version=version+1 WHERE id=? AND version=?').bind('done',now,t.id,b.version),
-   db().prepare('INSERT INTO inventory_count_activities(id,count_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,`Тооллого дуусгав: ${lines.results.length} бараа тоологдож, ${adjustments.length} зөрүү илэрсэн тул үлдэгдэлд тохируулав.`,m.email,now),
-   ...adjustments.map(l=>db().prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),l.item_id,t.warehouse_id,'count_adjustment',l.counted_qty-l.expected_qty,null,t.id,'Тооллогоор тохируулав: '+t.title,m.email,now)),
-  ]);
-  if(!r[0].meta.changes)throw new Failure('Тооллого шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
+  for(const l of adjustments){
+   const stock=await stockAt(tx,l.item_id,t.warehouse_id!);
+   const difference=l.counted_qty!-l.expected_qty;
+   const value=l.counted_qty===0?-stock.value_cents:Math.round((stock.qty?stock.value_cents/stock.qty:0)*difference);
+   await movement(tx,{item:l.item_id,warehouse:t.warehouse_id!,kind:'count_adjustment',qty:difference,value,estimated:stock.cost_estimated,ref:t.id,actor:m.email,at:now,note:'Тооллогоор тохируулав: '+t.title});
+  }
+  await db().prepare("UPDATE inventory_counts SET status='done',updated_at=?,version=version+1 WHERE id=? AND version=?").bind(now,t.id,b.version).run();
+  await db().prepare('INSERT INTO inventory_count_activities(id,count_id,note,actor,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,`Тооллого дуусгав: ${lines.results.length} бараа, ${adjustments.length} зөрүү тохируулав.`,m.email,now).run();
   return Response.json({ok:true,adjusted:adjustments.length});
  }
  throw new Failure('Тодорхойгүй үйлдэл.');
+ });
 }catch(e){return err(e);}}
