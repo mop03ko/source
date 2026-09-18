@@ -2,7 +2,7 @@
 import {useUnsavedChanges} from '@/components/draft-guard';
 import AvatarImage from 'next/image';
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
-import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus} from 'lucide-react';
+import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus,Pin} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
@@ -47,11 +47,15 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const peers=members.filter(p=>p.email!==me.email&&p.active);
  // Тухайн (сонгосон) сувагт эрхтэй бусад идэвхтэй гишүүд; "N/M үзсэн" тооны хуваарь энд хамаарна.
  const channelPeers=isChannel(peer)?peers.filter(p=>channelsForRole(p.role).includes(peer)):[];
- // Чатын жагсаалт (суваг + хувийн харилцан яриа) хамгийн сүүлд ирсэн мессежээр эрэмбэлэгдэнэ.
+ // Групп чат (суваг)-ууд байнга дээд талд бэхлэгдэнэ; хувийн харилцан яриа доор нь хамгийн сүүлд
+ // ирсэн мессежээр эрэмбэлэгдэнэ.
  const listItems=[
   ...(summary?.channels||[]).map(c=>({kind:'channel' as const,id:c.channel,label:c.label,last:c.last,unread:c.unread,member:null as Member|null})),
   ...peers.map(p=>{const c=conversations.find(x=>x.peer===p.email);return {kind:'peer' as const,id:p.email,label:p.name,last:c||null,unread:c?.unread||0,member:p};}),
- ].sort((a,b)=>(b.last?.created_at||'').localeCompare(a.last?.created_at||''));
+ ].sort((a,b)=>{
+  if(a.kind!==b.kind)return a.kind==='channel'?-1:1;
+  return (b.last?.created_at||'').localeCompare(a.last?.created_at||'');
+ });
  const pickImage=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setImageError('');if(!file.type.startsWith('image/')){setImageError('Зөвхөн зураг сонгоно уу.');return;}if(file.size>MAX_IMAGE){setImageError('Зургийн хэмжээ 5MB-аас бага байна.');return;}try{const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Файл уншиж чадсангүй.'));reader.onload=()=>resolve(reader.result as string);reader.readAsDataURL(file);});setImage(data);}catch(e){setImageError((e as Error).message);}};
  const loadConversations=useCallback(async()=>{try{const [c,s]=await Promise.all([request() as Promise<{items:Conversation[]}>,request(undefined,'?summary=1') as Promise<Summary>]);setConversations(c.items);setSummary(s);}catch(e){setError((e as Error).message);}},[]);
  const loadThread=useCallback(async(p:string)=>{try{if(isChannel(p)){const d=await request(undefined,'?team=1&channel='+p) as {items:Msg[];reads:TeamRead[]};if(selectedPeer.current===p){setThread(d.items);setTeamReads(d.reads);setError('');}}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};if(selectedPeer.current===p){setThread(d.items);setError('');}}}catch(e){if(selectedPeer.current===p)setError((e as Error).message);}},[]);
@@ -85,7 +89,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  return <div className={"chat-layout"+(peer?" has-peer":"")}>
  <aside className="chat-list"><div className="chat-list-head"><h2>Чат</h2>{loading&&<Loader2 size={15} className="spin muted"/>}</div>
  {!peer&&error&&<div className="error-box" role="alert">{error}<Button onClick={()=>void loadConversations()}>Дахин оролдох</Button></div>}<div className="chat-list-scroll">
- {listItems.map(item=>item.kind==='channel'?<button key={'c-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar chat-avatar-team"><Users size={16}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.sender===me.email?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>:<button key={'p-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar">{item.member!.avatar?<AvatarImage width={192} height={192} unoptimized src={item.member!.avatar} alt=""/>:item.member!.name.slice(0,1)}<i className={'chat-status'+(online(item.id)?' online':'')}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.mine?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>)}
+ {listItems.map(item=>item.kind==='channel'?<button key={'c-'+item.id} className={'chat-peer chat-peer-pinned'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar chat-avatar-team"><Users size={16}/></span><span className="chat-peer-info"><strong>{item.label}<Pin size={11} className="pin-icon"/></strong>{item.last&&<small>{item.last.sender===me.email?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>:<button key={'p-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar">{item.member!.avatar?<AvatarImage width={192} height={192} unoptimized src={item.member!.avatar} alt=""/>:item.member!.name.slice(0,1)}<i className={'chat-status'+(online(item.id)?' online':'')}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.mine?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>)}
  {!peers.length&&<p className="muted chat-empty-list">Идэвхтэй бусад ажилтан алга.</p>}</div></aside>
  <section className="chat-thread">{!peer?<div className="chat-empty"><MessageSquare size={28}/><strong>Ажилтан эсвэл суваг сонгоно уу</strong><p>Жагсаалтаас ажилтан эсвэл суваг сонгоод чат эхлүүлээрэй.</p></div>:<>
  <div className="chat-thread-head"><Button className="chat-back" variant="ghost" size="icon" disabled={busy} aria-label="Чатын жагсаалт руу буцах" onClick={()=>selectPeer('')}><ArrowLeft size={18}/></Button>{!peerIsChannel&&<span className="chat-avatar">{avatarOf(peer)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(peer)!} alt=""/>:name(peer).slice(0,1)}<i className={'chat-status'+(online(peer)?' online':'')}/></span>}<span><strong>{name(peer)}</strong>{!peerIsChannel&&<small>{online(peer)?'Онлайн':'Идэвхгүй'}</small>}</span></div>
