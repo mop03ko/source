@@ -17,7 +17,7 @@ export async function sendSms(toNumber: string, message: string) {
     signal: AbortSignal.timeout(10000),
   });
   const raw = await r.text();
-  let d: { success?: boolean; message?: string } | null = null;
+  let d: { success?: boolean; message?: string; messages?: string[] } | null = null;
   try {
     d = JSON.parse(raw);
   } catch {
@@ -27,9 +27,10 @@ export async function sendSms(toNumber: string, message: string) {
     // Vercel-ийн function log-д бодит хариуг бүтнээр нь үлдээж, шалтгааныг олоход туслана
     // (жишээ нь буруу дугаарын формат, template тохироогүй г.м нийлүүлэгчийн талын алдаа байж болно).
     console.error("SMS send failed", r.status, raw.slice(0, 500));
-    throw new Error(
-      d?.message ? `${d.message} (${r.status})` : `SMS илгээж чадсангүй (${r.status}).`,
-    );
+    // Нийлүүлэгчийн "message" талбар ерөнхий ("Bad Request" гэх мэт) байдаг тул бодит шалтгааг
+    // агуулсан "messages" массивыг байвал давуу тал болгож ашиглана.
+    const detail = d?.messages?.length ? d.messages.join(" ") : d?.message;
+    throw new Error(detail ? `${detail} (${r.status})` : `SMS илгээж чадсангүй (${r.status}).`);
   }
   return d;
 }
