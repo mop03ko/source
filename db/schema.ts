@@ -18,6 +18,10 @@ export const messages=sqliteTable('messages',{id:text('id').primaryKey(),pairKey
 // уншсан эсэхийг мессеж бүрээр биш, хүн + суваг хосын сүүлд уншсан цагаар хэмжинэ.
 export const teamMessages=sqliteTable('team_messages',{id:text('id').primaryKey(),channel:text('channel').notNull().default('all'),sender:text('sender').notNull(),body:text('body').notNull(),createdAt:text('created_at').notNull(),replyToId:text('reply_to_id'),replyToSender:text('reply_to_sender'),replyToBody:text('reply_to_body'),image:text('image')},t=>[index('team_messages_created').on(t.channel,t.createdAt)]);
 export const teamReads=sqliteTable('team_reads',{email:text('email').notNull(),channel:text('channel').notNull().default('all'),lastReadAt:text('last_read_at').notNull()},t=>[uniqueIndex('team_reads_email_channel').on(t.email,t.channel)]);
+// Ахлах, Админ (админтай адил эрхтэй Удирдлага орно) чөлөөтэй үүсгэдэг групп чат; team_messages/team_reads-ийг
+// "all"/"marketing"/"sales"-тай адилаар channel id-гаараа дундаа ашиглана, схем өөрчлөх шаардлагагүй.
+export const groupChats=sqliteTable('group_chats',{id:text('id').primaryKey(),name:text('name').notNull(),createdBy:text('created_by').notNull(),createdAt:text('created_at').notNull()});
+export const groupChatMembers=sqliteTable('group_chat_members',{channelId:text('channel_id').notNull(),email:text('email').notNull()},t=>[uniqueIndex('group_chat_members_unique').on(t.channelId,t.email),index('group_chat_members_email').on(t.email)]);
 // DM болон багийн мессеж хоёуланд нь ашиглагддаг тул message_kind-ээр ялгана; нэг хүн нэг мессежид
 // ижил emoji-г давхар нэмэхгүй байхыг unique index-ээр (toggle: дахин дарвал хасна) хангана.
 export const messageReactions=sqliteTable('message_reactions',{id:text('id').primaryKey(),messageKind:text('message_kind').notNull(),messageId:text('message_id').notNull(),emoji:text('emoji').notNull(),actor:text('actor').notNull(),createdAt:text('created_at').notNull()},t=>[index('reactions_message').on(t.messageKind,t.messageId),uniqueIndex('reactions_unique').on(t.messageKind,t.messageId,t.emoji,t.actor)]);

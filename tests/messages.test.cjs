@@ -98,5 +98,27 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  assert.deepEqual(d.channels.map(c=>c.channel).sort(),['marketing','sales']);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  [status,d]=await get('?summary=1');assert.deepEqual(d.channels.map(c=>c.channel).sort(),['all','marketing','sales']);
- console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, and director DM isolation (manager/admin only).');
+ // Групп чат: зөвхөн Ахлах, Админ (isAdminLike) үүсгэнэ; идэвхтэй гишүүд л оруулж болно, сонгосон
+ // гишүүд л уг сувагт унших/бичих боломжтой (тогтмол сувгуудтай адил channelAccess-ээр шалгагдана).
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post({action:'create_group',name:'Project X',members:['manager@example.test']}))[0],403);
+ user={userId:'mgr',email:'manager@example.test',displayName:'Manager'};
+ assert.equal((await post({action:'create_group',name:'',members:['agent@example.test']}))[0],400); // хоосон нэр
+ assert.equal((await post({action:'create_group',name:'Project X',members:['nobody@example.test']}))[0],400); // байхгүй гишүүн
+ [status,d]=await post({action:'create_group',name:'Project X',members:['agent@example.test','second@example.test']});
+ assert.equal(status,200);const groupId=d.id;
+ assert.equal((await post({action:'send_team',channel:groupId,body:'Тавтай морил'}))[0],200);
+ [status,d]=await get('?team=1&channel='+groupId);assert.equal(status,200);assert.equal(d.items.length,1);assert.equal(d.memberCount,2);
+ user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
+ assert.equal((await get('?team=1&channel='+groupId))[0],403);
+ assert.equal((await post({action:'send_team',channel:groupId,body:'x'}))[0],403);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ [status,d]=await get('?team=1&channel='+groupId);assert.equal(status,200);const welcomeId=d.items[0].id;
+ assert.equal((await post({action:'send_team',channel:groupId,body:'Баярлалаа',replyTo:welcomeId}))[0],200);
+ assert.equal((await post({action:'react',kind:'team',messageId:welcomeId,emoji:'👍'}))[0],200);
+ assert.equal((await post({action:'read_team',channel:groupId}))[0],200);
+ [status,d]=await get('?summary=1');assert.ok(d.channels.some(c=>c.channel===groupId&&c.label==='Project X'));
+ user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
+ [status,d]=await get('?summary=1');assert.ok(!d.channels.some(c=>c.channel===groupId));
+ console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), and manager/admin-created group chats with membership-based access control.');
 })().catch(e=>{console.error(e);process.exit(1)});

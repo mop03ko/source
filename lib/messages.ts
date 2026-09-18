@@ -1,6 +1,32 @@
 import {env} from './runtime';
-import {channelsForRole} from './crm';
+import {channelsForRole,teamChannels} from './crm';
 const db=()=>env.DB!;
+// Тогтмол 3 сувгаас гадна Ахлах, Админ (isAdminLike) чөлөөтэй үүсгэдэг групп чат байдаг тул хандах эрхийг
+// сувгийн төрлөөр нь ялгаж шалгана: тогтмол суваг бол channelsForRole, групп чат бол гишүүнчлэл.
+export async function channelAccess(viewer:{email:string;role:string},channel:string):Promise<{ok:boolean;label:string}> {
+ if(Object.hasOwn(teamChannels,channel))return {ok:channelsForRole(viewer.role).includes(channel),label:teamChannels[channel]};
+ const row=await db().prepare('SELECT g.name name FROM group_chats g JOIN group_chat_members gm ON gm.channel_id=g.id WHERE g.id=? AND gm.email=?').bind(channel,viewer.email).first<{name:string}>();
+ return {ok:!!row,label:row?.name||''};
+}
+export type GroupChatSummary={id:string;name:string};
+export async function myGroupChats(email:string):Promise<GroupChatSummary[]>{
+ const r=await db().prepare('SELECT g.id id,g.name name FROM group_chats g JOIN group_chat_members gm ON gm.channel_id=g.id WHERE gm.email=? ORDER BY g.created_at').bind(email).all<GroupChatSummary>();
+ return r.results;
+}
+// Тухайн групп чатын идэвхтэй гишүүдийн тоо (viewer-ээ эс тооцож), клиент талд "N/M үзсэн" харуулахад ашиглана.
+export async function groupChatMemberCount(channel:string,exclude:string){
+ const r=await db().prepare('SELECT COUNT(*) total FROM group_chat_members gm JOIN members m ON m.email=gm.email WHERE gm.channel_id=? AND m.active=1 AND gm.email!=?').bind(channel,exclude).first<{total:number}>();
+ return r?.total||0;
+}
+export async function createGroupChat(name:string,createdBy:string,members:string[]){
+ const id=crypto.randomUUID(),now=new Date().toISOString();
+ const roster=Array.from(new Set([...members,createdBy]));
+ await db().batch([
+  db().prepare('INSERT INTO group_chats(id,name,created_by,created_at) VALUES(?,?,?,?)').bind(id,name,createdBy,now),
+  ...roster.map(email=>db().prepare('INSERT INTO group_chat_members(channel_id,email) VALUES(?,?)').bind(id,email)),
+ ]);
+ return {id,created_at:now};
+}
 export const pairKey=(a:string,b:string)=>[a,b].sort().join('|');
 export type Reaction={emoji:string;count:number;mine:boolean;actors:string[]};
 export type ReplySnapshot={id:string;sender:string;body:string};
@@ -23,7 +49,7 @@ async function attachReactions<T extends {id:string}>(kind:'dm'|'team',rows:T[],
 export async function messageSnapshot(kind:'dm'|'team',messageId:string,viewer:{email:string;role:string}):Promise<ReplySnapshot|null>{
  if(kind==='team'){
   const t=await db().prepare('SELECT id,sender,body,channel FROM team_messages WHERE id=?').bind(messageId).first<ReplySnapshot&{channel:string}>();
-  if(!t||!channelsForRole(viewer.role).includes(t.channel))return null;
+  if(!t||!(await channelAccess(viewer,t.channel)).ok)return null;
   return {id:t.id,sender:t.sender,body:t.body};
  }
  const m=await db().prepare('SELECT id,sender,recipient,body FROM messages WHERE id=?').bind(messageId).first<ReplySnapshot&{recipient:string}>();

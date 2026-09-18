@@ -1,30 +1,39 @@
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {env} from '@/lib/runtime';
-import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState,messageSnapshot,toggleReaction} from '@/lib/messages';
-import {teamChannels,channelsForRole,canDm} from '@/lib/crm';
+import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState,messageSnapshot,toggleReaction,channelAccess,myGroupChats,groupChatMemberCount,createGroupChat} from '@/lib/messages';
+import {teamChannels,channelsForRole,canDm,isAdminLike} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'Мессежийн хүсэлт буруу.':(e as Error).message},{status:(e as {status?:number}).status||400});
-const channelSchema=z.enum(Object.keys(teamChannels) as [string,...string[]]);
+// Тогтмол 3 сувгаас гадна Ахлах, Админ үүсгэсэн групп чатын id (UUID) энд орох тул чөлөөт стринг болгосон;
+// хандах эрхийг channelAccess() өөрөө (тогтмол бол channelsForRole, групп бол гишүүнчлэл) шалгана.
+const channelSchema=z.string().min(1).max(80);
+const canCreateGroup=(role:string)=>role==='manager'||isAdminLike(role);
 // base64-руу хөрвүүлэхэд эх файлын хэмжээ ойролцоогоор 4/3 дахин нэмэгддэг тул 5MB-ийн decode-той тааруулав.
 const MAX_IMAGE_B64=Math.ceil(5*1024*1024/3)*4+64;
 const imageSchema=z.string().refine(v=>/^data:image\/(png|jpeg|webp|gif);base64,/.test(v),'Зөвхөн PNG/JPEG/WEBP/GIF зураг оруулна уу.').refine(v=>v.length<=MAX_IMAGE_B64,'Зургийн хэмжээ 5MB-аас бага байна.');
 export async function GET(req:Request){try{
  const m=await member(),url=new URL(req.url),myChannels=channelsForRole(m.role);
  if(url.searchParams.get('summary')==='1'){
-  const [dm,perChannel]=await Promise.all([
+  const groups=await myGroupChats(m.email);
+  const [dm,perChannel,perGroup]=await Promise.all([
    unreadTotal(m.email),
-   Promise.all(myChannels.map(async c=>({channel:c,label:teamChannels[c],unread:await teamUnread(m.email,c),last:await lastTeamMessage(c)||null}))),
+   Promise.all(myChannels.map(async c=>({channel:c,label:teamChannels[c],unread:await teamUnread(m.email,c),last:await lastTeamMessage(c)||null,group:false}))),
+   Promise.all(groups.map(async g=>({channel:g.id,label:g.name,unread:await teamUnread(m.email,g.id),last:await lastTeamMessage(g.id)||null,group:true}))),
   ]);
-  const team=perChannel.reduce((n,c)=>n+c.unread,0);
-  return Response.json({dm,team,total:dm+team,channels:perChannel},{headers:{'Cache-Control':'no-store'}});
+  const all=[...perChannel,...perGroup];
+  const team=all.reduce((n,c)=>n+c.unread,0);
+  return Response.json({dm,team,total:dm+team,channels:all},{headers:{'Cache-Control':'no-store'}});
  }
  if(url.searchParams.get('team')==='1'){
   const channel=channelSchema.safeParse(url.searchParams.get('channel')||'all');
-  if(!channel.success||!myChannels.includes(channel.data))throw new Failure('Энэ сувагт хандах эрхгүй.',403);
-  const [items,reads]=await Promise.all([teamMessages(m.email,channel.data),teamReadState(m.email,channel.data)]);
-  return Response.json({items,reads},{headers:{'Cache-Control':'no-store'}});
+  if(!channel.success)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
+  const access=await channelAccess(m,channel.data);
+  if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
+  const isGroup=!Object.hasOwn(teamChannels,channel.data);
+  const [items,reads,memberCount]=await Promise.all([teamMessages(m.email,channel.data),teamReadState(m.email,channel.data),isGroup?groupChatMemberCount(channel.data,m.email):Promise.resolve(null)]);
+  return Response.json({items,reads,memberCount},{headers:{'Cache-Control':'no-store'}});
  }
  const peer=(url.searchParams.get('peer')||'').trim().toLowerCase();
  if(peer)return Response.json({items:await thread(m.email,peer)},{headers:{'Cache-Control':'no-store'}});
@@ -40,17 +49,29 @@ export async function POST(req:Request){try{
   z.object({action:z.literal('send_team'),channel:channelSchema,body:z.string().trim().max(2000).default(''),image:imageSchema.optional(),replyTo:z.string().max(80).optional()}),
   z.object({action:z.literal('read_team'),channel:channelSchema}),
   z.object({action:z.literal('react'),kind:z.enum(['dm','team']),messageId:z.string().max(80),emoji:z.string().trim().min(1).max(8)}),
+  z.object({action:z.literal('create_group'),name:z.string().trim().min(1).max(80),members:z.array(z.string().email()).min(1).max(200)}),
  ]).parse(JSON.parse(text));
  if((b.action==='send'||b.action==='send_team')&&!b.body.trim()&&!b.image)throw new Failure('Мессеж эсвэл зураг оруулна уу.');
- const myChannels=channelsForRole(m.role);
+ if(b.action==='create_group'){
+  // Зөвхөн Ахлах, Админ (Удирдлага орно) шинэ групп чат үүсгэнэ; идэвхтэй гишүүдийг л оруулна.
+  if(!canCreateGroup(m.role))throw new Failure('Зөвхөн Ахлах, Админ групп чат үүсгэнэ.',403);
+  const emails=Array.from(new Set(b.members.map(e=>e.toLowerCase()))).filter(e=>e!==m.email);
+  if(!emails.length)throw new Failure('Дор хаяж нэг гишүүн сонгоно уу.');
+  const rows=await db().prepare(`SELECT email FROM members WHERE active=1 AND email IN (${emails.map(()=>'?').join(',')})`).bind(...emails).all<{email:string}>();
+  if(rows.results.length!==emails.length)throw new Failure('Идэвхтэй гишүүд сонгоно уу.');
+  const r=await createGroupChat(b.name,m.email,emails);
+  return Response.json({ok:true,...r});
+ }
  if(b.action==='send_team'){
-  if(!myChannels.includes(b.channel))throw new Failure('Энэ сувагт бичих эрхгүй.',403);
+  const access=await channelAccess(m,b.channel);
+  if(!access.ok)throw new Failure('Энэ сувагт бичих эрхгүй.',403);
   let replyTo=null;
   if(b.replyTo){replyTo=await messageSnapshot('team',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
   const r=await sendTeam(m.email,b.channel,b.body,replyTo,b.image);return Response.json({ok:true,...r});
  }
  if(b.action==='read_team'){
-  if(!myChannels.includes(b.channel))throw new Failure('Энэ сувагт хандах эрхгүй.',403);
+  const access=await channelAccess(m,b.channel);
+  if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
   await markTeamRead(m.email,b.channel);return Response.json({ok:true});
  }
  if(b.action==='react'){

@@ -2,14 +2,15 @@
 import {useUnsavedChanges} from '@/components/draft-guard';
 import AvatarImage from 'next/image';
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
-import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus,Pin} from 'lucide-react';
+import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus,Pin,Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
-import {dateLabel,teamChannels,channelsForRole,canDm} from '@/lib/crm';
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
+import {dateLabel,channelsForRole,canDm,isAdminLike} from '@/lib/crm';
 import type {Member} from '@/lib/crm';
 import {useClock} from '@/hooks/use-clock';
-const isChannel=(id:string)=>Object.hasOwn(teamChannels,id);
+const canCreateGroup=(role:string)=>role==='manager'||isAdminLike(role);
 // Идэвхтэй ажилтан бүр 30 секунд тутамд ямар нэг API-г polling хийдэг тул 90 секундийн цонх л хангалттай.
 const ONLINE_MS=90000;
 const EMOJIS=['😀','😁','😂','🤣','😊','🙂','😉','😍','😘','😎','🤔','😅','😢','😭','😡','😱','👍','👎','👏','🙏','💪','🔥','🎉','✅','❌','❤️','💯','🙌','👌','🤝','📌','⏰','📞','💬','😴','🥳','🤗','😐','🙄','🤩'];
@@ -18,7 +19,7 @@ type Conversation={peer:string;body:string;created_at:string;mine:boolean;unread
 type Reaction={emoji:string;count:number;mine:boolean;actors:string[]};
 type Msg={id:string;sender:string;recipient?:string;body:string;created_at:string;read_at?:string|null;reply_to_id?:string|null;reply_to_sender?:string|null;reply_to_body?:string|null;image?:string|null;reactions?:Reaction[]};
 type TeamRead={email:string;last_read_at:string};
-type ChannelSummary={channel:string;label:string;unread:number;last:{sender:string;body:string;created_at:string;image?:string|null}|null};
+type ChannelSummary={channel:string;label:string;unread:number;last:{sender:string;body:string;created_at:string;image?:string|null}|null;group?:boolean};
 type Summary={dm:number;team:number;total:number;channels:ChannelSummary[]};
 type ReplyTarget={id:string;sender:string;body:string};
 const snippet=(s:string,n=120)=>s.length>n?s.slice(0,n)+'…':s;
@@ -49,9 +50,20 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const stickToBottom=useRef(true);
  const onMessagesScroll=()=>{const el=messagesRef.current;if(!el)return;stickToBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;};
  const fileInputRef=useRef<HTMLInputElement>(null);
+ const [memberCount,setMemberCount]=useState<number|null>(null);
+ const [groupOpen,setGroupOpen]=useState(false),[groupName,setGroupName]=useState(''),[groupMembers,setGroupMembers]=useState<string[]>([]),[groupBusy,setGroupBusy]=useState(false),[groupError,setGroupError]=useState('');
  const peers=members.filter(p=>p.email!==me.email&&p.active&&canDm(me.role,p.role));
+ // Тогтмол 3 суваг болон Ахлах/Админ үүсгэсэн групп чат хоёулаа "channel" тул summary-д байгаа
+ // эсэхээр нь ялгана (teamChannels-ийн статик жагсаалтаас гадна групп чат динамикаар нэмэгддэг).
+ const channelIds=new Set((summary?.channels||[]).map(c=>c.channel));
+ const isChannel=(id:string)=>channelIds.has(id);
+ const channelIdsRef=useRef(channelIds);
+ useEffect(()=>{channelIdsRef.current=channelIds;});
+ const currentChannel=summary?.channels.find(c=>c.channel===peer);
  // Тухайн (сонгосон) сувагт эрхтэй бусад идэвхтэй гишүүд; "N/M үзсэн" тооны хуваарь энд хамаарна.
- const channelPeers=isChannel(peer)?peers.filter(p=>channelsForRole(p.role).includes(peer)):[];
+ // Групп чат бол сервэрээс ирсэн бодит гишүүдийн тоог, тогтмол суваг бол role-based тооцооллыг ашиглана.
+ const channelPeers=isChannel(peer)&&!currentChannel?.group?peers.filter(p=>channelsForRole(p.role).includes(peer)):[];
+ const seenDenominator=currentChannel?.group?(memberCount||0):channelPeers.length;
  // Групп чат (суваг)-ууд байнга дээд талд бэхлэгдэнэ; хувийн харилцан яриа доор нь хамгийн сүүлд
  // ирсэн мессежээр эрэмбэлэгдэнэ.
  const listItems=[
@@ -63,7 +75,8 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  });
  const pickImage=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setImageError('');if(!file.type.startsWith('image/')){setImageError('Зөвхөн зураг сонгоно уу.');return;}if(file.size>MAX_IMAGE){setImageError('Зургийн хэмжээ 5MB-аас бага байна.');return;}try{const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Файл уншиж чадсангүй.'));reader.onload=()=>resolve(reader.result as string);reader.readAsDataURL(file);});setImage(data);}catch(e){setImageError((e as Error).message);}};
  const loadConversations=useCallback(async()=>{try{const [c,s]=await Promise.all([request() as Promise<{items:Conversation[]}>,request(undefined,'?summary=1') as Promise<Summary>]);setConversations(c.items);setSummary(s);}catch(e){setError((e as Error).message);}},[]);
- const loadThread=useCallback(async(p:string)=>{try{if(isChannel(p)){const d=await request(undefined,'?team=1&channel='+p) as {items:Msg[];reads:TeamRead[]};if(selectedPeer.current===p){setThread(d.items);setTeamReads(d.reads);setError('');}}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};if(selectedPeer.current===p){setThread(d.items);setError('');}}}catch(e){if(selectedPeer.current===p)setError((e as Error).message);}},[]);
+ const createGroup=async(e:FormEvent)=>{e.preventDefault();if(!groupName.trim()||!groupMembers.length)return;setGroupBusy(true);setGroupError('');try{const d=await request({action:'create_group',name:groupName.trim(),members:groupMembers}) as {id:string};setGroupOpen(false);await loadConversations();selectPeer(d.id);}catch(e){setGroupError((e as Error).message);}finally{setGroupBusy(false);}};
+ const loadThread=useCallback(async(p:string)=>{try{if(channelIdsRef.current.has(p)){const d=await request(undefined,'?team=1&channel='+p) as {items:Msg[];reads:TeamRead[];memberCount:number|null};if(selectedPeer.current===p){setThread(d.items);setTeamReads(d.reads);setMemberCount(d.memberCount);setError('');}}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};if(selectedPeer.current===p){setThread(d.items);setError('');}}}catch(e){if(selectedPeer.current===p)setError((e as Error).message);}},[]);
  const seenCount=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).length;
  const seenBy=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).map(r=>r.email);
  // Идэвхгүй tab дээр polling зогсоож сервер рүү дэмий хүсэлт явуулахгүй.
@@ -87,12 +100,12 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
   }));
   try{await request({action:'react',kind,messageId:msg.id,emoji});}catch(e){setError((e as Error).message);void loadThread(peer);}
  };
- const name=(email:string)=>isChannel(email)?teamChannels[email]:members.find(p=>p.email===email)?.name||email;
+ const name=(email:string)=>isChannel(email)?(summary?.channels.find(c=>c.channel===email)?.label||email):members.find(p=>p.email===email)?.name||email;
  const avatarOf=(email:string)=>members.find(p=>p.email===email)?.avatar||null;
  const online=(email:string)=>{const p=members.find(x=>x.email===email);return !!p?.last_seen&&now-new Date(p.last_seen).getTime()<ONLINE_MS;};
  const peerIsChannel=isChannel(peer);
  return <div className={"chat-layout"+(peer?" has-peer":"")}>
- <aside className="chat-list"><div className="chat-list-head"><h2>Чат</h2>{loading&&<Loader2 size={15} className="spin muted"/>}</div>
+ <aside className="chat-list"><div className="chat-list-head"><h2>Чат</h2><div className="row">{loading&&<Loader2 size={15} className="spin muted"/>}{canCreateGroup(me.role)&&<Button type="button" variant="ghost" size="icon" aria-label="Групп чат үүсгэх" onClick={()=>{setGroupOpen(true);setGroupName('');setGroupMembers([]);setGroupError('');}}><Plus size={18}/></Button>}</div></div>
  {!peer&&error&&<div className="error-box" role="alert">{error}<Button onClick={()=>void loadConversations()}>Дахин оролдох</Button></div>}<div className="chat-list-scroll">
  {listItems.map(item=>item.kind==='channel'?<button key={'c-'+item.id} className={'chat-peer chat-peer-pinned'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar chat-avatar-team"><Users size={16}/></span><span className="chat-peer-info"><strong>{item.label}<Pin size={11} className="pin-icon"/></strong>{item.last&&<small>{item.last.sender===me.email?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>:<button key={'p-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar">{item.member!.avatar?<AvatarImage width={192} height={192} unoptimized src={item.member!.avatar} alt=""/>:item.member!.name.slice(0,1)}<i className={'chat-status'+(online(item.id)?' online':'')}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.mine?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>)}
  {!peers.length&&<p className="muted chat-empty-list">Идэвхтэй бусад ажилтан алга.</p>}</div></aside>
@@ -108,12 +121,18 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  <time>{dateLabel(msg.created_at)}</time>
  <div className="bubble-actions"><ReactionPicker onPick={e=>react(msg,e)}/><button type="button" className="bubble-action" aria-label="Хариулах" onClick={()=>setReplyTarget({id:msg.id,sender:msg.sender,body:msg.body})}><Reply size={13}/></button></div>
  {isLast&&mine&&!peerIsChannel&&<small className="seen-tag">{msg.read_at?'Үзсэн':'Илгээсэн'}</small>}
- {peerIsChannel&&channelPeers.length>0&&<small className="seen-tag" title={seenCount(msg.created_at)?seenBy(msg.created_at).map(name).join(', '):undefined}>{seenCount(msg.created_at)}/{channelPeers.length} үзсэн</small>}
+ {peerIsChannel&&seenDenominator>0&&<small className="seen-tag" title={seenCount(msg.created_at)?seenBy(msg.created_at).map(name).join(', '):undefined}>{seenCount(msg.created_at)}/{seenDenominator} үзсэн</small>}
  </div>;})}<div ref={bottomRef}/></div>
  {replyTarget&&<div className="chat-reply-banner"><Reply size={14}/><div><strong>{name(replyTarget.sender)}</strong><span>{snippet(replyTarget.body)}</span></div><button type="button" aria-label="Хариулахыг цуцлах" onClick={()=>setReplyTarget(null)}><X size={14}/></button></div>}
  {imageError&&<div role="alert" className="error-box">{imageError}</div>}
  {image&&<div className="chat-image-preview"><AvatarImage width={80} height={80} unoptimized src={image} alt=""/><button type="button" aria-label="Зураг хасах" onClick={()=>setImage(null)}><X size={14}/></button></div>}
  <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Button type="button" variant="ghost" size="icon" aria-label="Зураг хавсаргах" onClick={()=>fileInputRef.current?.click()}><ImagePlus size={18}/></Button><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={pickImage}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" aria-label="Мессеж илгээх" disabled={busy||(!body.trim()&&!image)}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>
  </>}</section>
+ <Dialog open={groupOpen} onOpenChange={setGroupOpen}><DialogContent><DialogHeader><DialogTitle>Шинэ групп чат</DialogTitle><DialogDescription>Нэр өгөөд, оруулах гишүүдээ сонгоно уу.</DialogDescription></DialogHeader><form className="form-stack" onSubmit={createGroup}>
+ {groupError&&<div role="alert" className="error-box">{groupError}</div>}
+ <label className="field"><span>Чатын нэр *</span><Input required maxLength={80} value={groupName} onChange={e=>setGroupName(e.target.value)} placeholder="Жишээ: Борлуулалтын төслийн баг"/></label>
+ <label className="field"><span>Гишүүд *</span><div className="group-member-list">{members.filter(p=>p.email!==me.email&&p.active).map(p=><label key={p.email} className="group-member-row"><input type="checkbox" checked={groupMembers.includes(p.email)} onChange={e=>setGroupMembers(g=>e.target.checked?[...g,p.email]:g.filter(x=>x!==p.email))}/><span>{p.name}</span><small>{p.email}</small></label>)}</div></label>
+ <Button type="submit" className="primary full" disabled={groupBusy||!groupName.trim()||!groupMembers.length}>{groupBusy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Үүсгэх</Button>
+ </form></DialogContent></Dialog>
  </div>;
 }
