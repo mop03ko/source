@@ -41,8 +41,13 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const selectedPeer=useRef('');
  const [drafts,setDrafts]=useState<Record<string,{body:string;image:string|null;reply:ReplyTarget|null}>>({});
  useUnsavedChanges(!!body||!!image||!!replyTarget||busy||Object.values(drafts).some(d=>!!d.body||!!d.image||!!d.reply));
- const selectPeer=(value:string)=>{if(value===peer||busy)return;setDrafts(d=>{const next={...d};if(peer)next[peer]={body,image,reply:replyTarget};delete next[value];return next;});const draft=drafts[value];selectedPeer.current=value;setPeer(value);setThread([]);setTeamReads([]);setBody(draft?.body||'');setReplyTarget(draft?.reply||null);setImage(draft?.image||null);setImageError('');setError('');};
+ const selectPeer=(value:string)=>{if(value===peer||busy)return;setDrafts(d=>{const next={...d};if(peer)next[peer]={body,image,reply:replyTarget};delete next[value];return next;});const draft=drafts[value];selectedPeer.current=value;stickToBottom.current=true;setPeer(value);setThread([]);setTeamReads([]);setBody(draft?.body||'');setReplyTarget(draft?.reply||null);setImage(draft?.image||null);setImageError('');setError('');};
  const bottomRef=useRef<HTMLDivElement>(null);
+ const messagesRef=useRef<HTMLDivElement>(null);
+ // Хэрэглэгч дээшээ гүйлгээд хуучин мессежээ уншиж байгаа бол poll бүрд доошоо шидэхгүй байхын тулд
+ // хамгийн доод хэсэгт байгаа эсэхийг хянана; шинэ чат сонгох бүрд дахин доошоо очно.
+ const stickToBottom=useRef(true);
+ const onMessagesScroll=()=>{const el=messagesRef.current;if(!el)return;stickToBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;};
  const fileInputRef=useRef<HTMLInputElement>(null);
  const peers=members.filter(p=>p.email!==me.email&&p.active&&canDm(me.role,p.role));
  // Тухайн (сонгосон) сувагт эрхтэй бусад идэвхтэй гишүүд; "N/M үзсэн" тооны хуваарь энд хамаарна.
@@ -66,9 +71,9 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  // Нээлттэй харилцан яриаг зэрэгцүүлж (thread ачаалах, уншсан гэж тэмдэглэх, жагсаалт шинэчлэх) 3 секунд
  // тутам хийснээр дараалсан 3 хүсэлтийн хүлээлтийг арилгаж, чат хурдан мэдрэгддэг болно.
  useEffect(()=>{if(!peer)return;let first=true;const tick=async()=>{if(document.visibilityState!=='visible')return;try{await Promise.all([loadThread(peer),request(isChannel(peer)?{action:'read_team',channel:peer}:{action:'read',peer}),loadConversations()]);}catch{}if(first){first=false;onRead();}};const onVisible=()=>void tick();void tick();const timer=setInterval(onVisible,3000);document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible);};},[peer,loadThread,loadConversations,onRead]);
- useEffect(()=>{bottomRef.current?.scrollIntoView({block:'nearest'});},[thread]);
+ useEffect(()=>{if(stickToBottom.current)bottomRef.current?.scrollIntoView({block:'nearest'});},[thread]);
  // Илгээх дарангуутаа мессежийг шууд бөмбөлөгт харуулж (optimistic), дараа нь бодит хариугаар баталгаажуулна.
- const submit=async(e:FormEvent)=>{e.preventDefault();const text=body.trim();if((!text&&!image)||!peer)return;const tempId='tmp-'+Date.now();const replying=replyTarget,pendingImage=image;setThread(t=>[...t,{id:tempId,sender:me.email,body:text,created_at:new Date().toISOString(),reply_to_id:replying?.id||null,reply_to_sender:replying?.sender||null,reply_to_body:replying?.body||null,image:pendingImage}]);setBody('');setReplyTarget(null);setImage(null);setImageError('');setBusy(true);try{await request(isChannel(peer)?{action:'send_team',channel:peer,body:text,image:pendingImage||undefined,replyTo:replying?.id}:{action:'send',peer,body:text,image:pendingImage||undefined,replyTo:replying?.id});await Promise.all([loadThread(peer),loadConversations()]);}catch(e){setThread(t=>t.filter(m=>m.id!==tempId));setError((e as Error).message);setBody(text);setReplyTarget(replying);setImage(pendingImage);}finally{setBusy(false);}};
+ const submit=async(e:FormEvent)=>{e.preventDefault();const text=body.trim();if((!text&&!image)||!peer)return;const tempId='tmp-'+Date.now();const replying=replyTarget,pendingImage=image;stickToBottom.current=true;setThread(t=>[...t,{id:tempId,sender:me.email,body:text,created_at:new Date().toISOString(),reply_to_id:replying?.id||null,reply_to_sender:replying?.sender||null,reply_to_body:replying?.body||null,image:pendingImage}]);setBody('');setReplyTarget(null);setImage(null);setImageError('');setBusy(true);try{await request(isChannel(peer)?{action:'send_team',channel:peer,body:text,image:pendingImage||undefined,replyTo:replying?.id}:{action:'send',peer,body:text,image:pendingImage||undefined,replyTo:replying?.id});await Promise.all([loadThread(peer),loadConversations()]);}catch(e){setThread(t=>t.filter(m=>m.id!==tempId));setError((e as Error).message);setBody(text);setReplyTarget(replying);setImage(pendingImage);}finally{setBusy(false);}};
  // Дарахад шууд орон нутагт тэмдэглээд, серверт мэдэгдэнэ; алдаа гарвал бодит thread-ээр солино.
  const react=async(msg:Msg,emoji:string)=>{
   const kind=isChannel(peer)?'team':'dm';
@@ -94,7 +99,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  <section className="chat-thread">{!peer?<div className="chat-empty"><MessageSquare size={28}/><strong>Ажилтан эсвэл суваг сонгоно уу</strong><p>Жагсаалтаас ажилтан эсвэл суваг сонгоод чат эхлүүлээрэй.</p></div>:<>
  <div className="chat-thread-head"><Button className="chat-back" variant="ghost" size="icon" disabled={busy} aria-label="Чатын жагсаалт руу буцах" onClick={()=>selectPeer('')}><ArrowLeft size={18}/></Button>{!peerIsChannel&&<span className="chat-avatar">{avatarOf(peer)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(peer)!} alt=""/>:name(peer).slice(0,1)}<i className={'chat-status'+(online(peer)?' online':'')}/></span>}<span><strong>{name(peer)}</strong>{!peerIsChannel&&<small>{online(peer)?'Онлайн':'Идэвхгүй'}</small>}</span></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
- <div className="chat-messages">{!thread.length&&<p className="muted chat-empty-list">Мессеж алга. Эхний мессежээ бичээрэй.</p>}{thread.map((msg,i)=>{const isLast=i===thread.length-1,mine=msg.sender===me.email;return <div key={msg.id} className={'chat-bubble'+(mine?' mine':'')}>
+ <div className="chat-messages" ref={messagesRef} onScroll={onMessagesScroll}>{!thread.length&&<p className="muted chat-empty-list">Мессеж алга. Эхний мессежээ бичээрэй.</p>}{thread.map((msg,i)=>{const isLast=i===thread.length-1,mine=msg.sender===me.email;return <div key={msg.id} className={'chat-bubble'+(mine?' mine':'')}>
  {peerIsChannel&&!mine&&<small><span className="chat-avatar chat-avatar-tiny">{avatarOf(msg.sender)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(msg.sender)!} alt=""/>:name(msg.sender).slice(0,1)}</span>{name(msg.sender)}</small>}
  {msg.reply_to_id&&<div className="chat-reply-quote"><strong>{name(msg.reply_to_sender||'')}</strong><span>{snippet(msg.reply_to_body||'')}</span></div>}
  {msg.body&&<p>{msg.body}</p>}
