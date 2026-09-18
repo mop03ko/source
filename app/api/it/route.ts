@@ -1,5 +1,5 @@
 import {env} from '@/lib/runtime';
-import {member,Failure} from '@/lib/access';
+import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
 import {itStages,itSystemAreas,type Member,type ItTask} from '@/lib/crm';
 export const dynamic='force-dynamic';
@@ -26,7 +26,7 @@ async function validOwner(email:string){
 }
 function err(e:unknown){
  if(e instanceof Failure)return Response.json({error:e.message},{status:e.status});
- if(e instanceof z.ZodError)return Response.json({error:'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.path.join('.')+' '+i.message).join('; ')},{status:400});
+ if(e instanceof z.ZodError)return Response.json({fieldErrors:Object.fromEntries(e.issues.map(i=>[String(i.path.at(-1)||''),i.message])),error:'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.path.join('.')+' '+i.message).join('; ')},{status:400});
  console.error('IT request failed',e instanceof Error?e.message:'error');
  return Response.json({error:'Хадгалж чадсангүй. Дахин оролдоно уу.'},{status:500});
 }
@@ -41,7 +41,7 @@ export async function GET(req:Request){try{
  }
  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
  const q=(url.searchParams.get('q')||'').slice(0,100),status=url.searchParams.get('status')||'',owner=(url.searchParams.get('owner')||'').trim().toLowerCase().slice(0,120);
- let where='1=1',args:unknown[]=[];
+ let where='1=1';const args:unknown[]=[];
  if(q){where+=' AND title LIKE ?';args.push('%'+q+'%');}
  if(status&&Object.hasOwn(itStages,status)){where+=' AND status=?';args.push(status);}
  if(owner){where+=' AND owner=?';args.push(owner);}
@@ -55,6 +55,15 @@ export async function GET(req:Request){try{
   const monthEndIso=new Date(nextMonth+'-01T00:00:00+08:00').toISOString();
   // Нэг өдөрт олон ажил байсан ч бусад өдрүүд "LIMIT"-д шахагдаж алга болохгүйн тулд өдөр (УБ цагийн
   // бүсээр) тус бүрд хамгийн ихдээ 5-ийг сонгоно; day_count-оор клиент "+N илүү" гэдгийг үнэн зөв харуулна.
+  const day=url.searchParams.get('day');
+  if(day){
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!day.startsWith(monthParam+'-')||day.slice(8)<'01'||day.slice(8)>'31')throw new Failure('Өдөр буруу.');
+   const dayWhere=where+" AND due_at>=? AND due_at<? AND date(due_at,'+8 hours')=?";
+   const dayArgs=[...args,monthStartIso,monthEndIso,day];
+   const count=await db().prepare(`SELECT COUNT(*) n FROM it_tasks WHERE ${dayWhere}`).bind(...dayArgs).first<{n:number}>();
+   const rows=await db().prepare(`SELECT id,title,due_at,status FROM it_tasks WHERE ${dayWhere} ORDER BY due_at,id LIMIT 50 OFFSET ?`).bind(...dayArgs,(page-1)*50).all();
+   return Response.json({items:rows.results,total:count?.n||0},{headers:{'Cache-Control':'no-store'}});
+  }
   const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM it_tasks WHERE ${where} AND due_at>=? AND due_at<?) WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
   return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
  }
@@ -65,7 +74,7 @@ export async function GET(req:Request){try{
   let rFromIso='',rToIso='';
   if(/^\d{4}-\d{2}-\d{2}$/.test(rFrom)){const t=new Date(rFrom+'T00:00:00+08:00');if(!Number.isNaN(t.getTime()))rFromIso=t.toISOString();}
   if(/^\d{4}-\d{2}-\d{2}$/.test(rTo)){const t=new Date(rTo+'T23:59:59+08:00');if(!Number.isNaN(t.getTime()))rToIso=t.toISOString();}
-  let rWhere='1=1',rArgs:unknown[]=[];
+  let rWhere='1=1';const rArgs:unknown[]=[];
   if(rFromIso){rWhere+=' AND created_at>=?';rArgs.push(rFromIso);}
   if(rToIso){rWhere+=' AND created_at<=?';rArgs.push(rToIso);}
   const [statusRows,areaRows,ownerRows]=await Promise.all([
@@ -91,7 +100,7 @@ export async function GET(req:Request){try{
  return Response.json({items:rows.results,count:count?.count||0,page,stats},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return err(e);}}
 export async function POST(req:Request){try{
- if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
+ if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
  if(Number(req.headers.get('content-length')||0)>50000)throw new Failure('Файл хэт том.',413);
  const m=await member();assertAccess(m);
  const raw=await req.text();

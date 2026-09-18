@@ -1,4 +1,4 @@
-import {member,Failure} from '@/lib/access';
+import {member,Failure,isSameOrigin} from '@/lib/access';
 import {env} from '@/lib/runtime';
 import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState,messageSnapshot,toggleReaction} from '@/lib/messages';
 import {teamChannels,channelsForRole} from '@/lib/crm';
@@ -31,7 +31,7 @@ export async function GET(req:Request){try{
  return Response.json({items:await conversations(m.email)},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return respondError(e);}}
 export async function POST(req:Request){try{
- if(req.headers.get('origin')!==new URL(req.url).origin)return Response.json({error:'Зөвшөөрөгдөхгүй хүсэлт.'},{status:403});
+ if(!isSameOrigin(req))return Response.json({error:'Зөвшөөрөгдөхгүй хүсэлт.'},{status:403});
  if(Number(req.headers.get('content-length')||0)>MAX_IMAGE_B64+10000)return Response.json({error:'Файл хэт том.'},{status:413});
  const m=await member();const text=await req.text();if(text.length>MAX_IMAGE_B64+10000)return Response.json({error:'Хүсэлт хэт том.'},{status:413});
  const b=z.discriminatedUnion('action',[

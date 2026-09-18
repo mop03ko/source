@@ -8,7 +8,7 @@ type Group={phone:string;count:number;leads:DupLead[]};
 export default function DuplicatesPanel({members,onOpen}:{members:Member[];onOpen:(id:string)=>void}){
  const [groups,setGroups]=useState<Group[]>([]),[total,setTotal]=useState(0),[page,setPage]=useState(1),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const load=useCallback(async(p:number)=>{setLoading(true);setError('');try{const r=await fetch('/api/crm?view=duplicates&page='+p,{cache:'no-store'});const d=await r.json() as {groups?:Group[];total?:number;error?:string};if(!r.ok)throw new Error(d.error||'Ачаалж чадсангүй.');setGroups(d.groups||[]);setTotal(d.total||0);}catch(e){setError((e as Error).message);}finally{setLoading(false);}},[]);
- useEffect(()=>{void load(page);},[page,load]);
+ useEffect(()=>{const timer=setTimeout(()=>void load(page),0);return()=>clearTimeout(timer);},[page,load]);
  const ownerName=(email:string)=>email==='__sheet_unassigned__'?'Хуваарилалт хүлээж буй':members.find(m=>m.email===email)?.name||email;
  const totalPages=Math.max(1,Math.ceil(total/20));
  return <section className="panel">

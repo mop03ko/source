@@ -1,8 +1,11 @@
+"use client"
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  const [fileName,setFileName]=React.useState('');
+  if(type==='file')return <div className="file-control"><span className="file-button">Файл сонгох</span><span className="file-name">{fileName||'Файл сонгоогүй'}</span><input {...props} type="file" className="file-native" onChange={e=>{setFileName(Array.from(e.target.files||[]).map(f=>f.name).join(', '));props.onChange?.(e);}}/></div>;
   return (
     <input
       type={type}

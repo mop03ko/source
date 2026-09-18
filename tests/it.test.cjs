@@ -94,5 +94,7 @@ const taskData=(overrides={})=>({title:'Нэвтрэх хуудасны алда
  assert.equal(futStatus,200);assert.equal(futRep.total,0);
  let [badStatus,badRep]=await iGet('?report=1&rfrom=not-a-date&rto=also-bad');
  assert.equal(badStatus,200);assert.equal(badRep.total,11);
+ const fullDay=(await iGet('?calendar=1&month='+skewDateKey.slice(0,7)+'&day='+skewDateKey))[1];assert.equal(fullDay.total,6);assert.equal(fullDay.items.length,6);
+ assert.equal((await iGet('?calendar=1&month='+skewDateKey.slice(0,7)+'&day='+skewDateKey+'&page=2'))[1].items.length,0);
  console.log('PASS: IT role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering (incl. per-day cap regression) and report breakdown (status/system area/owner).');
 })().catch(e=>{console.error(e);process.exit(1)});

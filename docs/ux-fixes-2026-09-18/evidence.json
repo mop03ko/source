@@ -1,0 +1,5114 @@
+{
+  "screens": [
+    {
+      "name": "01-initial-desktop",
+      "url": "http://127.0.0.1:34672/?view=dashboard&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Хяналтын самбар.",
+        "Хүсэлтийн үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Хүсэлтийн төлөвийн задаргаа",
+        "Худалдан авалтын хөрвөлт",
+        "Ажлын төлөв ба төсвийн баталгаажилт",
+        "Ажлын төлөвийн задаргаа",
+        "Маркетингийн төсөв баталгаажуулалт"
+      ],
+      "primary": [
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 558.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 627.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 696.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 765.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "2026-09-18 — 2026-09-18 хооронд ирсэн 18 хүсэлтэд үндэслэв.",
+          "x": 840.59375,
+          "y": 297.234375,
+          "width": 412.984375,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтүүдийн одоогийн байдал",
+          "x": 313,
+          "y": 962.625,
+          "width": 312.328125,
+          "height": 46.1875,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Ажлын тоо: одоогийн байдал · бүх хугацаа",
+          "x": 684.328125,
+          "y": 962.625,
+          "width": 312.328125,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтийн төлөв тус бүрийн тоо, эзлэх хувь.",
+          "x": 319,
+          "y": 1541.71875,
+          "width": 621.578125,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1596.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1646.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1696.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1746.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1796.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1846.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1896.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1946.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "01b-today-desktop",
+      "url": "http://127.0.0.1:34672/?view=today&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Өнөөдрийн ажил.",
+        "Холбоо барих дараалал14"
+      ],
+      "primary": [
+        {
+          "text": "1",
+          "x": 1267,
+          "y": 2441.296875,
+          "width": 30,
+          "height": 29,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Өнөөдөр ирсэн шинэ хүсэлт",
+          "x": 330,
+          "y": 385.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 385.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 376.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Өнөөдөр худалдан авсан",
+          "x": 1140,
+          "y": 385.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 638.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИЛЦАГЧ",
+          "x": 293,
+          "y": 688.828125,
+          "width": 360.1875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХҮСЭЛТ ИРСЭН ОГНОО",
+          "x": 653.1875,
+          "y": 688.828125,
+          "width": 183.484375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "БҮТЭЭГДЭХҮҮН / СУВАГ",
+          "x": 836.671875,
+          "y": 688.828125,
+          "width": 231.71875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 1068.390625,
+          "y": 688.828125,
+          "width": 186.5625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДАРААГИЙН АЛХАМ",
+          "x": 1254.953125,
+          "y": 688.828125,
+          "width": 304.78125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 1559.734375,
+          "y": 688.828125,
+          "width": 155.390625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Нээх",
+          "x": 1715.125,
+          "y": 688.828125,
+          "width": 60,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 369.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "02-sales-desktop",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": 131.90625,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": 231.828125,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 1154.234375,
+          "y": 456.828125,
+          "width": 100.1875,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 1267,
+          "y": 2691.859375,
+          "width": 30,
+          "height": 29,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 442.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 514.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИЛЦАГЧ",
+          "x": 293,
+          "y": 564.828125,
+          "width": 360.1875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХҮСЭЛТ ИРСЭН ОГНОО",
+          "x": 653.1875,
+          "y": 564.828125,
+          "width": 183.484375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "БҮТЭЭГДЭХҮҮН / СУВАГ",
+          "x": 836.671875,
+          "y": 564.828125,
+          "width": 231.71875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 1068.390625,
+          "y": 564.828125,
+          "width": 186.5625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДАРААГИЙН АЛХАМ",
+          "x": 1254.953125,
+          "y": 564.828125,
+          "width": 304.78125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 1559.734375,
+          "y": 564.828125,
+          "width": 155.390625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Нээх",
+          "x": 1715.125,
+          "y": 564.828125,
+          "width": 60,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 435.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "03-calendar-desktop",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": 131.90625,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": 231.828125,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 1256.46875,
+          "y": 456.828125,
+          "width": 108.53125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(135, 55, 4)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 442.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 514.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 435.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "03b-calendar-content",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": -173.09375,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": -73.171875,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 1256.46875,
+          "y": 151.828125,
+          "width": 108.53125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": -278.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 137.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 209.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 130.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "03c-calendar-day",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18",
+        "2026-09-18 · Ажлын жагсаалт"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": -173.09375,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": -73.171875,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 1256.46875,
+          "y": 151.828125,
+          "width": 108.53125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": -278.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 137.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 146.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 209.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 130.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "04-lead-detail",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09&lead=ux-17",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18",
+        "Урт нэртэй туршилтын байгууллага ХХК"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": 131.90625,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": 231.828125,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 1154.234375,
+          "y": 456.828125,
+          "width": 100.1875,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 1267,
+          "y": 2691.859375,
+          "width": 30,
+          "height": 29,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Үйлдэл бүртгэх",
+          "x": 887,
+          "y": 938.375,
+          "width": 512,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 442.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 514.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИЛЦАГЧ",
+          "x": 293,
+          "y": 564.828125,
+          "width": 360.1875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХҮСЭЛТ ИРСЭН ОГНОО",
+          "x": 653.1875,
+          "y": 564.828125,
+          "width": 183.484375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "БҮТЭЭГДЭХҮҮН / СУВАГ",
+          "x": 836.671875,
+          "y": 564.828125,
+          "width": 231.71875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 1068.390625,
+          "y": 564.828125,
+          "width": 186.5625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДАРААГИЙН АЛХАМ",
+          "x": 1254.953125,
+          "y": 564.828125,
+          "width": 304.78125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 1559.734375,
+          "y": 564.828125,
+          "width": 155.390625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Нээх",
+          "x": 1715.125,
+          "y": 564.828125,
+          "width": 60,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "Холбоо барилтМэдээлэлТүүх (0)",
+          "x": 887,
+          "y": 311.390625,
+          "width": 512,
+          "height": 41,
+          "font": "14px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 435.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "04b-lead-edit",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09&lead=ux-17",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18",
+        "Урт нэртэй туршилтын байгууллага ХХК"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": 131.90625,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": 231.828125,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 1154.234375,
+          "y": 456.828125,
+          "width": 100.1875,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 1267,
+          "y": 2691.859375,
+          "width": 30,
+          "height": 29,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хүсэлт хадгалах",
+          "x": 887,
+          "y": 982.171875,
+          "width": 512,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 442.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1189,
+          "y": 514.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИЛЦАГЧ",
+          "x": 293,
+          "y": 564.828125,
+          "width": 360.1875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХҮСЭЛТ ИРСЭН ОГНОО",
+          "x": 653.1875,
+          "y": 564.828125,
+          "width": 183.484375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "БҮТЭЭГДЭХҮҮН / СУВАГ",
+          "x": 836.671875,
+          "y": 564.828125,
+          "width": 231.71875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 1068.390625,
+          "y": 564.828125,
+          "width": 186.5625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДАРААГИЙН АЛХАМ",
+          "x": 1254.953125,
+          "y": 564.828125,
+          "width": 304.78125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 1559.734375,
+          "y": 564.828125,
+          "width": 155.390625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Нээх",
+          "x": 1715.125,
+          "y": 564.828125,
+          "width": 60,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "Холбоо барилтМэдээлэлТүүх (0)",
+          "x": 887,
+          "y": 311.390625,
+          "width": 512,
+          "height": 41,
+          "font": "14px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 435.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "05-dashboard-desktop",
+      "url": "http://127.0.0.1:34672/?view=dashboard&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Хяналтын самбар.",
+        "Хүсэлтийн үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Хүсэлтийн төлөвийн задаргаа",
+        "Худалдан авалтын хөрвөлт",
+        "Ажлын төлөв ба төсвийн баталгаажилт",
+        "Ажлын төлөвийн задаргаа",
+        "Маркетингийн төсөв баталгаажуулалт"
+      ],
+      "primary": [
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 558.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 627.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 696.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1243.78125,
+          "y": 765.125,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "2026-09-18 — 2026-09-18 хооронд ирсэн 18 хүсэлтэд үндэслэв.",
+          "x": 840.59375,
+          "y": 297.234375,
+          "width": 412.984375,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтүүдийн одоогийн байдал",
+          "x": 313,
+          "y": 962.625,
+          "width": 312.328125,
+          "height": 46.1875,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Ажлын тоо: одоогийн байдал · бүх хугацаа",
+          "x": 684.328125,
+          "y": 962.625,
+          "width": 312.328125,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтийн төлөв тус бүрийн тоо, эзлэх хувь.",
+          "x": 319,
+          "y": 1541.71875,
+          "width": 621.578125,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1596.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1646.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1696.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1746.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1796.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1846.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1896.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 915.671875,
+          "y": 1946.8125,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "06-marketing-desktop",
+      "url": "http://127.0.0.1:34672/?view=marketing&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Маркетинг.",
+        "Маркетингийн ажлууд4"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ ажил",
+          "x": 957.921875,
+          "y": 415.21875,
+          "width": 110.828125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 1078.75,
+          "y": 415.21875,
+          "width": 100.1875,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх маркетингийн ажил",
+          "x": 314,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хийгдэж/төлөвлөгдөж буй",
+          "x": 595.75,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Дуусах хугацаа өнгөрсөн",
+          "x": 877.5,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдсан ажил",
+          "x": 1159.25,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ГАРЧИГ",
+          "x": 293,
+          "y": 523.21875,
+          "width": 435.921875,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "СУВАГ",
+          "x": 728.921875,
+          "y": 523.21875,
+          "width": 87,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 815.921875,
+          "y": 523.21875,
+          "width": 155.5,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 971.421875,
+          "y": 523.21875,
+          "width": 117.09375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨСӨВ",
+          "x": 1088.515625,
+          "y": 523.21875,
+          "width": 84.65625,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДУУСАХ ХУГАЦАА",
+          "x": 1173.171875,
+          "y": 523.21875,
+          "width": 168.703125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "",
+          "x": 1341.875,
+          "y": 523.21875,
+          "width": 61.125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "06b-marketing-report-error",
+      "url": "http://127.0.0.1:34672/?view=marketing&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Маркетинг.",
+        "Маркетингийн ажлууд4"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ ажил",
+          "x": 958.09375,
+          "y": 392.328125,
+          "width": 110.828125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Тайлан",
+          "x": 1293.359375,
+          "y": 392.328125,
+          "width": 86.640625,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Тайлан ачаалагдаагүй.",
+          "x": 742.515625,
+          "y": 298.234375,
+          "width": 149.453125,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "07-it-desktop",
+      "url": "http://127.0.0.1:34672/?view=it&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "IT.",
+        "IT/вэбсайтын ажлууд4"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ ажил",
+          "x": 957.921875,
+          "y": 415.21875,
+          "width": 110.828125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 1078.75,
+          "y": 415.21875,
+          "width": 100.1875,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх IT/вэбсайтын ажил",
+          "x": 314,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хийгдэж/төлөвлөгдөж буй",
+          "x": 595.75,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Дуусах хугацаа өнгөрсөн",
+          "x": 877.5,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдсан ажил",
+          "x": 1159.25,
+          "y": 336.21875,
+          "width": 222.75,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ГАРЧИГ",
+          "x": 293,
+          "y": 523.21875,
+          "width": 419.578125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "СИСТЕМ",
+          "x": 712.578125,
+          "y": 523.21875,
+          "width": 105.609375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ХАРИУЦАГЧ",
+          "x": 818.1875,
+          "y": 523.21875,
+          "width": 119.609375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ТӨЛӨВ",
+          "x": 937.796875,
+          "y": 523.21875,
+          "width": 157.03125,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ДУУСАХ ХУГАЦАА",
+          "x": 1094.828125,
+          "y": 523.21875,
+          "width": 226.234375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        },
+        {
+          "text": "",
+          "x": 1321.0625,
+          "y": 523.21875,
+          "width": 81.9375,
+          "height": 42,
+          "font": "12px",
+          "color": "rgb(104, 87, 115)",
+          "background": "rgb(250, 249, 252)",
+          "display": "table-cell",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "08-settings-desktop",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 319,
+          "y": 594.921875,
+          "width": 114.09375,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 319,
+          "y": 388.828125,
+          "width": 1058,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 294,
+          "y": 231.828125,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "08b-sheets",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Тохиргоо.",
+        "Онлайн зээлийн хүсэлт",
+        "1. Google Sheet холбох",
+        "2. Ажилтны нэрийг холбох",
+        "3. Багана ба төлөв"
+      ],
+      "primary": [
+        {
+          "text": "Автомат уншилт асаах",
+          "x": 484.578125,
+          "y": 2382.484375,
+          "width": 191.546875,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Тохиргоо хадгалах",
+          "x": 319,
+          "y": 1783.125,
+          "width": 180,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 294,
+          "y": 231.828125,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Онлайн зээлийн хүсэлтAntmall.mn web Хүсэлтүүд",
+          "x": 294,
+          "y": 305.828125,
+          "width": 373.9375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": [
+        {
+          "text": "Google-ийн service account үүсгэх заавар ↗",
+          "x": 319,
+          "y": 630.203125,
+          "width": 281.203125,
+          "height": 16,
+          "font": "14px",
+          "color": "rgb(103, 60, 136)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "",
+          "x": 319,
+          "y": 1006.578125,
+          "width": 13,
+          "height": 13,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "08c-sms-error",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1425,
+      "headings": [
+        "Тохиргоо.",
+        "Автомат SMS дүрэм",
+        "Дурын дугаарт мессеж илгээх"
+      ],
+      "primary": [
+        {
+          "text": "Илгээх",
+          "x": 319,
+          "y": 884.015625,
+          "width": 1043,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Төлөв өөрчлөгдөхөд илгээх мессеж. Текст болон асаах/унтраах өөрчлөлт зөвхөн Хадгалах дарах",
+          "x": 319,
+          "y": 388.828125,
+          "width": 1043,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Утасны дугаар, мессежийг гараар оруулж шууд илгээнэ.",
+          "x": 319,
+          "y": 615.921875,
+          "width": 1043,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 294,
+          "y": 231.828125,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "09-chat-desktop",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл",
+        "Ажилтны чат",
+        "Чат"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 319,
+          "y": 594.921875,
+          "width": 114.09375,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 319,
+          "y": 388.828125,
+          "width": 1058,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 294,
+          "y": 231.828125,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [
+        {
+          "text": "ЧатБүх ажилчидМаркетингБорлуулалтIIT ажилтанББорлуулалтын ажилтанММаркетингийн ажилтанАжил",
+          "x": 561,
+          "y": 94.796875,
+          "width": 879,
+          "height": 905.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgb(255, 255, 255)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "ЧатБүх ажилчидМаркетингБорлуулалтIIT ажилтанББорлуулалтын ажилтанММаркетингийн ажилтан",
+          "x": 561,
+          "y": 94.796875,
+          "width": 280,
+          "height": 905.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "column"
+        },
+        {
+          "text": "Ажилтан эсвэл суваг сонгоно ууЖагсаалтаас ажилтан эсвэл суваг сонгоод чат эхлүүлээрэй.",
+          "x": 841,
+          "y": 94.796875,
+          "width": 599,
+          "height": 905.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "column"
+        }
+      ],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "10-chat-mobile",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 390,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл",
+        "Ажилтны чат",
+        "Чат"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 29,
+          "y": 750.90625,
+          "width": 114.09375,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": 21,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 29,
+          "y": 406.625,
+          "width": 332,
+          "height": 69.28125,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 14,
+          "y": 249.625,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [
+        {
+          "text": "ЧатБүх ажилчидМаркетингБорлуулалтIIT ажилтанББорлуулалтын ажилтанММаркетингийн ажилтанАжил",
+          "x": 1,
+          "y": 94.796875,
+          "width": 389,
+          "height": 749.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgb(255, 255, 255)",
+          "display": "flex",
+          "flexDirection": "column"
+        },
+        {
+          "text": "ЧатБүх ажилчидМаркетингБорлуулалтIIT ажилтанББорлуулалтын ажилтанММаркетингийн ажилтан",
+          "x": 1,
+          "y": 94.796875,
+          "width": 389,
+          "height": 749.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "column"
+        }
+      ],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "10b-chat-thread-mobile",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 390,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл",
+        "Ажилтны чат"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 29,
+          "y": 750.90625,
+          "width": 114.09375,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "",
+          "x": 328,
+          "y": 788,
+          "width": 42,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": 21,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 29,
+          "y": 406.625,
+          "width": 332,
+          "height": 69.28125,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Онлайн",
+          "x": 111,
+          "y": 137.296875,
+          "width": 165.96875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(106, 88, 119)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Мессеж алга. Эхний мессежээ бичээрэй.",
+          "x": 13,
+          "y": 187.796875,
+          "width": 365,
+          "height": 59.796875,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 14,
+          "y": 249.625,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [
+        {
+          "text": "ЧатБүх ажилчидМаркетингБорлуулалтIIT ажилтанББорлуулалтын ажилтанММаркетингийн ажилтанББор",
+          "x": 1,
+          "y": 94.796875,
+          "width": 389,
+          "height": 749.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgb(255, 255, 255)",
+          "display": "flex",
+          "flexDirection": "column"
+        },
+        {
+          "text": "ББорлуулалтын ажилтанОнлайнМессеж алга. Эхний мессежээ бичээрэй.",
+          "x": 1,
+          "y": 94.796875,
+          "width": 389,
+          "height": 749.203125,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "column"
+        },
+        {
+          "text": "",
+          "x": 1,
+          "y": 771,
+          "width": 389,
+          "height": 73,
+          "font": "14px",
+          "color": "rgb(37, 26, 52)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "11-sales-mobile",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 375,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": 187.625,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": 249.625,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 135.234375,
+          "y": 648.125,
+          "width": 100.1875,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 97,
+          "y": 10893.125,
+          "width": 30,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": 21,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": 492.71875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 211.5,
+          "y": 501.21875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": 683.8125,
+          "width": 116.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 211.5,
+          "y": 692.8125,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000017",
+          "x": 89,
+          "y": 1076.265625,
+          "width": 242,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 1237.828125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 1374.390625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000016",
+          "x": 89,
+          "y": 1615.515625,
+          "width": 211.265625,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 1778.515625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 1915.078125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000015",
+          "x": 89,
+          "y": 2156.203125,
+          "width": 185.25,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 2319.203125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 2455.765625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000014",
+          "x": 89,
+          "y": 2715.46875,
+          "width": 242,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "11b-sales-cards-mobile",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 375,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": -792.375,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": -730.375,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 135.234375,
+          "y": -331.875,
+          "width": 100.1875,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 97,
+          "y": 9913.125,
+          "width": 30,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -959,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": -487.28125,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 211.5,
+          "y": -478.78125,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": -296.1875,
+          "width": 116.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 211.5,
+          "y": -287.1875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000017",
+          "x": 89,
+          "y": 96.265625,
+          "width": 242,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 257.828125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 394.390625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000016",
+          "x": 89,
+          "y": 635.515625,
+          "width": 211.265625,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 798.515625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 935.078125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000015",
+          "x": 89,
+          "y": 1176.203125,
+          "width": 185.25,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 1339.203125,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 1475.765625,
+          "width": 287,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000014",
+          "x": 89,
+          "y": 1735.46875,
+          "width": 242,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "11c-sales-360",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=0&month=2026-09",
+      "viewport": 360,
+      "scrollWidth": 345,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": -792.375,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": -730.375,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Жагсаалт",
+          "x": 105.234375,
+          "y": -331.875,
+          "width": 100.1875,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "1",
+          "x": 97,
+          "y": 10221.65625,
+          "width": 30,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -959,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": -487.28125,
+          "width": 101.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 196.5,
+          "y": -478.78125,
+          "width": 101.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": -278.1875,
+          "width": 101.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 196.5,
+          "y": -287.1875,
+          "width": 101.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000017",
+          "x": 89,
+          "y": 96.265625,
+          "width": 212,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 257.828125,
+          "width": 257,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 394.390625,
+          "width": 257,
+          "height": 34.28125,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000016",
+          "x": 89,
+          "y": 652.65625,
+          "width": 211.265625,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 815.65625,
+          "width": 257,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 952.21875,
+          "width": 257,
+          "height": 34.28125,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000015",
+          "x": 89,
+          "y": 1210.484375,
+          "width": 185.25,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Facebook",
+          "x": 44,
+          "y": 1373.484375,
+          "width": 257,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+          "x": 44,
+          "y": 1510.046875,
+          "width": 257,
+          "height": 34.28125,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "99000014",
+          "x": 89,
+          "y": 1786.890625,
+          "width": 212,
+          "height": 17.140625,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "12-calendar-mobile",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 375,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": -60.375,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": 1.625,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 237.46875,
+          "y": 400.125,
+          "width": 108.53125,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(135, 55, 4)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -227,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": 244.71875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 211.5,
+          "y": 253.21875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": 435.8125,
+          "width": 116.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 211.5,
+          "y": 444.8125,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": []
+    },
+    {
+      "name": "12b-calendar-content-mobile",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 375,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": -190.375,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": -128.375,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 237.46875,
+          "y": 270.125,
+          "width": 108.53125,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -357,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": 114.71875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 211.5,
+          "y": 123.21875,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": 305.8125,
+          "width": 116.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 211.5,
+          "y": 314.8125,
+          "width": 116.5,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": []
+    },
+    {
+      "name": "13-calendar-320",
+      "url": "http://127.0.0.1:34672/?view=all&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 320,
+      "scrollWidth": 305,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл18"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 64,
+          "y": -190.375,
+          "width": 139.25,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 14,
+          "y": -128.375,
+          "width": 104.59375,
+          "height": 44,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 167.46875,
+          "y": 324.125,
+          "width": 108.53125,
+          "height": 44,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -357,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 47,
+          "y": 132.21875,
+          "width": 81.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 176.5,
+          "y": 123.21875,
+          "width": 81.5,
+          "height": 72,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 47,
+          "y": 359.8125,
+          "width": 81.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 176.5,
+          "y": 350.8125,
+          "width": 81.5,
+          "height": 54,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+15 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": []
+    },
+    {
+      "name": "14-settings-mobile",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 390,
+      "scrollWidth": 375,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 29,
+          "y": 682.90625,
+          "width": 114.09375,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -47,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 29,
+          "y": 338.625,
+          "width": 317,
+          "height": 69.28125,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 14,
+          "y": 181.625,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "14b-settings-320",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 320,
+      "scrollWidth": 305,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 29,
+          "y": 727,
+          "width": 114.09375,
+          "height": 44,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "/ Дотоод CRM",
+          "x": 96.359375,
+          "y": -47,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 29,
+          "y": 338.625,
+          "width": 247,
+          "height": 92.375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 14,
+          "y": 181.625,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "14c-settings-768",
+      "url": "http://127.0.0.1:34672/?view=settings&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 768,
+      "scrollWidth": 768,
+      "headings": [
+        "Тохиргоо.",
+        "Профайл"
+      ],
+      "primary": [
+        {
+          "text": "Хадгалах",
+          "x": 305,
+          "y": 638.109375,
+          "width": 114.09375,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Аватар зураг, харилцах утасны дугаараа энд шинэчилнэ. Админ, удирдлага, борлуулалтын ажилт",
+          "x": 305,
+          "y": 385.828125,
+          "width": 414,
+          "height": 69.28125,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [
+        {
+          "text": "ПрофайлСистемийн тохиргооSMS тохиргооGoogle Sheets",
+          "x": 280,
+          "y": 218.828125,
+          "width": 492.4375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(98, 84, 110)",
+          "background": "rgb(242, 240, 245)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "14e-restore-confirmation",
+      "url": "http://127.0.0.1:34672/?view=all&q=%D0%A2%D1%83%D1%80%D1%88%D0%B8%D0%BB%D1%82%D1%8B%D0%BD&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "headings": [
+        "Бүх хүсэлт.",
+        "Хүсэлтийн бүртгэл12",
+        "Устгасан хүсэлтүүд",
+        "Хүсэлт сэргээх"
+      ],
+      "primary": [
+        {
+          "text": "Шинэ хүсэлт",
+          "x": 1249.75,
+          "y": 131.90625,
+          "width": 139.25,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Бүх хүсэлт",
+          "x": 294,
+          "y": 231.828125,
+          "width": 104.59375,
+          "height": 36,
+          "font": "13px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Календарь",
+          "x": 1256.46875,
+          "y": 456.828125,
+          "width": 108.53125,
+          "height": 32,
+          "font": "12px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сэргээх",
+          "x": 489,
+          "y": 580.921875,
+          "width": 462,
+          "height": 36,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(135, 55, 4)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Таны харах эрхтэй бүртгэл",
+          "x": 330,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Одоо холбоо барих ажлууд",
+          "x": 600,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Хаагдаагүй мөчлөгүүд, хугацаандаа",
+          "x": 870,
+          "y": 442.21875,
+          "width": 211,
+          "height": 36,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Худалдан авсан төлөвтэй",
+          "x": 1140,
+          "y": 451.21875,
+          "width": 211,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "—",
+          "x": 1026.703125,
+          "y": 514.828125,
+          "width": 14,
+          "height": 21,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [
+        {
+          "text": "+9 илүү",
+          "tag": "BUTTON",
+          "tabIndex": 0
+        }
+      ],
+      "smallTargets": [
+        {
+          "text": "Заавар",
+          "x": 1288.8125,
+          "y": 435.71875,
+          "width": 62.1875,
+          "height": 18,
+          "font": "12px",
+          "color": "rgb(118, 82, 50)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "flex",
+          "flexDirection": "row"
+        }
+      ]
+    },
+    {
+      "name": "14d-dashboard-1280",
+      "url": "http://127.0.0.1:34672/?view=dashboard&q=&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "viewport": 1280,
+      "scrollWidth": 1265,
+      "headings": [
+        "Хяналтын самбар.",
+        "Хүсэлтийн үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Ажлын үзүүлэлт",
+        "Хүсэлтийн төлөвийн задаргаа",
+        "Худалдан авалтын хөрвөлт",
+        "Ажлын төлөв ба төсвийн баталгаажилт",
+        "Ажлын төлөвийн задаргаа",
+        "Маркетингийн төсөв баталгаажуулалт"
+      ],
+      "primary": [
+        {
+          "text": "Батлах",
+          "x": 1118.921875,
+          "y": 597.21875,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1118.921875,
+          "y": 666.21875,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1118.921875,
+          "y": 735.21875,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Батлах",
+          "x": 1118.921875,
+          "y": 804.21875,
+          "width": 93,
+          "height": 32,
+          "font": "14px",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(169, 71, 6)",
+          "display": "inline-flex",
+          "flexDirection": "row"
+        }
+      ],
+      "smallText": [
+        {
+          "text": "TEAM WORKSPACE",
+          "x": 76,
+          "y": 68,
+          "width": 129.828125,
+          "height": 15,
+          "font": "10px",
+          "color": "rgb(186, 169, 206)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Админ",
+          "x": 63,
+          "y": 963,
+          "width": 36.59375,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(163, 139, 184)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "/ Дотоод CRM",
+          "x": 372.359375,
+          "y": 26.5,
+          "width": 77.453125,
+          "height": 14,
+          "font": "12px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "2026-09-18 — 2026-09-18 хооронд ирсэн 18 хүсэлтэд үндэслэв.",
+          "x": 319,
+          "y": 336.328125,
+          "width": 412.984375,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтүүдийн одоогийн байдал",
+          "x": 313,
+          "y": 1016.71875,
+          "width": 259,
+          "height": 46.1875,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Ажлын тоо: одоогийн байдал · бүх хугацаа",
+          "x": 631,
+          "y": 1016.71875,
+          "width": 259,
+          "height": 46.1875,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "Сонгосон хугацаанд ирсэн хүсэлтийн төлөв тус бүрийн тоо, эзлэх хувь.",
+          "x": 319,
+          "y": 1726.90625,
+          "width": 520.84375,
+          "height": 23.09375,
+          "font": "14px",
+          "color": "rgb(101, 86, 111)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 1782,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 1832,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 1882,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 1932,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 1982,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 2032,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 2082,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        },
+        {
+          "text": "(11%)",
+          "x": 814.9375,
+          "y": 2132,
+          "width": 24.90625,
+          "height": 11,
+          "font": "9.6px",
+          "color": "rgb(112, 96, 121)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "inline",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    },
+    {
+      "name": "15-login",
+      "url": "http://127.0.0.1:34672/login",
+      "viewport": 1280,
+      "scrollWidth": 1280,
+      "headings": [
+        "Тавтай морил"
+      ],
+      "primary": [],
+      "smallText": [
+        {
+          "text": "Зөвхөн эрх олгосон AntMall ажилтнуудад.",
+          "x": 458,
+          "y": 639.46875,
+          "width": 364,
+          "height": 16.796875,
+          "font": "11.2px",
+          "color": "rgb(128, 118, 135)",
+          "background": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "flexDirection": "row"
+        }
+      ],
+      "tabs": [],
+      "chat": [],
+      "calendarMore": [],
+      "smallTargets": []
+    }
+  ],
+  "checks": {
+    "dialogs": [
+      {
+        "type": "confirm",
+        "accepted": false
+      },
+      {
+        "type": "confirm",
+        "accepted": false
+      },
+      {
+        "type": "confirm",
+        "accepted": true
+      }
+    ],
+    "approvalPosition": 369.328125,
+    "fullCalendarDay": 18,
+    "editableFields": [
+      {
+        "name": "name",
+        "value": "Урт нэртэй туршилтын байгууллага ХХК",
+        "readOnly": false
+      },
+      {
+        "name": "phone",
+        "value": "99000017",
+        "readOnly": true
+      },
+      {
+        "name": "registration",
+        "value": "",
+        "readOnly": false
+      },
+      {
+        "name": "product",
+        "value": "Dell Pro 14 — зөөврийн компьютер",
+        "readOnly": false
+      },
+      {
+        "name": "next_at",
+        "value": "2026-09-18T10:11",
+        "readOnly": false
+      },
+      {
+        "name": "next_action",
+        "value": "Зээлийн нөхцөл тайлбарлаж, материал бүрдүүлэх",
+        "readOnly": false
+      }
+    ],
+    "keyboardTabs": true,
+    "smsBlocked": {
+      "text": "Профайл\nСистемийн тохиргоо\nSMS тохиргоо\nGoogle Sheets\nSMS ТОХИРГОО\nАвтомат SMS дүрэм\n\nТөлөв өөрчлөгдөхөд илгээх мессеж. Текст болон асаах/унтраах өөрчлөлт зөвхөн Хадгалах дарахад үйлчилнэ.\n\nСервертэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.\nДахин оролдох\nГАРААР SMS ИЛГЭЭХ\nДурын дугаарт мессеж илгээх\n\nУтасны дугаар, мессежийг гараар оруулж шууд илгээнэ.\n\nУтасны дугаар\nМессеж\nИлгээх",
+      "alerts": [
+        "Сервертэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.Дахин оролдох"
+      ]
+    },
+    "smsExplicitSaveAndDelete": true,
+    "beforeReload": {
+      "url": "http://127.0.0.1:34672/?view=all&q=%D0%A2%D1%83%D1%80%D1%88%D0%B8%D0%BB%D1%82%D1%8B%D0%BD&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "title": "Бүх хүсэлт."
+    },
+    "afterReload": {
+      "url": "http://127.0.0.1:34672/?view=all&q=%D0%A2%D1%83%D1%80%D1%88%D0%B8%D0%BB%D1%82%D1%8B%D0%BD&status=&owner=&from=&to=&rfrom=2026-09-18&rto=2026-09-18&page=1&calendar=1&month=2026-09",
+      "title": "Бүх хүсэлт."
+    },
+    "restoreUI": true
+  },
+  "errors": []
+}

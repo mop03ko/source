@@ -103,5 +103,10 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  assert.equal(futStatus,200);assert.equal(futRep.total,0);assert.equal(futRep.budget.total,0);
  let [badStatus,badRep]=await mGet('?report=1&rfrom=not-a-date&rto=also-bad');
  assert.equal(badStatus,200);assert.equal(badRep.total,4);
+ const calDay=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+ for(let i=0;i<55;i++)await mPost('create',taskData({title:'Agenda '+i,due_at:calDay+'T03:00:00.000Z'}));
+ const dayUrl='?calendar=1&month='+calDay.slice(0,7)+'&day='+calDay;
+ const firstDay=(await mGet(dayUrl))[1],secondDay=(await mGet(dayUrl+'&page=2'))[1];
+ assert.equal(firstDay.items.length,50);assert.ok(firstDay.total>=55);assert.equal(firstDay.total,secondDay.total);assert.equal(firstDay.items.length+secondDay.items.length,firstDay.total);assert.ok(!firstDay.items.some(a=>secondDay.items.some(b=>a.id===b.id)));
  console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering, report breakdown (status/channel/owner/budget), budget approve/unapprove with mandatory notes and admin dashboard pending-approvals access control.');
 })().catch(e=>{console.error(e);process.exit(1)});

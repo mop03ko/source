@@ -1,5 +1,5 @@
 import {env} from '@/lib/runtime';
-import {member,Failure} from '@/lib/access';
+import {member,Failure,isSameOrigin} from '@/lib/access';
 import {isAdminLike,stages} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
@@ -23,7 +23,7 @@ const bodySchema=z.discriminatedUnion('action',[
  z.object({action:z.literal('delete'),status:z.string().refine(v=>Object.hasOwn(stages,v))}),
 ]);
 export async function POST(req:Request){try{
- if(req.headers.get('origin')!==new URL(req.url).origin)throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
+ if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
  const m=await member();if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага удирдана.',403);
  const raw=await req.text();if(raw.length>3000)throw new Failure('Мэдээлэл хэт их.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();

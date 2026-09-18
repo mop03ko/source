@@ -1,4 +1,5 @@
 "use client"
+import {useDraftGuard} from '@/components/draft-guard';
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -11,16 +12,21 @@ function Tabs({
   orientation = "horizontal",
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+  const allow=useDraftGuard();
+  const [localValue,setLocalValue]=React.useState(props.defaultValue??'');
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
       data-orientation={orientation}
       orientation={orientation}
+      activationMode="manual"
       className={cn(
         "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
         className
       )}
       {...props}
+      value={props.value??localValue}
+      onValueChange={value=>{if(allow()){setLocalValue(value);props.onValueChange?.(value);}}}
     />
   )
 }

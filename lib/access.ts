@@ -2,6 +2,16 @@ import {env} from './runtime';
 import {getCurrentUser} from '../app/session';
 import type {Member} from './crm';
 export class Failure extends Error {constructor(message:string,public status=400){super(message);}}
+// Next's internal Request URL can use localhost behind its server adapter.
+// Host is the browser's target authority; do not trust forwarded-host as a CSRF bypass.
+export function isSameOrigin(req:Request){
+ try{
+  const origin=req.headers.get('origin');if(!origin||origin==='null')return false;
+  const target=new URL(req.url),host=req.headers.get('host');
+  if(host){if(/[\s,/@#?\\]/.test(host))return false;target.host=host;if(target.host.toLowerCase()!==host.toLowerCase())return false;}
+  return new URL(origin).origin===origin&&origin===target.origin;
+ }catch{return false;}
+}
 const db=()=>env.DB;
 export async function member(){
  const u=await getCurrentUser();if(!u)throw new Failure('Нэвтрэх шаардлагатай.',401);

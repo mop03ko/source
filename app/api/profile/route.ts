@@ -1,4 +1,4 @@
-import {member} from '@/lib/access';
+import {member,isSameOrigin} from '@/lib/access';
 import {env} from '@/lib/runtime';
 import {normalizePhone} from '@/lib/crm';
 import {z} from 'zod';
@@ -6,7 +6,7 @@ export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 // Гишүүн бүр (эрхээс үл хамааран) зөвхөн ӨӨРИЙН avatar, утасны дугаараа засна; нэр/эрхийг админ 'member' үйлдлээр удирдана.
 export async function POST(req:Request){try{
- if(req.headers.get('origin')!==new URL(req.url).origin)return Response.json({error:'Хүсэлт зөвшөөрөгдөхгүй.'},{status:403});
+ if(!isSameOrigin(req))return Response.json({error:'Хүсэлт зөвшөөрөгдөхгүй.'},{status:403});
  const m=await member();
  const raw=await req.text();if(raw.length>400000)return Response.json({error:'Зураг хэт том.'},{status:413});
  const b=z.object({

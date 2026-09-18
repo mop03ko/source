@@ -1,7 +1,8 @@
 'use client';
+import {useUnsavedChanges} from '@/components/draft-guard';
 import AvatarImage from 'next/image';
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
-import {Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus} from 'lucide-react';
+import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,ImagePlus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
@@ -24,20 +25,23 @@ const snippet=(s:string,n=120)=>s.length>n?s.slice(0,n)+'…':s;
 // Мессежийн урьдчилан харуулах текст: зөвхөн зурагтай, текстгүй мессежийг тэмдэгээр ялгана.
 const previewText=(m:{body:string;image?:string|null}|null|undefined)=>m?m.body||(m.image?'📷 Зураг':''):'';
 const MAX_IMAGE=5*1024*1024;
-async function request(body?:unknown,query=''){const r=await fetch('/api/messages'+query,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error||'Мессеж ачаалахад алдаа гарлаа.');return d;}
+async function request(body?:unknown,query=''){const r=await fetch('/api/messages'+query,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)}:{cache:'no-store',signal:AbortSignal.timeout(20000)});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error||'Мессеж ачаалахад алдаа гарлаа.');return d;}
 function EmojiPicker({onPick}:{onPick:(e:string)=>void}){
  const [open,setOpen]=useState(false);
- return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Emoji нэмэх"><Smile size={18}/></Button></PopoverTrigger><PopoverContent align="end" className="emoji-picker">{EMOJIS.map(e=><button type="button" key={e} onClick={()=>{onPick(e);setOpen(false);}}>{e}</button>)}</PopoverContent></Popover>;
+ return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Эможи нэмэх"><Smile size={18}/></Button></PopoverTrigger><PopoverContent align="end" className="emoji-picker">{EMOJIS.map(e=><button type="button" key={e} onClick={()=>{onPick(e);setOpen(false);}}>{e}</button>)}</PopoverContent></Popover>;
 }
 function ReactionPicker({onPick}:{onPick:(e:string)=>void}){
  const [open,setOpen]=useState(false);
- return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><button type="button" className="bubble-action" aria-label="Reaction нэмэх"><SmilePlus size={13}/></button></PopoverTrigger><PopoverContent align="start" className="reaction-picker">{REACT_EMOJIS.map(e=><button type="button" key={e} onClick={()=>{onPick(e);setOpen(false);}}>{e}</button>)}</PopoverContent></Popover>;
+ return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><button type="button" className="bubble-action" aria-label="Сэтгэгдэл нэмэх"><SmilePlus size={13}/></button></PopoverTrigger><PopoverContent align="start" className="reaction-picker">{REACT_EMOJIS.map(e=><button type="button" key={e} onClick={()=>{onPick(e);setOpen(false);}}>{e}</button>)}</PopoverContent></Popover>;
 }
 export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[];onRead:()=>void}){
  const [peer,setPeer]=useState(''),[conversations,setConversations]=useState<Conversation[]>([]),[summary,setSummary]=useState<Summary|null>(null),[thread,setThread]=useState<Msg[]>([]),[teamReads,setTeamReads]=useState<TeamRead[]>([]),[body,setBody]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loading,setLoading]=useState(true),[replyTarget,setReplyTarget]=useState<ReplyTarget|null>(null);
  const [image,setImage]=useState<string|null>(null),[imageError,setImageError]=useState('');
  const now=useClock();
- const selectPeer=(value:string)=>{if(value===peer)return;setPeer(value);setThread([]);setTeamReads([]);setReplyTarget(null);setImage(null);setImageError('');};
+ const selectedPeer=useRef('');
+ const [drafts,setDrafts]=useState<Record<string,{body:string;image:string|null;reply:ReplyTarget|null}>>({});
+ useUnsavedChanges(!!body||!!image||!!replyTarget||busy||Object.values(drafts).some(d=>!!d.body||!!d.image||!!d.reply));
+ const selectPeer=(value:string)=>{if(value===peer||busy)return;setDrafts(d=>{const next={...d};if(peer)next[peer]={body,image,reply:replyTarget};delete next[value];return next;});const draft=drafts[value];selectedPeer.current=value;setPeer(value);setThread([]);setTeamReads([]);setBody(draft?.body||'');setReplyTarget(draft?.reply||null);setImage(draft?.image||null);setImageError('');setError('');};
  const bottomRef=useRef<HTMLDivElement>(null);
  const fileInputRef=useRef<HTMLInputElement>(null);
  const peers=members.filter(p=>p.email!==me.email&&p.active);
@@ -50,7 +54,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  ].sort((a,b)=>(b.last?.created_at||'').localeCompare(a.last?.created_at||''));
  const pickImage=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setImageError('');if(!file.type.startsWith('image/')){setImageError('Зөвхөн зураг сонгоно уу.');return;}if(file.size>MAX_IMAGE){setImageError('Зургийн хэмжээ 5MB-аас бага байна.');return;}try{const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Файл уншиж чадсангүй.'));reader.onload=()=>resolve(reader.result as string);reader.readAsDataURL(file);});setImage(data);}catch(e){setImageError((e as Error).message);}};
  const loadConversations=useCallback(async()=>{try{const [c,s]=await Promise.all([request() as Promise<{items:Conversation[]}>,request(undefined,'?summary=1') as Promise<Summary>]);setConversations(c.items);setSummary(s);}catch(e){setError((e as Error).message);}},[]);
- const loadThread=useCallback(async(p:string)=>{try{if(isChannel(p)){const d=await request(undefined,'?team=1&channel='+p) as {items:Msg[];reads:TeamRead[]};setThread(d.items);setTeamReads(d.reads);}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};setThread(d.items);}}catch(e){setError((e as Error).message);}},[]);
+ const loadThread=useCallback(async(p:string)=>{try{if(isChannel(p)){const d=await request(undefined,'?team=1&channel='+p) as {items:Msg[];reads:TeamRead[]};if(selectedPeer.current===p){setThread(d.items);setTeamReads(d.reads);setError('');}}else{const d=await request(undefined,'?peer='+encodeURIComponent(p)) as {items:Msg[]};if(selectedPeer.current===p){setThread(d.items);setError('');}}}catch(e){if(selectedPeer.current===p)setError((e as Error).message);}},[]);
  const seenCount=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).length;
  const seenBy=(createdAt:string)=>teamReads.filter(r=>r.last_read_at>=createdAt).map(r=>r.email);
  // Идэвхгүй tab дээр polling зогсоож сервер рүү дэмий хүсэлт явуулахгүй.
@@ -78,13 +82,13 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const avatarOf=(email:string)=>members.find(p=>p.email===email)?.avatar||null;
  const online=(email:string)=>{const p=members.find(x=>x.email===email);return !!p?.last_seen&&now-new Date(p.last_seen).getTime()<ONLINE_MS;};
  const peerIsChannel=isChannel(peer);
- return <div className="chat-layout">
+ return <div className={"chat-layout"+(peer?" has-peer":"")}>
  <aside className="chat-list"><div className="chat-list-head"><h2>Чат</h2>{loading&&<Loader2 size={15} className="spin muted"/>}</div>
- <div className="chat-list-scroll">
+ {!peer&&error&&<div className="error-box" role="alert">{error}<Button onClick={()=>void loadConversations()}>Дахин оролдох</Button></div>}<div className="chat-list-scroll">
  {listItems.map(item=>item.kind==='channel'?<button key={'c-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar chat-avatar-team"><Users size={16}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.sender===me.email?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>:<button key={'p-'+item.id} className={'chat-peer'+(peer===item.id?' active':'')} onClick={()=>selectPeer(item.id)}><span className="chat-avatar">{item.member!.avatar?<AvatarImage width={192} height={192} unoptimized src={item.member!.avatar} alt=""/>:item.member!.name.slice(0,1)}<i className={'chat-status'+(online(item.id)?' online':'')}/></span><span className="chat-peer-info"><strong>{item.label}</strong>{item.last&&<small>{item.last.mine?'Та: ':''}{previewText(item.last)}</small>}</span>{!!item.unread&&<b className="chat-unread">{item.unread}</b>}</button>)}
  {!peers.length&&<p className="muted chat-empty-list">Идэвхтэй бусад ажилтан алга.</p>}</div></aside>
- <section className="chat-thread">{!peer?<div className="chat-empty"><MessageSquare size={28}/><strong>Ажилтан эсвэл суваг сонгоно уу</strong><p>Зүүн талаас ажилтнаа эсвэл суваг сонгоод чат эхлүүлээрэй.</p></div>:<>
- <div className="chat-thread-head">{!peerIsChannel&&<span className="chat-avatar">{avatarOf(peer)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(peer)!} alt=""/>:name(peer).slice(0,1)}<i className={'chat-status'+(online(peer)?' online':'')}/></span>}<span><strong>{name(peer)}</strong>{!peerIsChannel&&<small>{online(peer)?'Онлайн':'Идэвхгүй'}</small>}</span></div>
+ <section className="chat-thread">{!peer?<div className="chat-empty"><MessageSquare size={28}/><strong>Ажилтан эсвэл суваг сонгоно уу</strong><p>Жагсаалтаас ажилтан эсвэл суваг сонгоод чат эхлүүлээрэй.</p></div>:<>
+ <div className="chat-thread-head"><Button className="chat-back" variant="ghost" size="icon" disabled={busy} aria-label="Чатын жагсаалт руу буцах" onClick={()=>selectPeer('')}><ArrowLeft size={18}/></Button>{!peerIsChannel&&<span className="chat-avatar">{avatarOf(peer)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(peer)!} alt=""/>:name(peer).slice(0,1)}<i className={'chat-status'+(online(peer)?' online':'')}/></span>}<span><strong>{name(peer)}</strong>{!peerIsChannel&&<small>{online(peer)?'Онлайн':'Идэвхгүй'}</small>}</span></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
  <div className="chat-messages">{!thread.length&&<p className="muted chat-empty-list">Мессеж алга. Эхний мессежээ бичээрэй.</p>}{thread.map((msg,i)=>{const isLast=i===thread.length-1,mine=msg.sender===me.email;return <div key={msg.id} className={'chat-bubble'+(mine?' mine':'')}>
  {peerIsChannel&&!mine&&<small><span className="chat-avatar chat-avatar-tiny">{avatarOf(msg.sender)?<AvatarImage width={192} height={192} unoptimized src={avatarOf(msg.sender)!} alt=""/>:name(msg.sender).slice(0,1)}</span>{name(msg.sender)}</small>}
@@ -100,7 +104,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  {replyTarget&&<div className="chat-reply-banner"><Reply size={14}/><div><strong>{name(replyTarget.sender)}</strong><span>{snippet(replyTarget.body)}</span></div><button type="button" aria-label="Хариулахыг цуцлах" onClick={()=>setReplyTarget(null)}><X size={14}/></button></div>}
  {imageError&&<div role="alert" className="error-box">{imageError}</div>}
  {image&&<div className="chat-image-preview"><AvatarImage width={80} height={80} unoptimized src={image} alt=""/><button type="button" aria-label="Зураг хасах" onClick={()=>setImage(null)}><X size={14}/></button></div>}
- <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Button type="button" variant="ghost" size="icon" aria-label="Зураг хавсаргах" onClick={()=>fileInputRef.current?.click()}><ImagePlus size={18}/></Button><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={pickImage}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" disabled={busy||(!body.trim()&&!image)}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>
+ <form className="chat-composer" onSubmit={submit}><EmojiPicker onPick={e=>setBody(b=>b+e)}/><Button type="button" variant="ghost" size="icon" aria-label="Зураг хавсаргах" onClick={()=>fileInputRef.current?.click()}><ImagePlus size={18}/></Button><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={pickImage}/><Input aria-label="Мессеж бичих" value={body} maxLength={2000} placeholder="Мессежээ бичнэ үү…" onChange={e=>setBody(e.target.value)}/><Button className="primary" type="submit" aria-label="Мессеж илгээх" disabled={busy||(!body.trim()&&!image)}>{busy?<Loader2 size={16} className="spin"/>:<Send size={16}/>}</Button></form>
  </>}</section>
  </div>;
 }

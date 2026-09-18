@@ -23,6 +23,8 @@ try{
  }
  r=await fetch(base+'/api/crm',{headers:{cookie:cookieName+'=forged'}});assert.equal(r.status,401);
  const ownerCookie=await cookie('google:owner','owner@example.test');
+ r=await fetch(base+'/api/sms-rules',{method:'POST',headers:{cookie:ownerCookie,Origin:base,'Content-Type':'application/json'},body:JSON.stringify({action:'save',status:'new',message:'Local origin regression',enabled:false})});assert.equal(r.status,200,'same-site writes must accept browser Host even when Next uses an internal localhost URL');
+ r=await fetch(base+'/api/sms-rules',{method:'POST',headers:{cookie:ownerCookie,Origin:'https://other.invalid','x-forwarded-host':'other.invalid','Content-Type':'application/json'},body:JSON.stringify({action:'delete',status:'new'})});assert.equal(r.status,403,'forwarded-host must not bypass origin validation');
  r=await fetch(base+'/api/crm',{headers:{cookie:ownerCookie}});assert.equal(r.status,200);assert.equal((await r.json()).me.role,'admin');
  r=await fetch(base+'/api/crm',{headers:{cookie:await cookie('google:stranger','stranger@example.test')}});assert.equal(r.status,403);
  r=await fetch(base+'/api/crm',{method:'POST',headers:{cookie:ownerCookie,Origin:'https://other.invalid','Content-Type':'application/json'},body:'{}'});assert.equal(r.status,403);

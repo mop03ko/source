@@ -1,0 +1,115 @@
+/* Higher specificity keeps these workspace rules above the legacy surface styles. */
+:root:root {color-scheme:light;--muted-foreground:#62546e;--secondary:#f2f0f5;--secondary-foreground:#251a34;--accent:#f2f0f5;--accent-foreground:#251a34;--destructive:#b91c1c;--destructive-foreground:#fff}
+:root .sales-navigation>.row{width:max-content;flex-wrap:nowrap}
+:root .import-preview{max-height:45dvh;overflow:auto}
+:root .error-box{white-space:pre-line;overflow-wrap:anywhere}
+:root .notice p,:root .notice button{color:#765232}
+:root .purple-notice p{color:#655074}
+:root .unassigned-notice p{color:#923d3d}
+:root .metric>div{color:#65566f}
+:root .brand small{font-size:10px}
+:root .lead-link strong{font-size:14px}
+:root .sales-tabs button{flex-shrink:0}
+:root .sidebar-user a{display:grid;place-items:center;min-width:32px;min-height:32px}
+:root .phone-action{min-height:28px;line-height:28px}
+:root .sheet-settings{grid-template-columns:minmax(0,1fr)}
+:root .sheet-settings>*, :root [data-slot=tabs],:root [data-slot=tabs-content]{min-width:0;max-width:100%}
+:root .sync-summary span{color:#65506f}
+:root .owner-label,:root .next-box{color:#65506f}
+:root .dashboard-approvals .table-scroll{max-height:360px;overflow:auto}
+:root .form-dialog{max-height:90dvh;overflow-y:auto}
+:root .file-control{position:relative;display:flex;gap:12px;align-items:center;min-height:44px;border:1px solid #d8cddd;border-radius:7px;padding:8px 12px;min-width:0;max-width:100%;font-size:14px}
+:root .file-control:focus-within{outline:3px solid #70458f;outline-offset:3px}
+:root .file-button{flex-shrink:0;color:#522a70;font-weight:600}
+:root .file-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#65566f}
+:root .file-control .file-native{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+:root .workspace,:root .main-content,:root .panel,:root .table-panel,:root .sheet-settings,:root .reports-grid>*{min-width:0;max-width:100%}
+:root .sales-tabs,:root .settings-tabs{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 2px;scrollbar-width:thin}
+:root [role=tablist]{max-width:100%}
+:root .sales-tabs [role=tablist],:root .settings-tabs [role=tablist]{width:max-content;max-width:none}
+:root .sync-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+:root .sync-summary>div{min-width:0;padding:14px;overflow-wrap:anywhere}
+:root .sync-summary strong{font-size:20px}
+:root .budget-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+:root .budget-cards .panel{padding:20px}
+:root .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+:root .primary{background:#a94706!important;border-color:#a94706!important;color:#fff!important}
+:root .primary:hover{background:#873704!important}
+:root .muted,:root .form-help,:root .page-head p,:root .metric small,:root .table-footer{color:#65566f}
+:root .table-panel th,:root .panel th{color:#685773;font-size:12px;letter-spacing:0}
+:root .table-panel td,:root .panel td,:root .field input,:root .field select,:root .field textarea{font-size:14px}
+:root .table-panel td small,:root .panel td small,:root .stage,:root .form-help{font-size:12px;color:#65566f}
+:root .stage-new{color:#1d4ed8}:root .stage-won,:root .stage-contacted{color:#047857}:root .stage-lost,:root .stage-invalid,:root .stage-blocked{color:#b91c1c}
+:root .stage-pending,:root .stage-materials,:root .stage-appointment{color:#92400e}
+:root .stage-unreachable{color:#6d28d9}
+:root .table-toolbar>.row{flex-wrap:wrap;justify-content:flex-end;min-width:0}
+:root .view-toggle{flex-wrap:wrap}
+:root .month-cal-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+:root .month-cal-day,:root .month-cal-events{min-width:0}
+:root .month-cal-event{display:block;width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:28px;color:#472760}
+:root .month-cal-more{display:block;color:#522a70;text-decoration:underline;min-height:32px;text-align:left}
+:root .month-cal-head{flex-wrap:wrap}
+:root .day-agenda{display:flex;flex-direction:column;gap:10px;max-height:60dvh;overflow:auto}
+:root .day-agenda button{text-align:left;padding:12px;border:1px solid #d8cddd;border-radius:8px;overflow-wrap:anywhere}
+:root .day-agenda button:hover{background:#f2edf7}
+:root .day-agenda time{display:block;font-size:12px;color:#65566f}
+:root .mobile-agenda{display:none}
+:root .draft-hint{color:#7a3b06;font-size:13px}
+:root .field-error{color:#a12828;font-size:13px}
+:root [aria-invalid=true]{border-color:#b91c1c!important}
+:root input[readonly]{background:#f2f0f5!important;color:#65566f;cursor:default}
+:root .phone-action{display:block;color:#522a70;text-decoration:underline;margin-top:6px;font-size:13px}
+:root .work-summary{margin-bottom:16px;border:1px solid #e1d9e8;border-radius:10px;padding:12px 16px;background:#fff}
+:root .work-summary summary{cursor:pointer;font-weight:600;min-height:28px}
+:root .work-summary[open] summary{margin-bottom:16px}
+:root .work-summary .notice{margin-bottom:0}
+:root .dashboard-approvals{order:-2;grid-column:1/-1}
+:root .dashboard-current{order:-1}
+:root .scope-caption{grid-column:1/-1;color:#65566f;font-size:13px}
+:root .setup-steps{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+:root .setup-steps a{padding:10px 14px;border:1px solid #d8cddd;border-radius:8px;color:#522a70}
+:root .setup-steps a[aria-current=step]{background:#522a70;color:white}
+:root .setup-form{scroll-margin-top:20px}
+:root .setup-summary{order:2}
+:root .setup-layout{display:flex;flex-direction:column;gap:22px}
+:root .setup-layout>.panel{flex-shrink:0}
+:root .chat-back{display:none}
+:root [data-slot=dialog-close],:root [data-slot=sheet-content]>button.absolute{width:32px;height:32px;display:grid;place-items:center}
+:root .bubble-action{min-width:28px;min-height:28px}
+:root .sales-tabs [role=tab],:root .settings-tabs [role=tab]{min-height:36px}
+:root .field>span{color:#65506f;font-size:13px}
+:root button:focus-visible,:root a:focus-visible,:root input:focus-visible,:root select:focus-visible,:root textarea:focus-visible{outline:3px solid #70458f;outline-offset:3px}
+@media(max-width:1100px){:root .budget-cards{grid-template-columns:1fr}:root .budget-cards .sync-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px){
+ :root .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ :root .budget-cards .sync-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ :root .main-content{padding:20px 12px}:root .panel{padding:16px}
+ :root .topbar{gap:8px}:root .topbar .row{min-width:0}:root .private-badge{display:none}
+ :root .page-head{margin-bottom:14px}:root h1{font-size:26px!important}
+ :root .head-actions{justify-content:flex-start;flex-wrap:wrap}
+ :root button,:root select{min-height:44px}
+ :root .profile-row{flex-direction:column;align-items:flex-start}:root .profile-avatar-actions{width:100%}
+ :root .profile-avatar-actions input{min-width:0;max-width:100%}
+ :root .filters input[type=date]{width:100%}:root .filters>.muted{display:none}
+ :root .detail-sheet{width:100vw!important;max-width:100vw!important}
+ :root .detail-sheet [data-slot=sheet-header]{padding:20px 44px 20px 16px}
+ :root .detail-tabs{height:auto}:root .detail-tabs button{min-width:0;white-space:normal}
+ :root .month-cal-grid{display:none}:root .mobile-agenda{display:flex;flex-direction:column;gap:8px}
+ :root .mobile-agenda button{padding:12px;text-align:left;border:1px solid #d8cddd;border-radius:8px;display:flex;justify-content:space-between;gap:12px}
+ :root .month-cal-head strong{min-width:0}
+ :root .chat-sheet{width:100vw!important;max-width:100vw!important;height:100dvh}
+ :root .chat-layout{flex-direction:column}:root .chat-list{width:100%;max-height:none;flex:1;min-height:0;border:0}
+ :root .chat-thread{min-height:0}:root .chat-layout:not(.has-peer) .chat-thread{display:none}
+ :root .chat-layout.has-peer .chat-list{display:none}:root .chat-back{display:inline-flex}
+ :root .chat-composer{flex-shrink:0;flex-wrap:wrap;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+ :root .chat-messages{padding:12px}:root .chat-bubble{max-width:90%}
+ :root .lead-list-table{display:block;width:100%}:root .lead-list-table thead{display:none}
+ :root .lead-list-table tbody{display:flex;flex-direction:column;gap:12px;padding:12px}
+ :root .lead-list-table tr{display:flex;flex-direction:column;border:1px solid #ddd3e5;border-radius:10px;padding:12px;white-space:normal}
+ :root .lead-list-table td{display:block;width:100%;padding:6px!important;white-space:normal;border:0;overflow-wrap:anywhere}
+ :root .lead-list-table td::before{content:attr(data-label);display:block;font-size:12px;color:#65566f;margin-bottom:4px}
+ :root .lead-list-table .owner-label{max-width:none}:root .lead-list-table .group-header-row{background:#f2edf7}
+ :root .lead-list-table .group-header-row td::before{display:none}
+ :root .table-scroll:has(.lead-list-table){overflow:visible}
+ :root .auth-card{padding:24px}
+}

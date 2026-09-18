@@ -1,6 +1,6 @@
 import {assignmentNotice,newLeadNotice} from './notifications';
 import {env} from '@/lib/runtime';import {z} from 'zod';
-import {defaults,label,configSchema,transformRows,type SheetConfig} from './sheet-model';import {closed,type Lead} from './crm';
+import {defaults,label,configSchema,transformRows} from './sheet-model';import {closed,type Lead} from './crm';
 const db=()=>env.DB!;const enc=new TextEncoder();
 const base64=(v:Uint8Array)=>btoa(String.fromCharCode(...v));const bytes=(v:string)=>Uint8Array.from(atob(v),c=>c.charCodeAt(0));const url64=(v:Uint8Array)=>base64(v).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
 const keySchema=z.object({type:z.literal('service_account'),client_email:z.string().email().regex(/\.iam\.gserviceaccount\.com$/),private_key:z.string().min(100).max(12000)});

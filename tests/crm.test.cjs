@@ -121,5 +121,28 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  // 'candidates' таб дээр ч статистик нь тухайн табын статус хязгаарлалтад биш, ерөнхий шүүлтэд л хамаарна.
  assert.equal((await get('?view=candidates&from='+new Date(Date.now()+86400000).toISOString().slice(0,10)))[1].stats.total,0);
  assert.equal((await get('?view=candidates'))[1].stats.total,totalNow);
+ // Full-day pagination must not repeat the capped month preview; preserve date and owner scopes.
+ const dayURL='?view=all&calendar=1&month='+thisMonth+'&day='+thisMonth+'-05';
+ const dayList=(await get(dayURL))[1];assert.ok(dayList.total>=8);assert.equal(dayList.items.length,dayList.total);
+ assert.equal((await get(dayURL+'&from=2099-01-01'))[1].total,0);
+ assert.equal((await get(dayURL+'&page=2'))[1].items.length,0);
+ assert.equal((await get('?calendar=1&month='+thisMonth+'&day=2020-01-01'))[0],400);
+ user={userId:'agent',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await get(dayURL))[1].total,0);
+ assert.equal((await get('?deleted=1'))[0],403);
+ assert.equal((await post('restore',{note:'Denied'},deletedId,2))[0],403);
+ user=ownerUser;
+ assert.ok((await get('?deleted=1'))[1].items.some(l=>l.id===deletedId));
+ assert.equal((await post('restore',{note:'Stale'},deletedId,1))[0],409);
+ assert.equal((await post('restore',{note:''},deletedId,2))[0],400);
+ assert.equal((await post('restore',{note:'Undo mistaken deletion'},deletedId,2))[0],200);
+ const restored=(await get('?id='+deletedId))[1];assert.equal(restored.lead.status,'review');assert.equal(restored.lead.next_at,null);assert.equal(restored.lead.version,3);assert.ok(restored.activities.some(a=>a.kind==='restore'));assert.ok(restored.activities.some(a=>a.kind==='delete'));
+ assert.equal((await post('restore',{note:'Again'},deletedId,2))[0],404);
+ assert.ok(!(await get('?deleted=1'))[1].items.some(l=>l.id===deletedId));
+ const blockedBefore=(await get('?id='+second))[1].lead;
+ assert.equal((await post('delete',{note:'Test restore suppression'},second,blockedBefore.version))[0],200);
+ assert.equal((await post('restore',{note:'Preserve opt-out'},second,blockedBefore.version+1))[0],200);
+ assert.equal((await get('?id='+second))[1].lead.blocked,1);
+ console.log('PASS: full-day calendar scope/pagination; restore permission, optimistic locking, audit trail and suppression preservation.');
  console.log('PASS: authentication, roles, ownership, origin, input validation, duplicates, optimistic locking, recycle stop, opt-out, admin-only soft delete, calendar filtering, calendar per-day skew, stats date-range filtering, imports, CSV safety, timezone, expired cycles, notification ownership, durable deduplication, stale writes, reassignment, read isolation, alert claims, rescheduling and opt-out.');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -1,6 +1,6 @@
 import { assignmentNotice, newLeadNotice } from "@/lib/notifications";
 import { env } from "@/lib/runtime";
-import { member, Failure } from "@/lib/access";
+import { member, Failure ,isSameOrigin} from "@/lib/access";
 import { z } from "zod";
 import {
   normalizePhone,
@@ -34,7 +34,7 @@ const candidateStatuses = [
 ];
 async function getLead(id: string, m: Member) {
   const s = scope(m);
-  // Устгасан хүсэлт бүрмөсөн харагдахгүй болно; админ ч дахин нээж, засаж чадахгүй.
+  // Устгасан хүсэлтийг ердийн дэлгэрэнгүйгээр нээхгүй; эрхтэй хэрэглэгч тусдаа урсгалаар сэргээнэ.
   const l = await db()
     .prepare(
       `SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked,(SELECT COUNT(*) FROM activities WHERE phone=l.phone AND kind='no_answer' AND created_at>=?) attempts FROM leads l WHERE l.id=? AND l.deleted_at IS NULL ${s.sql}`,
@@ -56,6 +56,7 @@ const bodySchema = z.object({
     "bulk_recycle",
     "assign",
     "delete",
+    "restore",
   ]),
   id: z.string().max(80).optional(),
   version: z.number().int().positive().optional(),
@@ -102,6 +103,7 @@ function err(e: unknown) {
   if (e instanceof z.ZodError)
     return Response.json(
       {
+        fieldErrors:Object.fromEntries(e.issues.map(i=>[String(i.path.at(-1)||''),i.message])),
         error:
           "Мэдээллээ шалгана уу: " +
           e.issues.map((i) => i.path.join(".") + " " + i.message).join("; "),
@@ -132,6 +134,16 @@ export async function GET(req: Request) {
     const m = await member(),
       url = new URL(req.url),
       s = scope(m);
+    if(url.searchParams.get('deleted')==='1'){
+      if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага устгасан хүсэлт харна.',403);
+      const page=Math.max(1,Math.min(10000,Math.floor(Number(url.searchParams.get('page'))||1)));
+      const q=(url.searchParams.get('q')||'').slice(0,100);
+      const condition="deleted_at IS NOT NULL AND (name LIKE ? OR phone LIKE ?)";
+      const args=['%'+q+'%','%'+q+'%'];
+      const count=await db().prepare('SELECT COUNT(*) n FROM leads WHERE '+condition).bind(...args).first<{n:number}>();
+      const items=await db().prepare('SELECT id,name,phone,product,status,deleted_at,version FROM leads WHERE '+condition+' ORDER BY deleted_at DESC,id LIMIT 50 OFFSET ?').bind(...args,(page-1)*50).all();
+      return Response.json({items:items.results,total:count?.n||0},{headers:{'Cache-Control':'no-store'}});
+    }
     const id = url.searchParams.get("id");
     if (id) {
       const lead = await getLead(id, m);
@@ -294,6 +306,15 @@ export async function GET(req: Request) {
       // Нэг өдөрт олон зуун хүсэлт (жишээ нь Sheet синкээс) хуваарилагдсан ч бусад өдрүүд "LIMIT"-д
       // шахагдаж алга болохгүйн тулд өдөр (УБ цагийн бүсээр) тус бүрд хамгийн ихдээ 5-ийг сонгоно;
       // day_count-оор клиент "+N илүү" гэдгийг үнэн зөв харуулна.
+      const day=url.searchParams.get("day");
+      if(day){
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!day.startsWith(monthParam+'-')||day.slice(8)<'01'||day.slice(8)>'31')throw new Failure("Өдөр буруу.");
+        const dayWhere=calWhere+" AND date(l.next_at,'+8 hours')=?";
+        const dayArgs=[...calArgs,day];
+        const count=await db().prepare(`SELECT COUNT(*) n FROM leads l WHERE ${dayWhere}`).bind(...dayArgs).first<{n:number}>();
+        const rows=await db().prepare(`SELECT id,name,next_at,status FROM leads l WHERE ${dayWhere} ORDER BY next_at,id LIMIT 50 OFFSET ?`).bind(...dayArgs,(page-1)*50).all();
+        return Response.json({items:rows.results,total:count?.n||0},{headers:{'Cache-Control':'no-store'}});
+      }
       const cal = await db()
         .prepare(
           `SELECT id,name,next_at,status,day_count FROM (SELECT id,name,next_at,status,COUNT(*) OVER (PARTITION BY date(next_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(next_at,'+8 hours') ORDER BY next_at ASC) rn FROM leads l WHERE ${calWhere}) WHERE rn<=5 ORDER BY next_at ASC`,
@@ -562,7 +583,7 @@ export async function GET(req: Request) {
 }
 export async function POST(req: Request) {
   try {
-    if (req.headers.get("origin") !== new URL(req.url).origin)
+    if (!isSameOrigin(req))
       throw new Failure("Хүсэлтийн эх сурвалж буруу.", 403);
     if (Number(req.headers.get("content-length") || 0) > 200000)
       throw new Failure("Файл хэт том.", 413);
@@ -787,6 +808,20 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, matched: rows.results.length, updated });
     }
     if (!b.id || !b.version) throw new Failure("Хүсэлтийн хувилбар дутуу.");
+    if(b.action==='restore'){
+      if(!isAdminLike(m.role))throw new Failure('Зөвхөн админ, удирдлага хүсэлт сэргээнэ.',403);
+      const note=z.object({note:z.string().trim().min(1).max(500)}).parse(b.data).note;
+      const old=await db().prepare('SELECT id,status,version FROM leads WHERE id=? AND deleted_at IS NOT NULL').bind(b.id).first<{id:string;status:string;version:number}>();
+      if(!old)throw new Failure('Устгасан хүсэлт олдсонгүй.',404);
+      if(old.version!==b.version)throw new Failure('Хүсэлт өөрчлөгдсөн байна. Жагсаалтыг шинэчилнэ үү.',409);
+      const op=crypto.randomUUID();
+      const result=await db().batch([
+        db().prepare("UPDATE leads SET deleted_at=NULL,status='review',next_at=NULL,next_action='Мэдээлэл шалгах',recycle_at=NULL,connected=0,updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND deleted_at IS NOT NULL").bind(now,op,b.id,b.version),
+        db().prepare('INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,?,?,?,? FROM leads WHERE id=? AND op=?').bind(op,'restore',note+' · Өмнөх төлөв: '+old.status,m.email,now,b.id,op),
+      ]);
+      if(!result[0].meta.changes)throw new Failure('Хүсэлт өөрчлөгдсөн байна. Дахин ачаална уу.',409);
+      return Response.json({ok:true});
+    }
     const l = await getLead(b.id, m);
     if (l.version !== b.version)
       throw new Failure(
