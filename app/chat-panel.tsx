@@ -6,7 +6,7 @@ import {ArrowLeft,Send,MessageSquare,Loader2,Users,Smile,Reply,X,SmilePlus,Image
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
-import {dateLabel,teamChannels,channelsForRole} from '@/lib/crm';
+import {dateLabel,teamChannels,channelsForRole,canDm} from '@/lib/crm';
 import type {Member} from '@/lib/crm';
 import {useClock} from '@/hooks/use-clock';
 const isChannel=(id:string)=>Object.hasOwn(teamChannels,id);
@@ -44,7 +44,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  const selectPeer=(value:string)=>{if(value===peer||busy)return;setDrafts(d=>{const next={...d};if(peer)next[peer]={body,image,reply:replyTarget};delete next[value];return next;});const draft=drafts[value];selectedPeer.current=value;setPeer(value);setThread([]);setTeamReads([]);setBody(draft?.body||'');setReplyTarget(draft?.reply||null);setImage(draft?.image||null);setImageError('');setError('');};
  const bottomRef=useRef<HTMLDivElement>(null);
  const fileInputRef=useRef<HTMLInputElement>(null);
- const peers=members.filter(p=>p.email!==me.email&&p.active);
+ const peers=members.filter(p=>p.email!==me.email&&p.active&&canDm(me.role,p.role));
  // Тухайн (сонгосон) сувагт эрхтэй бусад идэвхтэй гишүүд; "N/M үзсэн" тооны хуваарь энд хамаарна.
  const channelPeers=isChannel(peer)?peers.filter(p=>channelsForRole(p.role).includes(peer)):[];
  // Групп чат (суваг)-ууд байнга дээд талд бэхлэгдэнэ; хувийн харилцан яриа доор нь хамгийн сүүлд

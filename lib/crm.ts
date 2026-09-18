@@ -16,6 +16,13 @@ export function channelsForRole(role:string):string[]{
  if(role==='agent'||role==='manager'||role==='admin'||role==='director')list.push('sales');
  return list;
 }
+// Удирдлага (director) хувийн чат (DM)-аар зөвхөн Ахлах, Админтай харилцана; энгийн ажилтан
+// (агент, маркетинг, IT) удирдлагатай шууд DM бичиж чадахгүй, зөвхөн сувгаар л хандана.
+export function canDm(a:string,b:string):boolean{
+ if(a==='director'&&!(b==='manager'||b==='admin'||b==='director'))return false;
+ if(b==='director'&&!(a==='manager'||a==='admin'||a==='director'))return false;
+ return true;
+}
 export const marketingStages:Record<string,string>={planned:'Төлөвлөсөн',in_progress:'Хийгдэж байгаа',pending:'Хүлээгдэж буй',paused:'Түр зогссон',done:'Дууссан',cancelled:'Цуцалсан'};
 export const marketingClosed=['done','cancelled'];
 export const marketingChannels=['Meta / гүйцэтгэлд суурилсан сурталчилгаа','Дахин чиглүүлэх сурталчилгаа','Google хайлтын сурталчилгаа','TikTok / Reels богино видео','OOH / DOOH гадна сурталчилгаа','Нөлөөлөгч / контент бүтээгч','Контент үйлдвэрлэл','CRM / зээлийн хүсэлт сэргээх','A/B тест ба өсгөх нөөц','Facebook','Instagram','Вэбсайт','Email','Бусад'];

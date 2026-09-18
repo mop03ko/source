@@ -79,11 +79,24 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?team=1&channel=marketing');const marketingMsgId=d.items[0].id;
  user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  assert.equal((await post({action:'send_team',channel:'sales',body:'stolen quote',replyTo:marketingMsgId}))[0],400);
+ // Хувийн чат (DM): Удирдлага зөвхөн Ахлах, Админтай харилцана; агент, маркетингийн ажилтантай хоёр
+ // чиглэлд аль алинд нь DM бичих боломжгүй.
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ assert.equal((await crmPost('member',{email:'manager@example.test',name:'Manager',role:'manager',active:true}))[0],200);
+ user={userId:'d',email:'director@example.test',displayName:'Director'};
+ assert.equal((await post({action:'send',peer:'agent@example.test',body:'hi'}))[0],403);
+ assert.equal((await post({action:'send',peer:'marketer@example.test',body:'hi'}))[0],403);
+ assert.equal((await post({action:'send',peer:'owner@example.test',body:'hi admin'}))[0],200);
+ assert.equal((await post({action:'send',peer:'manager@example.test',body:'hi manager'}))[0],200);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await post({action:'send',peer:'director@example.test',body:'hi director'}))[0],403);
+ user={userId:'mgr',email:'manager@example.test',displayName:'Manager'};
+ assert.equal((await post({action:'send',peer:'director@example.test',body:'hi back'}))[0],200);
  // Хураангуй (summary): хүн бүр зөвхөн channelsForRole-оороо тодорхойлогдсон сувгуудын мэдээллийг л авна.
  user={userId:'d',email:'director@example.test',displayName:'Director'};
  [status,d]=await get('?summary=1');assert.equal(status,200);
  assert.deepEqual(d.channels.map(c=>c.channel).sort(),['marketing','sales']);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  [status,d]=await get('?summary=1');assert.deepEqual(d.channels.map(c=>c.channel).sort(),['all','marketing','sales']);
- console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control.');
+ console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, and director DM isolation (manager/admin only).');
 })().catch(e=>{console.error(e);process.exit(1)});

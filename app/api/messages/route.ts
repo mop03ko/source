@@ -1,7 +1,7 @@
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {env} from '@/lib/runtime';
 import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState,messageSnapshot,toggleReaction} from '@/lib/messages';
-import {teamChannels,channelsForRole} from '@/lib/crm';
+import {teamChannels,channelsForRole,canDm} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
@@ -61,8 +61,12 @@ export async function POST(req:Request){try{
   return Response.json({ok:true,...r});
  }
  const peer=b.peer.toLowerCase();if(peer===m.email)throw new Failure('Өөртөө мессеж илгээх боломжгүй.');
- if(!await db().prepare('SELECT 1 FROM members WHERE email=? AND active=1').bind(peer).first())throw new Failure('Идэвхтэй ажилтан сонгоно уу.');
+ const peerRow=await db().prepare('SELECT role FROM members WHERE email=? AND active=1').bind(peer).first<{role:string}>();
+ if(!peerRow)throw new Failure('Идэвхтэй ажилтан сонгоно уу.');
  if(b.action==='send'){
+  // Удирдлага зөвхөн Ахлах, Админтай хувийн чатаар харилцана (canDm нь channelsForRole-той адил
+  // алдаагаа тусгаарлагдсан харилцааг хамгаалдаг дүрэм).
+  if(!canDm(m.role,peerRow.role))throw new Failure('Энэ ажилтантай хувийн чатаар харилцах эрхгүй.',403);
   let replyTo=null;
   if(b.replyTo){replyTo=await messageSnapshot('dm',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
   const r=await send(m.email,peer,b.body,replyTo,b.image);return Response.json({ok:true,...r});
