@@ -1,6 +1,6 @@
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {env} from '@/lib/runtime';
-import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamReadState,messageSnapshot,toggleReaction,channelAccess,myGroupChats,groupChatMemberCount,createGroupChat} from '@/lib/messages';
+import {conversations,thread,send,markRead,teamMessages,lastTeamMessage,sendTeam,markTeamRead,unreadTotal,teamUnread,teamMentioned,teamReadState,messageSnapshot,toggleReaction,channelAccess,myGroupChats,groupChatRoster,createGroupChat} from '@/lib/messages';
 import {teamChannels,channelsForRole,canDm,isAdminLike} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
@@ -10,6 +10,22 @@ const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'М
 // хандах эрхийг channelAccess() өөрөө (тогтмол бол channelsForRole, групп бол гишүүнчлэл) шалгана.
 const channelSchema=z.string().min(1).max(80);
 const canCreateGroup=(role:string)=>role==='manager'||isAdminLike(role);
+// Тухайн сувагт харагдах бүх идэвхтэй гишүүд: тогтмол суваг бол role-оор шүүнэ, групп чат бол гишүүнчлэлээр.
+// @дурдах (mention) сонголт болон "N/M үзсэн" тоо хоёулаа энэ жагсаалтыг ашиглана.
+async function channelRoster(channel:string):Promise<{email:string;name:string}[]>{
+ if(Object.hasOwn(teamChannels,channel)){
+  const rows=await db().prepare('SELECT email,name,role FROM members WHERE active=1').all<{email:string;name:string;role:string}>();
+  return rows.results.filter(r=>channelsForRole(r.role).includes(channel));
+ }
+ return groupChatRoster(channel);
+}
+// Мессежийн текстээс "@Нэр" хэлбэрийн дурдалтуудыг тухайн сувгийн гишүүдийн нэртэй тааруулж олно;
+// клиентээс ирсэн mention-г итгэмжлэхгүй, серверт өөрөө дахин тооцоолж баталгаажуулна.
+function parseMentions(body:string,roster:{email:string;name:string}[]){
+ const mentionsAll=/(^|[^\p{L}\p{N}_])@(Бүгд|бүгд|all)(?![\p{L}\p{N}_])/u.test(' '+body);
+ const mentions=roster.filter(r=>body.includes('@'+r.name)).map(r=>r.email);
+ return {mentions,mentionsAll};
+}
 // base64-руу хөрвүүлэхэд эх файлын хэмжээ ойролцоогоор 4/3 дахин нэмэгддэг тул 5MB-ийн decode-той тааруулав.
 const MAX_IMAGE_B64=Math.ceil(5*1024*1024/3)*4+64;
 const imageSchema=z.string().refine(v=>/^data:image\/(png|jpeg|webp|gif);base64,/.test(v),'Зөвхөн PNG/JPEG/WEBP/GIF зураг оруулна уу.').refine(v=>v.length<=MAX_IMAGE_B64,'Зургийн хэмжээ 5MB-аас бага байна.');
@@ -19,8 +35,8 @@ export async function GET(req:Request){try{
   const groups=await myGroupChats(m.email);
   const [dm,perChannel,perGroup]=await Promise.all([
    unreadTotal(m.email),
-   Promise.all(myChannels.map(async c=>({channel:c,label:teamChannels[c],unread:await teamUnread(m.email,c),last:await lastTeamMessage(c)||null,group:false}))),
-   Promise.all(groups.map(async g=>({channel:g.id,label:g.name,unread:await teamUnread(m.email,g.id),last:await lastTeamMessage(g.id)||null,group:true}))),
+   Promise.all(myChannels.map(async c=>({channel:c,label:teamChannels[c],unread:await teamUnread(m.email,c),mentioned:await teamMentioned(m.email,c),last:await lastTeamMessage(c)||null,group:false}))),
+   Promise.all(groups.map(async g=>({channel:g.id,label:g.name,unread:await teamUnread(m.email,g.id),mentioned:await teamMentioned(m.email,g.id),last:await lastTeamMessage(g.id)||null,group:true}))),
   ]);
   const all=[...perChannel,...perGroup];
   const team=all.reduce((n,c)=>n+c.unread,0);
@@ -31,9 +47,8 @@ export async function GET(req:Request){try{
   if(!channel.success)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
   const access=await channelAccess(m,channel.data);
   if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
-  const isGroup=!Object.hasOwn(teamChannels,channel.data);
-  const [items,reads,memberCount]=await Promise.all([teamMessages(m.email,channel.data),teamReadState(m.email,channel.data),isGroup?groupChatMemberCount(channel.data,m.email):Promise.resolve(null)]);
-  return Response.json({items,reads,memberCount},{headers:{'Cache-Control':'no-store'}});
+  const [items,reads,roster]=await Promise.all([teamMessages(m.email,channel.data),teamReadState(m.email,channel.data),channelRoster(channel.data)]);
+  return Response.json({items,reads,members:roster.filter(r=>r.email!==m.email)},{headers:{'Cache-Control':'no-store'}});
  }
  const peer=(url.searchParams.get('peer')||'').trim().toLowerCase();
  if(peer)return Response.json({items:await thread(m.email,peer)},{headers:{'Cache-Control':'no-store'}});
@@ -67,7 +82,9 @@ export async function POST(req:Request){try{
   if(!access.ok)throw new Failure('Энэ сувагт бичих эрхгүй.',403);
   let replyTo=null;
   if(b.replyTo){replyTo=await messageSnapshot('team',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
-  const r=await sendTeam(m.email,b.channel,b.body,replyTo,b.image);return Response.json({ok:true,...r});
+  const roster=await channelRoster(b.channel);
+  const {mentions,mentionsAll}=parseMentions(b.body,roster);
+  const r=await sendTeam(m.email,b.channel,b.body,replyTo,b.image,mentions,mentionsAll);return Response.json({ok:true,...r});
  }
  if(b.action==='read_team'){
   const access=await channelAccess(m,b.channel);

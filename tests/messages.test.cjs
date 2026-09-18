@@ -45,7 +45,21 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await post({action:'send_team',channel:'all',body:'Team hello'});assert.equal(status,200);const teamId=d.id;
  [status,d]=await post({action:'send_team',channel:'all',body:'reply',replyTo:teamId});assert.equal(status,200);
  [status,d]=await get('?team=1&channel=all');const teamReply=d.items.find(m=>m.body==='reply');assert.equal(teamReply.reply_to_id,teamId);assert.equal(teamReply.reply_to_sender,'agent@example.test');
+ // @дурдах (mention): текстээс тухайн сувгийн гишүүдийн нэрийг серверт өөрөө тааруулж олно;
+ // дурдагдсан хүний summary-д тухайн суваг "mentioned" гэж тэмдэглэгдэнэ, уншсаны дараа арилна.
+ [status,d]=await post({action:'send_team',channel:'all',body:'@Second сайн уу'});assert.equal(status,200);
+ [status,d]=await get('?team=1&channel=all');const mentionMsg=d.items.find(m=>m.body==='@Second сайн уу');
+ assert.deepEqual(mentionMsg.mentions,['second@example.test']);assert.equal(mentionMsg.mentions_all,false);
+ user={userId:'s',email:'second@example.test',displayName:'Second'};
+ [status,d]=await get('?summary=1');assert.ok(d.channels.find(c=>c.channel==='all').mentioned);
+ assert.equal((await post({action:'read_team',channel:'all'}))[0],200);
+ [status,d]=await get('?summary=1');assert.ok(!d.channels.find(c=>c.channel==='all').mentioned);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ [status,d]=await post({action:'send_team',channel:'all',body:'@Бүгд анхаарна уу'});assert.equal(status,200);
+ [status,d]=await get('?team=1&channel=all');const allMentionMsg=d.items.find(m=>m.body==='@Бүгд анхаарна уу');
+ assert.equal(allMentionMsg.mentions_all,true);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ [status,d]=await get('?summary=1');assert.ok(d.channels.find(c=>c.channel==='all').mentioned);
  assert.equal((await post({action:'react',kind:'team',messageId:teamId,emoji:'🔥'}))[0],200);
  [status,d]=await get('?team=1&channel=all');assert.deepEqual(d.items.find(m=>m.id===teamId).reactions,[{emoji:'🔥',count:1,mine:true,actors:['owner@example.test']}]);
  // Reaction actors: хэд хэдэн хүн ижил emoji-гоор reaction хийхэд бүгд actors жагсаалтад орно (хэн реакц хийснийг харуулах tooltip-д ашиглана).
@@ -108,7 +122,8 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await post({action:'create_group',name:'Project X',members:['agent@example.test','second@example.test']});
  assert.equal(status,200);const groupId=d.id;
  assert.equal((await post({action:'send_team',channel:groupId,body:'Тавтай морил'}))[0],200);
- [status,d]=await get('?team=1&channel='+groupId);assert.equal(status,200);assert.equal(d.items.length,1);assert.equal(d.memberCount,2);
+ [status,d]=await get('?team=1&channel='+groupId);assert.equal(status,200);assert.equal(d.items.length,1);assert.equal(d.members.length,2);
+ assert.deepEqual(d.members.map(x=>x.email).sort(),['agent@example.test','second@example.test']);
  user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
  assert.equal((await get('?team=1&channel='+groupId))[0],403);
  assert.equal((await post({action:'send_team',channel:groupId,body:'x'}))[0],403);
@@ -120,5 +135,5 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?summary=1');assert.ok(d.channels.some(c=>c.channel===groupId&&c.label==='Project X'));
  user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
  [status,d]=await get('?summary=1');assert.ok(!d.channels.some(c=>c.channel===groupId));
- console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), and manager/admin-created group chats with membership-based access control.');
+ console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), manager/admin-created group chats with membership-based access control, and @mention/@all detection with per-channel "mentioned" summary flag.');
 })().catch(e=>{console.error(e);process.exit(1)});

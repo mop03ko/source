@@ -13,10 +13,11 @@ export async function myGroupChats(email:string):Promise<GroupChatSummary[]>{
  const r=await db().prepare('SELECT g.id id,g.name name FROM group_chats g JOIN group_chat_members gm ON gm.channel_id=g.id WHERE gm.email=? ORDER BY g.created_at').bind(email).all<GroupChatSummary>();
  return r.results;
 }
-// Тухайн групп чатын идэвхтэй гишүүдийн тоо (viewer-ээ эс тооцож), клиент талд "N/M үзсэн" харуулахад ашиглана.
-export async function groupChatMemberCount(channel:string,exclude:string){
- const r=await db().prepare('SELECT COUNT(*) total FROM group_chat_members gm JOIN members m ON m.email=gm.email WHERE gm.channel_id=? AND m.active=1 AND gm.email!=?').bind(channel,exclude).first<{total:number}>();
- return r?.total||0;
+// Тухайн групп чатын идэвхтэй гишүүдийн бүрэн жагсаалт; клиент талд "N/M үзсэн" тоо болон
+// @дурдах (mention) сонголтын жагсаалтад хоёуланд нь ашиглана.
+export async function groupChatRoster(channel:string):Promise<{email:string;name:string}[]>{
+ const r=await db().prepare('SELECT m.email email,m.name name FROM group_chat_members gm JOIN members m ON m.email=gm.email WHERE gm.channel_id=? AND m.active=1 ORDER BY m.name').bind(channel).all<{email:string;name:string}>();
+ return r.results;
 }
 export async function createGroupChat(name:string,createdBy:string,members:string[]){
  const id=crypto.randomUUID(),now=new Date().toISOString();
@@ -86,17 +87,18 @@ export async function send(sender:string,recipient:string,body:string,replyTo?:R
 export async function markRead(email:string,peer:string){
  await db().prepare('UPDATE messages SET read_at=? WHERE recipient=? AND sender=? AND read_at IS NULL').bind(new Date().toISOString(),email,peer).run();
 }
-export type TeamMessage={id:string;channel:string;sender:string;body:string;created_at:string;reply_to_id:string|null;reply_to_sender:string|null;reply_to_body:string|null;image:string|null;reactions:Reaction[]};
+export type TeamMessage={id:string;channel:string;sender:string;body:string;created_at:string;reply_to_id:string|null;reply_to_sender:string|null;reply_to_body:string|null;image:string|null;mentions:string[];mentions_all:boolean;reactions:Reaction[]};
 export async function teamMessages(viewer:string,channel:string){
- const r=await db().prepare('SELECT * FROM team_messages WHERE channel=? ORDER BY created_at ASC LIMIT 200').bind(channel).all<TeamMessage>();
- return attachReactions('team',r.results,viewer);
+ const r=await db().prepare('SELECT * FROM team_messages WHERE channel=? ORDER BY created_at ASC LIMIT 200').bind(channel).all<Omit<TeamMessage,'mentions'|'mentions_all'|'reactions'>&{mentions:string|null;mentions_all:number}>();
+ const rows=r.results.map(row=>({...row,mentions:row.mentions?JSON.parse(row.mentions) as string[]:[],mentions_all:!!row.mentions_all}));
+ return attachReactions('team',rows,viewer);
 }
 export async function lastTeamMessage(channel:string){
  return db().prepare('SELECT sender,body,created_at,image FROM team_messages WHERE channel=? ORDER BY created_at DESC LIMIT 1').bind(channel).first<{sender:string;body:string;created_at:string;image:string|null}>();
 }
-export async function sendTeam(sender:string,channel:string,body:string,replyTo?:ReplySnapshot|null,image?:string|null){
+export async function sendTeam(sender:string,channel:string,body:string,replyTo?:ReplySnapshot|null,image?:string|null,mentions?:string[],mentionsAll?:boolean){
  const id=crypto.randomUUID(),now=new Date().toISOString();
- await db().prepare('INSERT INTO team_messages(id,channel,sender,body,created_at,reply_to_id,reply_to_sender,reply_to_body,image) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,channel,sender,body,now,replyTo?.id||null,replyTo?.sender||null,replyTo?.body.slice(0,300)||null,image||null).run();
+ await db().prepare('INSERT INTO team_messages(id,channel,sender,body,created_at,reply_to_id,reply_to_sender,reply_to_body,image,mentions,mentions_all) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,channel,sender,body,now,replyTo?.id||null,replyTo?.sender||null,replyTo?.body.slice(0,300)||null,image||null,mentions?.length?JSON.stringify(mentions):null,mentionsAll?1:0).run();
  return {id,created_at:now};
 }
 export async function markTeamRead(email:string,channel:string){
@@ -112,4 +114,11 @@ export async function teamReadState(exclude:string,channel:string){
 export async function teamUnread(email:string,channel:string){
  const r=await db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE channel=? AND sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=? AND channel=?),'')`).bind(channel,email,email,channel).first<{total:number}>();
  return r?.total||0;
+}
+// Уншаагүй мессежийн дунд @Бүгд эсвэл яг өөрийг нь @дурдсан мессеж байгаа эсэх; чатын жагсаалтад
+// тухайн сувгийг онцгойлон харуулахад ашиглана. mentions нь JSON массив тул email-ийг хашилтад
+// орсноор ("email") нарийвчлан тааруулна.
+export async function teamMentioned(email:string,channel:string){
+ const r=await db().prepare(`SELECT COUNT(*) total FROM team_messages WHERE channel=? AND sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=? AND channel=?),'') AND (mentions_all=1 OR mentions LIKE ?)`).bind(channel,email,email,channel,'%"'+email+'"%').first<{total:number}>();
+ return (r?.total||0)>0;
 }

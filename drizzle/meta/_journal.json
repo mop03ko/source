@@ -134,6 +134,13 @@
       "when": 1789715021570,
       "tag": "0018_melted_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1789716507027,
+      "tag": "0019_magical_hawkeye",
+      "breakpoints": true
     }
   ]
 }
