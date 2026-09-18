@@ -40,8 +40,12 @@ export type MarketingTask={id:string;title:string;channel:string;budget:number;o
 export type MarketingActivity={id:string;task_id:string;note:string;actor:string;created_at:string};
 export type ItTask={id:string;title:string;system_area:string;owner:string;status:string;due_at:string|null;note:string;created_by:string;created_at:string;updated_at:string;version:number};
 export type ItActivity={id:string;task_id:string;note:string;actor:string;created_at:string};
-export type InventoryCount={id:string;title:string;category:string;owner:string;status:string;due_at:string|null;expected_amount:number;actual_amount:number|null;note:string;created_by:string;created_at:string;updated_at:string;version:number};
+export type InventoryCount={id:string;title:string;category:string;owner:string;status:string;due_at:string|null;expected_amount:number;actual_amount:number|null;note:string;created_by:string;created_at:string;updated_at:string;version:number;warehouse_id:string|null};
 export type InventoryCountActivity={id:string;count_id:string;note:string;actor:string;created_at:string};
+export type InventoryWarehouse={id:string;name:string;created_at:string};
+export type InventoryItem={id:string;code:string;brand:string;name:string;variant:string;imei:string|null;sale_price:number;active:number;created_by:string;created_at:string;updated_at:string};
+export type InventoryPurchase={id:string;item_id:string;warehouse_id:string;qty:number;unit_cost:number;total_cost:number;ordered_at:string|null;received_at:string|null;payment_status:string;note:string;created_by:string;created_at:string};
+export type InventorySale={id:string;item_id:string;warehouse_id:string;qty:number;unit_price:number;total_price:number;customer_name:string;customer_phone:string;platform:string;sold_at:string|null;note:string;created_by:string;created_at:string};
 export const closed=['won','lost','invalid'];
 export function normalizePhone(v:string){let p=v.replace(/[\s()+-]/g,'');if(p.startsWith('976')&&p.length===11)p=p.slice(3);if(!/^\d{8}$/.test(p))throw new Error('Монголын 8 оронтой утасны дугаар оруулна уу.');return p;}
 export function dateLabel(v:string|null){if(!v)return 'Товгүй';const d=new Date(v);return Number.isNaN(d.getTime())?'Огноо шалгах':new Date(d.getTime()+8*3600000).toISOString().slice(0,16).replace('T',' ')+' · УБ';}

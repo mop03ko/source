@@ -141,6 +141,13 @@
       "when": 1789716507027,
       "tag": "0019_magical_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1789718226959,
+      "tag": "0020_gifted_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
