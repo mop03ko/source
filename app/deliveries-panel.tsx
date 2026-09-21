@@ -13,6 +13,8 @@ import {Field} from '@/components/form-field';
 import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
+import {ReportExport} from '@/components/report-export';
+import type {ReportDoc} from '@/lib/report-export';
 import {ItemPicker,type Item} from './inventory-forms';
 import {toast} from '@/components/ui/sonner';
 import {deliveryStatuses,deliveryDone,deliveryKinds,isCourierOnly,personKey,requestDateLabel,type Member,type Delivery} from '@/lib/crm';
@@ -116,6 +118,18 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  const reportDone=report.data?.byStatus.filter(s=>deliveryDone.includes(s.status)).reduce((n,s)=>n+s.total,0)||0;
  const reportDays=report.data?.byCourier.reduce((n,c)=>Math.max(n,c.active_days),0)||0;
  const maxMonth=Math.max(1,...(report.data?.byMonth||[]).map(b=>b.total));
+ // Дашбоардын бүх задаргааг Excel/PDF-д нэг ижил бүтэцтэй гаргана.
+ const reportDoc=():ReportDoc=>{
+  const r=report.data;
+  return {title:'Хүргэлтийн дашбоард',meta:[`Хугацаа: ${rfrom||'бүх'} — ${rto||'өнөөдөр'}`,`Нийт хүргэлт: ${r?.total||0}`],sheets:[
+   {name:'Ажилтны гүйцэтгэл',columns:[{header:'Хүргэгч',width:22},{header:'Нийт'},{header:'Хүргэсэн'},{header:'Хүргэгдээгүй'},{header:'Цуцалсан'},{header:'Хүлээгдэж буй'},{header:'Ажилласан өдөр'},{header:'Өдрийн дундаж'},{header:'Гүйцэтгэл %'},{header:'Сүүлд',width:14}],
+    rows:(r?.byCourier||[]).map(c=>[c.name,c.total,c.done,c.failed,c.cancelled,c.pending,c.active_days,c.active_days?Number((c.total/c.active_days).toFixed(1)):0,pct(c.done,c.total),c.last_day])},
+   {name:'Сараар',columns:[{header:'Сар',width:12},{header:'Нийт'},{header:'Хүргэсэн'}],rows:(r?.byMonth||[]).map(b=>[b.month,b.total,b.done])},
+   {name:'Төлбөрийн суваг',columns:[{header:'Суваг',width:24},{header:'Тоо'},{header:'Хувь %'}],rows:(r?.byChannel||[]).map(c=>[c.channel,c.total,pct(c.total,r?.total||0)])},
+   {name:'Төрөл',columns:[{header:'Төрөл',width:20},{header:'Тоо'},{header:'Хувь %'}],rows:(r?.byKind||[]).map(k=>[k.kind,k.total,pct(k.total,r?.total||0)])},
+   {name:'Хамгийн их хүргэгдсэн',columns:[{header:'Бараа',width:34},{header:'Код',width:18},{header:'Тоо'}],rows:(r?.byItem||[]).map(i=>[i.name,i.code,i.total])},
+  ]};
+ };
  return <section className="table-panel">
  <div className="table-toolbar"><h2>{courierOnly?'Миний хүргэлтүүд':'Хүргэлтийн журнал'}<span>{mode==='report'?report.data?.total||0:total}</span></h2><div className="row">{!courierOnly&&<Button className="primary" size="sm" onClick={()=>setCreate(true)}><Plus size={16}/>Шинэ хүргэлт</Button>}<div className="view-toggle"><Button variant={mode==='serials'?'default':'outline'} className={mode==='serials'?'primary':''} size="sm" onClick={()=>setMode('serials')}><Search size={14}/>Сериал хайх</Button><Button variant={mode==='list'?'default':'outline'} className={mode==='list'?'primary':''} size="sm" onClick={()=>setMode('list')}><List size={14}/>Жагсаалт</Button><Button variant={mode==='report'?'default':'outline'} className={mode==='report'?'primary':''} size="sm" onClick={()=>setMode('report')}><ChartNoAxesCombined size={14}/>Дашбоард</Button></div></div></div>
  {mode==='serials'?<SerialSearch q={serialQ} onQ={setSerialQ}/>:mode==='list'?<>
@@ -131,7 +145,7 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  {!list.error&&(rows.length?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>ОГНОО</TableHead><TableHead>ТӨРӨЛ</TableHead><TableHead>БАРАА</TableHead><TableHead>УТАС</TableHead><TableHead>ХАЯГ</TableHead><TableHead>СУВАГ</TableHead><TableHead>ХҮРГЭГЧ</TableHead><TableHead>ТӨЛӨВ</TableHead><TableHead><span className="sr-only">Үйлдэл</span></TableHead></TableRow></TableHeader><TableBody>{rows.map(r=><TableRow key={r.id} className="lead-row"><TableCell><button className="lead-link" onClick={()=>setDetailId(r.id)}><span className="lead-avatar"><Truck size={16}/></span><strong>{r.delivered_on}</strong></button></TableCell><TableCell>{r.kind||'—'}</TableCell><TableCell>{r.item_name?<span className="owner-label" title={r.item_code||''}><Link2 size={12}/> {r.item_name}</span>:r.item_info||'—'}</TableCell><TableCell>{r.customer_phone||'—'}</TableCell><TableCell><span title={r.address}>{r.address.slice(0,40)||'—'}{r.address.length>40?'…':''}</span></TableCell><TableCell>{r.payment_channel||'—'}</TableCell><TableCell><span className="owner-label">{r.courier_name}</span></TableCell><TableCell><span className={'stage '+statusClass(r.status)}>{deliveryStatuses[r.status]||r.status}</span></TableCell><TableCell><Button variant="ghost" size="icon" aria-label="Хүргэлт нээх" onClick={()=>setDetailId(r.id)}><ArrowUpRight size={18}/></Button></TableCell></TableRow>)}</TableBody></Table></div>:!list.loading&&<p className="muted chat-empty-list">Тохирох хүргэлт олдсонгүй.</p>)}
  <ListPagination page={page} total={total} loading={list.loading} onChange={setPage} pageSize={50} label="хүргэлт"/>
  </>:<>
- <div className="report-range panel"><Field label="Хугацааны эхлэл"><Input type="date" value={rfrom} max={rto||undefined} onChange={e=>setRfrom(e.target.value)}/></Field><Field label="Хугацааны төгсгөл"><Input type="date" value={rto} min={rfrom||undefined} onChange={e=>setRto(e.target.value)}/></Field><Button variant="ghost" size="sm" onClick={()=>{setRfrom('');setRto('');}}>Бүх хугацаа</Button><p className="muted text-sm">{rfrom||rto?`${rfrom||'…'} — ${rto||'өнөөдөр'} хооронд хүргэсэн ${(report.data?.total||0).toLocaleString()} хүргэлтэд үндэслэв.`:'Бүх хугацааны хүргэлт харагдаж байна.'}</p></div>
+ <div className="report-range panel"><Field label="Хугацааны эхлэл"><Input type="date" value={rfrom} max={rto||undefined} onChange={e=>setRfrom(e.target.value)}/></Field><Field label="Хугацааны төгсгөл"><Input type="date" value={rto} min={rfrom||undefined} onChange={e=>setRto(e.target.value)}/></Field><Button variant="ghost" size="sm" onClick={()=>{setRfrom('');setRto('');}}>Бүх хугацаа</Button><ReportExport doc={reportDoc} disabled={!report.data}/><p className="muted text-sm">{rfrom||rto?`${rfrom||'…'} — ${rto||'өнөөдөр'} хооронд хүргэсэн ${(report.data?.total||0).toLocaleString()} хүргэлтэд үндэслэв.`:'Бүх хугацааны хүргэлт харагдаж байна.'}</p></div>
  <AsyncStatus error={report.error} loading={report.loading} retry={report.retry}/>
  {report.data&&!report.error&&<>
  <div className="metrics"><div className="metric"><div><span>Нийт хүргэлт</span><Truck size={19}/></div><strong>{report.data.total.toLocaleString()}</strong><small>Сонгосон хугацаанд</small></div><div className="metric"><div><span>Хүргэсэн</span><CheckCircle2 size={19}/></div><strong>{reportDone.toLocaleString()}</strong><small>{pct(reportDone,report.data.total)}% гүйцэтгэл</small></div><div className="metric metric-focus"><div><span>Хүргэгч</span><Package size={19}/></div><strong>{report.data.byCourier.length}</strong><small>Ажилласан ажилтан</small></div><div className="metric"><div><span>Өдрийн дундаж</span><ChartNoAxesCombined size={19}/></div><strong>{reportDays?(report.data.total/reportDays).toFixed(1):'0.0'}</strong><small>Хамгийн ачаалалтай {reportDays} өдөрт</small></div></div>

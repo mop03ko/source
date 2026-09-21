@@ -2,6 +2,8 @@
 import {TextareaControl} from '@/components/ui/form-controls';
 import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
+import {ReportExport} from '@/components/report-export';
+import type {ReportDoc} from '@/lib/report-export';
 import {useCallback,useEffect,useState} from 'react';
 import {BadgeCheck,Loader2,Wallet,ShieldAlert} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -59,8 +61,25 @@ export default function DashboardPanel({members,salesStats,salesDistribution,rfr
  const salesConversion=salesTotal?Math.round(salesWon/salesTotal*1000)/10:0;
  const budget=marketingReport?.budget||{total:0,approved:0,unapproved:0};
  const budgetApprovedPct=budget.total?Math.round(budget.approved/budget.total*100):0;
+ // Бүх модулийн ерөнхий үзүүлэлтийг Excel/PDF-д нэг ижил бүтэцтэй гаргана.
+ const reportDoc=():ReportDoc=>({title:'Хяналтын самбар',meta:[`Хугацаа: ${rfrom||'бүх'} — ${rto||'өнөөдөр'}`],sheets:[
+  {name:'Борлуулалт',columns:[{header:'Үзүүлэлт',width:30},{header:'Дүн'}],rows:[
+   ['Нийт хүсэлт',salesTotal],['Худалдан авсан',salesWon],['Хөрвөлт %',salesConversion],
+   ['Холбогдох хүсэлт',salesStats.due],['Дахин холбогдох',salesStats.recycled],
+   ['Хугацаа хэтэрсэн',salesStats.recycle_overdue],['Хариуцагчгүй',salesStats.unassigned]]},
+  {name:'Хүсэлтийн төлөв',columns:[{header:'Төлөв',width:26},{header:'Тоо'},{header:'Хувь %'}],
+   rows:salesDistribution.map(d=>[stages[d.status]||d.status,d.count,salesTotal?Math.round(d.count/salesTotal*100):0])},
+  {name:'Маркетинг',columns:[{header:'Үзүүлэлт',width:30},{header:'Дүн'}],rows:[
+   ['Нийт ажил',marketing?.total||0],['Идэвхтэй',marketing?.active||0],['Хугацаа хэтэрсэн',marketing?.overdue||0],['Дууссан',marketing?.done||0],
+   ['Нийт төсөв',budget.total],['Батлагдсан төсөв',budget.approved],['Батлагдаагүй төсөв',budget.unapproved],['Батлагдсан %',budgetApprovedPct]]},
+  {name:'IT',columns:[{header:'Үзүүлэлт',width:30},{header:'Дүн'}],rows:[
+   ['Нийт ажил',it?.total||0],['Идэвхтэй',it?.active||0],['Хугацаа хэтэрсэн',it?.overdue||0],['Дууссан',it?.done||0]]},
+  {name:'Батлах хүлээж буй',columns:[{header:'Ажил',width:38},{header:'Суваг',width:26},{header:'Хариуцагч',width:22},{header:'Төсөв'},{header:'Товлосон',width:14}],
+   rows:pending.map(x=>[x.title,x.channel,ownerName(x.owner),x.budget,x.due_at?x.due_at.slice(0,10):''])},
+ ]});
  return <>
  {error&&<div role="alert" className="error-box">{error}</div>}
+ <div className="row" style={{justifyContent:'flex-end',padding:'0 4px 10px'}}><ReportExport doc={reportDoc}/></div>
  <div className="reports-grid">
  <div className="budget-cards team-report dashboard-current">
  <section className="panel"><div className="eyebrow">БОРЛУУЛАЛТ</div><h2>Хүсэлтийн үзүүлэлт</h2><p className="muted">Сонгосон хугацаанд ирсэн хүсэлтүүдийн одоогийн байдал</p><div className="sync-summary"><div><span>Нийт хүсэлт</span><strong>{salesStats.total.toLocaleString()}</strong></div><div><span>Холбогдох хүсэлт</span><strong>{salesStats.due.toLocaleString()}</strong></div><div><span>Идэвхтэй Дахин холбогдох</span><strong>{salesStats.recycled.toLocaleString()}</strong></div><div><span>Хугацаа хэтэрсэн Дахин холбогдох</span><strong>{salesStats.recycle_overdue.toLocaleString()}</strong></div><div><span>Хуваарилагдаагүй</span><strong>{salesStats.unassigned.toLocaleString()}</strong></div><div><span>Худалдан авсан</span><strong>{salesStats.won.toLocaleString()}</strong></div></div></section>
