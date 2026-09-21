@@ -135,5 +135,30 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  [status,d]=await get('?summary=1');assert.ok(d.channels.some(c=>c.channel===groupId&&c.label==='Project X'));
  user={userId:'mk',email:'marketer@example.test',displayName:'Marketer'};
  [status,d]=await get('?summary=1');assert.ok(!d.channels.some(c=>c.channel===groupId));
+ // Sidebar totals must agree with chat summary, including membership and per-channel reads.
+ const sidebar=async()=>{const r=await crmRoute.GET(new Request('https://crm.test/api/crm'));assert.equal(r.status,200);return r.json();};
+ user={userId:'d',email:'director@example.test',displayName:'Director'};
+ const before=(await sidebar()).unreadTeam;
+ await msgLib.sendTeam('agent@example.test','all','Hidden all-staff message');
+ await msgLib.sendTeam('agent@example.test',groupId,'Hidden private group message');
+ assert.equal((await sidebar()).unreadTeam,before,'director badge must ignore inaccessible channels');
+ await msgLib.sendTeam('agent@example.test','sales','Visible sales message');
+ assert.equal((await sidebar()).unreadTeam,before+1);
+ assert.equal((await sidebar()).unreadTeam,(await get('?summary=1'))[1].team);
+ // Reading sales must not accidentally mark marketing or a private group as read.
+ sqlite.prepare("INSERT INTO team_reads(email,channel,last_read_at) VALUES(?,'sales','9999-01-01') ON CONFLICT(email,channel) DO UPDATE SET last_read_at=excluded.last_read_at").run(user.email);
+ await msgLib.sendTeam('marketer@example.test','marketing','Unread marketing message');
+ assert.equal((await sidebar()).unreadTeam,(await get('?summary=1'))[1].team);
+ assert.ok((await sidebar()).unreadTeam>0);
+ // Joining/leaving a group immediately updates the sidebar scope.
+ sqlite.prepare('INSERT INTO group_chat_members(channel_id,email) VALUES(?,?)').run(groupId,user.email);
+ const joined=(await sidebar()).unreadTeam;
+ assert.equal(joined,(await get('?summary=1'))[1].team);
+ assert.ok(joined>before);
+ sqlite.prepare('DELETE FROM group_chat_members WHERE channel_id=? AND email=?').run(groupId,user.email);
+ assert.ok((await sidebar()).unreadTeam<joined);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
+ assert.equal((await sidebar()).unreadTeam,(await get('?summary=1'))[1].team);
+ console.log('PASS: sidebar unread count respects director channel isolation, group membership and per-channel read timestamps.');
  console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), manager/admin-created group chats with membership-based access control, and @mention/@all detection with per-channel "mentioned" summary flag.');
 })().catch(e=>{console.error(e);process.exit(1)});

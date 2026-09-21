@@ -10,6 +10,7 @@ import {
   isAdminLike,
   isIsolatedRole,
   canOwnLead,
+  channelsForRole,
   canManageSchedule,
   type Member,
   type Lead,
@@ -478,9 +479,9 @@ export async function GET(req: Request) {
         .first<{ total: number }>(),
       db()
         .prepare(
-          `SELECT COUNT(*) total FROM team_messages WHERE sender!=? AND created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=?),'')`,
+          `SELECT COUNT(*) total FROM team_messages tm WHERE tm.sender!=? AND tm.created_at>COALESCE((SELECT last_read_at FROM team_reads WHERE email=? AND channel=tm.channel),'') AND (tm.channel IN (${channelsForRole(m.role).map(()=>'?').join(',')}) OR EXISTS(SELECT 1 FROM group_chat_members gm JOIN group_chats g ON g.id=gm.channel_id WHERE gm.channel_id=tm.channel AND gm.email=?))`,
         )
-        .bind(m.email, m.email)
+        .bind(m.email, m.email, ...channelsForRole(m.role), m.email)
         .first<{ total: number }>(),
       // Чатын хамтрагчийн жагсаалт: role-оор хязгаарлагдаагүй, идэвхтэй бүх ажилтан (owner-ийн scoped members-ээс тусад нь).
       // last_seen нь онлайн төлөв харуулахад ашиглагдана (lib/access.ts-ийн member() бүр request тутамд шинэчилнэ).
