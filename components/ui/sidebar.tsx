@@ -15,7 +15,7 @@ export function Sidebar({children,className,...props}:React.ComponentProps<'div'
  const ctx=React.useContext(Context);
  const content=<div {...props} data-slot="sidebar-inner" className={`crm-ant-sidebar-inner ${className??''}`}>{children}</div>;
  if(ctx.mobile)return <Drawer open={ctx.mobileOpen} placement="left" onClose={()=>ctx.setMobileOpen(false)} size={288} title="Ажлын цэс" styles={{body:{padding:0}}}>{content}</Drawer>;
- return <Layout.Sider width={248} collapsedWidth={0} collapsed={!ctx.open} theme="light" className="crm-ant-sider">{content}</Layout.Sider>;
+ return <Layout.Sider aria-label="Ажлын цэс" width={248} collapsedWidth={0} collapsed={!ctx.open} theme="light" className="crm-ant-sider">{content}</Layout.Sider>;
 }
 export function SidebarInset(props:React.ComponentProps<'main'>){return <Layout.Content {...props}/>;}
 export function SidebarHeader(props:React.ComponentProps<'div'>){return <div {...props} data-slot="sidebar-header"/>;}

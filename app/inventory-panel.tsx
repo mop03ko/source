@@ -1,4 +1,5 @@
 'use client';
+import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useRef,useState} from 'react';
 import {Package,Truck,ShoppingCart,ClipboardList,Plus,Search,Download,Upload,ArrowLeftRight,Settings2,Warehouse as WarehouseIcon,ChartNoAxesCombined} from 'lucide-react';
@@ -78,16 +79,17 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
   <div className="inventory-tabs" role="tablist" aria-label="Агуулахын хэсгүүд">{modes.map(({id,label,icon:Icon})=><Button key={id} role="tab" aria-selected={mode===id} variant={mode===id?'default':'ghost'} onClick={()=>{if(allow()){setMode(id);setPage(1);}}}><Icon size={16}/>{label}</Button>)}</div>
   {mode==='counts'?<InventoryCountsPanel me={me} members={members}/>:<>
    <AsyncStatus error={options.error} loading={options.loading} retry={options.retry}/>
-   {summary&&(mode==='items'||mode==='balance')&&<div className="metrics inventory-metrics">{[['Барааны төрөл',summary.count],['Нийт үлдэгдэл',summary.units],['Үлдэгдлийн өртөг',cash(summary.value_cents/100)],['Доод үлдэгдэлд хүрсэн',summary.low_stock]].map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>}
-   {summary&&mode==='sales'&&<div className="metrics inventory-metrics">{[['Борлуулалт',summary.revenue_cents],['Борлуулсан өртөг',summary.cost_cents],['Шимтгэл + татвар',summary.commission_cents+summary.tax_cents],['Ашиг',summary.profit_cents]].map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{cash(Number(value)/100)}</strong></div>)}</div>}
+   {summary&&(mode==='items'||mode==='balance')&&<MobileDisclosure label="Агуулахын үзүүлэлт"><div className="metrics inventory-metrics">{[['Барааны төрөл',summary.count],['Нийт үлдэгдэл',summary.units],['Үлдэгдлийн өртөг',cash(summary.value_cents/100)],['Доод үлдэгдэлд хүрсэн',summary.low_stock]].map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></MobileDisclosure>}
+   {summary&&mode==='sales'&&<MobileDisclosure label="Агуулахын үзүүлэлт"><div className="metrics inventory-metrics">{[['Борлуулалт',summary.revenue_cents],['Борлуулсан өртөг',summary.cost_cents],['Шимтгэл + татвар',summary.commission_cents+summary.tax_cents],['Ашиг',summary.profit_cents]].map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{cash(Number(value)/100)}</strong></div>)}</div></MobileDisclosure>}
    {!!summary?.cost_estimated&&<p className="inventory-note">Хуучин хөдөлгөөний зарим өртгийг худалдан авалтын дундаж үнээр нөхөн тооцсон тул өртөг, ашиг ойролцоо дүнтэй.</p>}
-   <div className="filters inventory-filters">
+   <ResponsiveFilters className="filters inventory-filters" active={[warehouse,brand,stock,status,...(mode!=='items'?[from,to]:[])].filter(Boolean).length}>
     <div className="search"><Search size={17}/><Input aria-label="Бараа хайх" placeholder="Код, IMEI, нэрээр хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
     <SelectControl aria-label="Агуулахаар шүүх" value={warehouse} onChange={e=>setFilter(setWarehouse,e.target.value)}><option value="">Бүх агуулах</option>{opts.warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</SelectControl>
     {(mode==='items'||mode==='balance')&&<><SelectControl aria-label="Брэндээр шүүх" value={brand} onChange={e=>setFilter(setBrand,e.target.value)}><option value="">Бүх брэнд</option>{opts.brands.map(b=><option key={b.brand}>{b.brand}</option>)}</SelectControl><SelectControl aria-label="Үлдэгдлээр шүүх" value={stock} onChange={e=>setFilter(setStock,e.target.value)}><option value="">Бүх үлдэгдэл</option><option value="positive">Үлдэгдэлтэй</option><option value="empty">Үлдэгдэлгүй</option><option value="low">Доод хэмжээнд хүрсэн</option></SelectControl></>}
     {mode==='purchases'&&<SelectControl aria-label="Худалдан авалтын төлөв" value={status} onChange={e=>setFilter(setStatus,e.target.value)}><option value="">Бүх төлөв</option>{Object.entries(purchaseStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>}
     {mode!=='items'&&<div className="row inventory-date-range"><Field label="Эхлэх"><Input type="date" value={from} onChange={e=>setFilter(setFrom,e.target.value)}/></Field><Field label="Дуусах"><Input type="date" value={to} onChange={e=>setFilter(setTo,e.target.value)}/></Field></div>}
-   </div>
+    <Button variant="ghost" size="sm" onClick={()=>{setWarehouse('');setBrand('');setStock('');setStatus('');setFrom('');setTo('');setQ('');setPage(1);}}>Шүүлтүүр цэвэрлэх</Button>
+   </ResponsiveFilters>
    <div className="inventory-commandbar"><div className="row inventory-actions">
     {mode==='items'&&<><Button onClick={()=>setModal({kind:'item'})}><Plus size={16}/>Бараа нэмэх</Button><Button variant="outline" onClick={()=>setModal({kind:'warehouse'})}><WarehouseIcon size={16}/>Агуулах нэмэх</Button></>}
     {mode==='purchases'&&<Button disabled={!opts.warehouses.length} onClick={()=>openMovement('purchase')}><Plus size={16}/>Худалдан авалт</Button>}

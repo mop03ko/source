@@ -1,5 +1,7 @@
 'use client';
+import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {useState} from 'react';
+import {Pagination} from 'antd';
 import {ShoppingCart,Plus,Search,Users,CircleDollarSign} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -12,18 +14,19 @@ import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
 import {toast} from '@/components/ui/sonner';
 import {ItemPicker,cash,type Item,type Options} from './inventory-forms';
-import {canManageSchedule,isIsolatedRole,type Member} from '@/lib/crm';
+import {dateLabel,canManageSchedule,isIsolatedRole,type Member} from '@/lib/crm';
 type Row={id:string;item_name:string;item_code:string;warehouse_name:string;qty:number;unit_price:number;total_price:number;seller:string;seller_name:string|null;customer_name:string;customer_phone:string;platform:string;sold_at:string|null;created_at:string;profit_cents:number};
 type List={items:Row[];count:number;summary:{revenue_cents:number;profit_cents:number}};
 type Unit={serial:string;barcode:string;note:string};
 const todayUB=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 export default function DirectSalesPanel({me,members}:{me:Member;members:Member[]}){
  const canPickSeller=canManageSchedule(me.role);
+ const [page,setPage]=useState(1);
  const [seller,setSeller]=useState(canPickSeller?'__direct__':me.email);
  const [from,setFrom]=useState(()=>todayUB().slice(0,7)+'-01'),[to,setTo]=useState(todayUB);
  const [q,setQ]=useState(''),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
  // Зарагч бүртгэгдсэн борлуулалт = шууд бэлэн борлуулалт. Агент өөрийнхөө л жагсаалтыг хардаг.
- const list=useRemote<List>('/api/inventory?'+new URLSearchParams({view:'sales',seller,from,to,q,revision:String(revision)}));
+ const list=useRemote<List>('/api/inventory?'+new URLSearchParams({view:'sales',seller,from,to,q,page:String(page),revision:String(revision)}));
  const options=useRemote<Options>('/api/inventory?view=options');
  const sellers=members.filter(m=>m.active&&!isIsolatedRole(m.role));
  const rows=list.data?.items||[];
@@ -34,23 +37,23 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
    const d=await r.json() as {error?:string;fieldErrors?:Record<string,string>};
    const form=document.activeElement?.closest('form')||null;
    if(!r.ok){markFormError(form,d.error||'Хадгалж чадсангүй.',d.fieldErrors);throw new Error(d.error||'Хадгалж чадсангүй.');}
-   markFormSaved(form);setRevision(v=>v+1);toast.success('Борлуулалт бүртгэгдлээ.');return d;
+   markFormSaved(form);setPage(1);setRevision(v=>v+1);toast.success('Борлуулалт бүртгэгдлээ.');return d;
   }catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}
  };
  return <section className="table-panel">
  <div className="table-toolbar"><h2>Шууд бэлэн борлуулалт<span>{list.data?.count||0}</span></h2><div className="row">
   <Button className="primary" size="sm" onClick={()=>setOpen(true)}><Plus size={16}/>Борлуулалт бүртгэх</Button>
  </div></div>
- {list.data?.summary&&<div className="metrics"><div className="metric"><div><span>Борлуулалт</span><ShoppingCart size={19}/></div><strong>{(list.data.count||0).toLocaleString()}</strong><small>Сонгосон хугацаанд</small></div><div className="metric metric-focus"><div><span>Нийт орлого</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.revenue_cents/100)}</strong><small>Бэлнээр гарсан</small></div><div className="metric"><div><span>Ашиг</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.profit_cents/100)}</strong><small>Өртөг, шимтгэл хассан</small></div></div>}
- <div className="filters">
-  <div className="search"><Search size={17}/><Input aria-label="Бараагаар хайх" placeholder="Бараа, кодоор хайх…" value={q} onChange={e=>setQ(e.target.value)}/></div>
-  {canPickSeller&&<SelectControl aria-label="Зарсан ажилтнаар шүүх" value={seller} onChange={e=>setSeller(e.target.value)}><option value="__direct__">Бүх ажилтан</option>{sellers.map(m=><option key={m.email} value={m.email}>{m.name}</option>)}</SelectControl>}
-  <Input aria-label="Огноо: эхлэх" type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/><span className="muted">—</span><Input aria-label="Огноо: дуусах" type="date" value={to} min={from} onChange={e=>setTo(e.target.value)}/>
- </div>
+ {list.data?.summary&&<MobileDisclosure label="Борлуулалтын үзүүлэлт"><div className="metrics"><div className="metric"><div><span>Борлуулалт</span><ShoppingCart size={19}/></div><strong>{(list.data.count||0).toLocaleString()}</strong><small>Сонгосон хугацаанд</small></div><div className="metric metric-focus"><div><span>Нийт орлого</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.revenue_cents/100)}</strong><small>Бэлнээр гарсан</small></div><div className="metric"><div><span>Ашиг</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.profit_cents/100)}</strong><small>Өртөг, шимтгэл хассан</small></div></div></MobileDisclosure>}
+ <ResponsiveFilters active={[seller!=='__direct__'&&canPickSeller,from,to].filter(Boolean).length}>
+  <div className="search"><Search size={17}/><Input aria-label="Бараагаар хайх" placeholder="Бараа, кодоор хайх…" value={q} onChange={e=>{setQ(e.target.value);setPage(1);}}/></div>
+  {canPickSeller&&<SelectControl aria-label="Зарсан ажилтнаар шүүх" value={seller} onChange={e=>{setSeller(e.target.value);setPage(1);}}><option value="__direct__">Бүх ажилтан</option>{sellers.map(m=><option key={m.email} value={m.email}>{m.name}</option>)}</SelectControl>}
+  <Input aria-label="Огноо: эхлэх" type="date" value={from} max={to} onChange={e=>{setFrom(e.target.value);setPage(1);}}/><span className="muted">—</span><Input aria-label="Огноо: дуусах" type="date" value={to} min={from} onChange={e=>{setTo(e.target.value);setPage(1);}}/>
+ </ResponsiveFilters>
  <AsyncStatus error={list.error} loading={list.loading} retry={list.retry}/>
  {!list.error&&(rows.length?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>ОГНОО</TableHead><TableHead>БАРАА</TableHead><TableHead>АГУУЛАХ</TableHead><TableHead>ТОО</TableHead><TableHead>ДҮН</TableHead><TableHead>АШИГ</TableHead><TableHead>ЗАРСАН</TableHead><TableHead>ХАРИЛЦАГЧ</TableHead></TableRow></TableHeader><TableBody>
   {rows.map(r=><TableRow key={r.id}>
-   <TableCell>{(r.sold_at||r.created_at).slice(0,10)}</TableCell>
+   <TableCell>{dateLabel(r.sold_at||r.created_at)}</TableCell>
    <TableCell><strong>{r.item_name}</strong><small>{r.item_code}</small></TableCell>
    <TableCell>{r.warehouse_name}</TableCell>
    <TableCell>{r.qty}</TableCell>
@@ -60,6 +63,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
    <TableCell>{r.customer_name||'—'}<small>{r.customer_phone||''}</small></TableCell>
   </TableRow>)}
  </TableBody></Table></div>:!list.loading&&<p className="muted chat-empty-list">Сонгосон хугацаанд шууд борлуулалт бүртгэгдээгүй байна.</p>)}
+ {!!list.data?.count&&<div className="table-footer"><Pagination current={page} pageSize={50} total={list.data.count} onChange={setPage} disabled={list.loading} showSizeChanger={false} showTotal={(total,range)=>`${range[0]}–${range[1]} / ${total} борлуулалт`} responsive/></div>}
  <Dialog open={open} onOpenChange={setOpen}><DialogContent className="form-dialog">
   <DialogHeader><DialogTitle>Шууд бэлэн борлуулалт</DialogTitle><DialogDescription>Хүсэлтээр ирээгүй, шууд ирж худалдан авсан борлуулалтыг бүртгэнэ. Агуулахын үлдэгдлээс хасагдана.</DialogDescription></DialogHeader>
   <SaleForm me={me} sellers={sellers} canPickSeller={canPickSeller} options={options.data||undefined} busy={busy} onSubmit={async v=>{if(await post(v))setOpen(false);}}/>

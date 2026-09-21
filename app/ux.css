@@ -1,4 +1,27 @@
 /* Higher specificity keeps these workspace rules above the legacy surface styles. */
+:root .perf-stats span,:root .capacity-result span,:root .candidate-group span,:root .table-toolbar h2>span,:root .guide-grid p,:root .cadence p{color:#65506f}
+:root .schedule-grid th button small{color:#65506f;font-size:11px}
+:root .auth-kicker,:root .auth-card>small{color:#65566f}
+:root .mobile-disclosure,:root .mobile-disclosure-content{display:contents}
+:root .mobile-disclosure-toggle{display:none}
+:root .filters .mobile-disclosure-content>.crm-date-control{width:170px}
+:root .filters .mobile-disclosure-content>.crm-select-control{width:210px;font-size:12px}
+:root .sound-option .ant-radio-wrapper{flex:1;min-height:44px;align-items:center}
+:root .sound-option .ant-radio-label{display:flex;gap:8px;align-items:center}
+:root .group-member-row .ant-checkbox-wrapper{width:100%;min-height:44px;align-items:center}
+@media(max-width:767px){
+ :root .mobile-disclosure{display:block;width:100%;min-width:0}
+ :root .mobile-disclosure-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;text-align:left;border:1px solid #d8cddd;border-radius:8px;background:#fff;color:#522a70;font-size:13px}
+ :root .mobile-disclosure-content{display:block;margin-top:10px}
+ :root .mobile-disclosure-content[hidden]{display:none}
+ :root .table-panel>.mobile-disclosure{padding:8px 12px}
+ :root .filters .mobile-disclosure-content{display:flex;flex-wrap:wrap;gap:12px}
+ :root .filters .mobile-disclosure-content>*{min-width:0;max-width:100%}
+ :root .filters .mobile-disclosure-content>.crm-select-control,:root .filters .mobile-disclosure-content>.crm-date-control{width:100%}
+ :root .filters .mobile-disclosure-content>.muted{display:none}
+ :root .main-content>.mobile-disclosure{margin-bottom:12px}
+ :root .table-footer .ant-pagination{flex-wrap:wrap;row-gap:10px}
+}
 :root:root {color-scheme:light;--muted-foreground:#62546e;--secondary:#f2f0f5;--secondary-foreground:#251a34;--accent:#f2f0f5;--accent-foreground:#251a34;--destructive:#b91c1c;--destructive-foreground:#fff}
 :root .sales-navigation>.row{width:max-content;flex-wrap:nowrap}
 :root .import-preview{max-height:45dvh;overflow:auto}

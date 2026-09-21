@@ -15,7 +15,7 @@ export function useUnsavedChanges(dirty:boolean){
  const id=useId(),{register}=useContext(Context);
  useEffect(()=>{register(id,dirty);return()=>register(id,false);},[id,dirty,register]);
 }
-const snapshot=(form:HTMLFormElement)=>JSON.stringify(Array.from(form.elements).filter((el):el is HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement=>el instanceof HTMLInputElement||el instanceof HTMLSelectElement||el instanceof HTMLTextAreaElement).map(el=>[el.name,el.value,el instanceof HTMLInputElement?el.checked:null]));
+const snapshot=(form:HTMLFormElement)=>JSON.stringify(Array.from(form.elements).filter((el):el is HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement=>(el instanceof HTMLInputElement||el instanceof HTMLSelectElement||el instanceof HTMLTextAreaElement)&&!el.closest('.ant-select')).map(el=>[el.name,el.value,el instanceof HTMLInputElement?el.checked:null]));
 export function markFormSaved(form:HTMLFormElement|null){form?.dispatchEvent(new Event('crm:saved'));}
 export function markFormError(form:HTMLFormElement|null,message:string,fields?:Record<string,string>){
  form?.dispatchEvent(new CustomEvent('crm:error',{detail:message}));
