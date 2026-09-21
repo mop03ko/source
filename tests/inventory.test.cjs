@@ -13,12 +13,13 @@ deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps[
 async function crmGet(query=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()];}
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function invGet(query=''){const r=await invRoute.GET(new Request('https://crm.test/api/inventory'+query));return [r.status,await r.json()];}
-async function invPost(action,data,id){const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id})}));return [r.status,await r.json()];}
+async function invPost(action,data,id,request_id){const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id})}));return [r.status,await r.json()];}
 (async()=>{
  await crmGet(); // bootstrap owner as admin
  assert.equal((await crmPost('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
  assert.equal((await crmPost('member',{email:'marketing@example.test',name:'Marketing',role:'marketing',active:true}))[0],200);
  assert.equal((await crmPost('member',{email:'it@example.test',name:'IT',role:'it',active:true}))[0],200);
+ for(const role of ['manager','director'])assert.equal((await crmPost('member',{email:role+'@example.test',name:role,role,active:true}))[0],200);
  // Маркетинг, IT хоёул бараа материалын системд хамааралгүй тул огт хандахгүй.
  user={userId:'m',email:'marketing@example.test',displayName:'Marketing'};
  assert.equal((await invGet())[0],403);
@@ -48,9 +49,29 @@ async function invPost(action,data,id){const r=await invRoute.POST(new Request('
  [status,d]=await invGet('?view=items&id='+itemId);assert.equal(d.byWarehouse.find(w=>w.warehouse_id===whId).qty,3);assert.equal(d.moves.length,2);
  [status,d]=await invGet('?view=purchases');assert.equal(status,200);assert.equal(d.count,1);assert.equal(d.items[0].item_name,'CUCKOO STICK GUN');
  [status,d]=await invGet('?view=sales');assert.equal(status,200);assert.equal(d.count,1);assert.equal(d.items[0].customer_name,'Бат');
- // Бараа мэдээлэл шинэчлэх (нэр/үнэ засах).
- [status]=await invPost('update_item',{code:'AME1410NW',brand:'CUCKOO',name:'CUCKOO STICK GUN v2',variant:'',sale_price:950000},itemId);
- assert.equal(status,200);
- [status,d]=await invGet('?view=items&id='+itemId);assert.equal(d.item.name,'CUCKOO STICK GUN v2');assert.equal(d.item.sale_price,950000);
- console.log('PASS: inventory (SKU/warehouse/stock) role isolation from marketing/IT, item CRUD, warehouse creation, purchase/sale recording with stock-level enforcement, and stock-move ledger derived balances.');
+ // Only admin and manager may edit existing items, including direct API requests.
+ const edit={code:'AME1410NW',brand:'CUCKOO',name:'CUCKOO STICK GUN v2',variant:'',sale_price:950000};
+ for(const role of ['admin','manager','director','agent','marketing','it']){
+  user=role==='admin'?{userId:'owner-test',email:'owner@example.test',displayName:'Owner'}:{userId:({agent:'a',marketing:'m',it:'it'})[role]||role,email:role+'@example.test',displayName:role};
+  const before=sqlite.prepare('SELECT * FROM inventory_items WHERE id=?').get(itemId);
+  const requestsBefore=sqlite.prepare('SELECT COUNT(*) n FROM inventory_requests').get().n;
+  const allowed=role==='admin'||role==='manager';
+  assert.equal(common.canEditInventoryItem(role),allowed);
+  [status]=await invPost('update_item',{...edit,name:edit.name+' '+role},itemId,crypto.randomUUID());
+  assert.equal(status,allowed?200:403,role+' edit permission');
+  const after=sqlite.prepare('SELECT * FROM inventory_items WHERE id=?').get(itemId);
+  if(allowed){assert.equal(after.name,edit.name+' '+role);assert.equal(after.sale_price,950000);}
+  else{assert.deepEqual(after,before,'Denied edit must not change the item');assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM inventory_requests').get().n,requestsBefore);}
+ }
+ assert.equal(common.canEditInventoryItem('unknown'),false);
+ // A role downgrade must be checked before returning a cached successful request.
+ user={userId:'manager',email:'manager@example.test',displayName:'Manager'};
+ const editRequest=crypto.randomUUID();
+ assert.equal((await invPost('update_item',edit,itemId,editRequest))[0],200);
+ sqlite.prepare("UPDATE members SET role='agent' WHERE email=?").run(user.email);
+ const beforeReplay=sqlite.prepare('SELECT * FROM inventory_items WHERE id=?').get(itemId);
+ assert.equal((await invPost('update_item',edit,itemId,editRequest))[0],403);
+ assert.deepEqual(sqlite.prepare('SELECT * FROM inventory_items WHERE id=?').get(itemId),beforeReplay);
+ assert.equal((await invGet('?view=items&id='+itemId))[0],200,'Agent may still view inventory');
+ console.log('PASS: inventory role isolation, admin/manager-only item edits, denied-edit immutability, revoked-role request replay, item creation, purchases/sales and stock enforcement.');
 })().catch(e=>{console.error(e);process.exit(1)});

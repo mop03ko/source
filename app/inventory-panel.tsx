@@ -11,7 +11,7 @@ import {GuardedForm,useDraftGuard} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
 import {useRemote,readJson} from '@/hooks/use-remote';
 import {toCsv} from '@/lib/inventory-csv';
-import {dateLabel,type Member} from '@/lib/crm';
+import {canEditInventoryItem,dateLabel,type Member} from '@/lib/crm';
 import {toast} from 'sonner';
 import InventoryCountsPanel from './inventory-counts-panel';
 import {ItemForm,MovementForm,ImportForm,cash,type Item,type Options,type Detail,type Post} from './inventory-forms';
@@ -41,6 +41,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const detail=useRemote<Detail>(detailId?'/api/inventory?view=items&id='+encodeURIComponent(detailId)+'&revision='+revision:null);
  const summary=list.data?.summary,rows=list.data?.items||[],total=list.data?.count||0,totalPages=Math.max(1,Math.ceil(total/50));
  const canManage=['admin','director','manager'].includes(me.role);
+ const canEditItem=canEditInventoryItem(me.role);
  const post:Post=async(action,data,id)=>{
   if(busyRef.current)throw new Error('Өмнөх хүсэлт дуусахыг хүлээнэ үү.');
   const body=JSON.stringify({action,data,id});
@@ -108,12 +109,12 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
   </>}
   <Sheet open={!!detailId} onOpenChange={o=>{if(!o)setDetailId('');}}><SheetContent className="detail-sheet"><SheetHeader><SheetTitle>{detail.data?.item.name||'Барааны дэлгэрэнгүй'}</SheetTitle><SheetDescription>Агуулах тус бүрийн үлдэгдэл, өртөг, сүүлийн 100 хөдөлгөөн</SheetDescription></SheetHeader><div className="detail-body"><AsyncStatus error={detail.error} loading={detail.loading} retry={detail.retry}/>{detail.data&&<>
    <p className="muted">{detail.data.item.code} · {detail.data.item.brand} · {[detail.data.item.capacity,detail.data.item.color,detail.data.item.imei].filter(Boolean).join(' / ')}</p>
-   <div className="row inventory-actions"><Button size="sm" onClick={()=>setModal({kind:'item',item:detail.data!.item})}>Мэдээлэл засах</Button><Button size="sm" variant="outline" onClick={()=>openMovement('purchase',detail.data!.item)}>Орлого нэмэх</Button><Button size="sm" variant="outline" onClick={()=>openMovement('sale',detail.data!.item)}>Зарлага бүртгэх</Button><Button size="sm" variant="outline" disabled={opts.warehouses.length<2} onClick={()=>openMovement('transfer',detail.data!.item)}>Шилжүүлэх</Button></div>
+   <div className="row inventory-actions">{canEditItem&&<Button size="sm" onClick={()=>setModal({kind:'item',item:detail.data!.item})}>Мэдээлэл засах</Button>}<Button size="sm" variant="outline" onClick={()=>openMovement('purchase',detail.data!.item)}>Орлого нэмэх</Button><Button size="sm" variant="outline" onClick={()=>openMovement('sale',detail.data!.item)}>Зарлага бүртгэх</Button><Button size="sm" variant="outline" disabled={opts.warehouses.length<2} onClick={()=>openMovement('transfer',detail.data!.item)}>Шилжүүлэх</Button></div>
    <div className="sync-summary">{detail.data.byWarehouse.map(w=><div key={w.warehouse_id}><span>{w.warehouse_name}</span><strong>{w.qty} ш</strong><small>{cash(w.value_cents/100)}</small></div>)}</div>
    <div className="timeline">{detail.data.moves.map(m=><article key={m.id}><span className="timeline-dot"/><div className="row between"><strong>{kinds[m.kind]||m.kind} · {m.qty_delta>0?'+':''}{m.qty_delta} ш</strong><time>{dateLabel(m.occurred_at||m.created_at)}</time></div><p>{m.warehouse_name} · {cash(m.value_cents/100)}</p>{m.note&&<small>{m.note}</small>}</article>)}</div>
   </>}</div></SheetContent></Sheet>
   <Dialog open={!!modal} onOpenChange={open=>{if(!open&&!busy)setModal(null);}}><DialogContent className="form-dialog inventory-dialog"><DialogHeader><DialogTitle>{modal?modalTitle[modal.kind]:''}</DialogTitle><DialogDescription>{modal?.kind==='import'?'Үлдэгдлийг импортлохоос өмнө файл, огноо болон зөрчлийг шалгана.':'Мэдээллээ бөглөөд хадгална уу.'}</DialogDescription></DialogHeader>
-   {modal?.kind==='item'&&<ItemForm item={modal.item} busy={busy} onSave={data=>save(modal.item?'update_item':'create_item',data,modal.item?.id)}/>}
+   {modal?.kind==='item'&&(!modal.item||canEditItem)&&<ItemForm item={modal.item} busy={busy} onSave={data=>save(modal.item?'update_item':'create_item',data,modal.item?.id)}/>}
    {modal&&['purchase','sale','transfer'].includes(modal.kind)&&<MovementForm kind={modal.kind as 'purchase'|'sale'|'transfer'} item={modal.item} options={opts} warehouse={warehouse} busy={busy} onSave={data=>save(modal.kind==='purchase'?'record_purchase':modal.kind==='sale'?'record_sale':'transfer',data)}/>}
    {modal?.kind==='warehouse'&&<GuardedForm className="form-stack" onSubmit={async e=>{await save('create_warehouse',{name:new FormData(e.currentTarget).get('name')});return true;}}><Field label="Агуулах / салбарын нэр *"><Input name="name" required maxLength={120}/></Field><Button disabled={busy}>Хадгалах</Button></GuardedForm>}
    {modal?.kind==='return'&&<GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);await save('return_purchase',{qty:Number(f.get('qty')),note:f.get('note')},modal.purchase!.id);return true;}}><p>{modal.purchase!.item_name} · {modal.purchase!.warehouse_name}</p><Field label="Буцаах тоо *"><Input name="qty" type="number" min={1} max={modal.purchase!.qty-modal.purchase!.returned_qty} defaultValue={1} required/></Field><Field label="Буцаалтын шалтгаан *"><textarea name="note" required maxLength={2000}/></Field><p className="muted">Буцаалтын өртгийг агуулахын одоогийн дундаж өртгөөр хасна.</p><Button disabled={busy} variant="destructive">Буцаалт бүртгэх</Button></GuardedForm>}

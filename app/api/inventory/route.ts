@@ -1,6 +1,6 @@
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
-import {isIsolatedRole,type Member} from '@/lib/crm';
+import {canEditInventoryItem,isIsolatedRole,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds} from '@/lib/inventory';
 import type {DatabaseSession} from '@/lib/database';
@@ -82,6 +82,7 @@ export async function POST(req:Request){try{
  if(Number(req.headers.get('content-length')||0)>5_000_000)throw new Failure('Файл хэт том.',413);
  const raw=await req.text();if(raw.length>5_000_000)throw new Failure('Файл хэт том.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
+ if(b.action==='update_item'&&!canEditInventoryItem(m.role))throw new Failure('Барааны мэдээллийг зөвхөн админ болон ахлах засах эрхтэй.',403);
  const result=await db().transaction(async d=>{
   const payload=JSON.stringify({action:b.action,id:b.id,data:b.data});
   if(b.request_id){const prev=await d.prepare('SELECT * FROM inventory_requests WHERE id=?').bind(b.request_id).first();if(prev){if(prev.payload!==payload)throw new Failure('Давтан хүсэлтийн өгөгдөл өөрчлөгдсөн.',409);return JSON.parse(String(prev.response));}}

@@ -4,6 +4,8 @@ export const roles:Record<string,string>={admin:'Админ',director:'Удир�
 // "Удирдлага" (director) нь админтай адил эрхтэй (гишүүн удирдах, тайлан, төсөв батлах г.м); зөвхөн жинхэнэ
 // эзэмшигчийн бүртгэлийг хамгаалах логик (owner protection) л 'admin'-ийг өөрөө шаарддаг тул үүнд хамаарахгүй.
 export const isAdminLike=(role:string)=>role==='admin'||role==='director';
+// Барааны мэдээллийг зөвхөн Админ, Ахлах засна.
+export const canEditInventoryItem=(role:string)=>role==='admin'||role==='manager';
 // Маркетинг, IT хоёр хоёулаа борлуулалтын хүсэлт (leads)-тэй огт харьцдаггүй, тусад нь модультай эрхүүд.
 export const isIsolatedRole=(role:string)=>role==='marketing'||role==='it';
 export const teamChannels:Record<string,string>={all:'Бүх ажилчид',marketing:'Маркетинг',sales:'Борлуулалт'};
