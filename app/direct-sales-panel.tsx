@@ -77,7 +77,7 @@ function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Member;se
  const [units,setUnits]=useState<Unit[]>([]);
  const stock=useRemote<{byWarehouse:{warehouse_id:string;qty:number}[]}>(item?'/api/inventory?view=items&id='+encodeURIComponent(item.id):null);
  const available=stock.data?.byWarehouse.find(w=>w.warehouse_id===warehouse)?.qty??null;
- const choose=(it:Item|null)=>{setItem(it);setPrice(salePrice(it,platform?'credit':'cash'));};
+ const choose=(it:Item|null)=>{setItem(it);setQty(1);setUnits(it&&(it.imei||it.barcode)?[{serial:it.imei||'',barcode:it.barcode||'',note:''}]:[]);setPrice(salePrice(it,platform?'credit':'cash'));};
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);
   if(!item||!warehouse){toast.error('Бараа болон агуулах сонгоно уу.');return;}
   onSubmit({item_id:item.id,warehouse_id:warehouse,qty,unit_price:price,seller:canPickSeller?f.get('seller'):me.email,

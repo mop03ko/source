@@ -47,7 +47,7 @@ try{
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');await viewport(1440);
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
  await cdp('Page.navigate',{url:base});await wait("!!document.querySelector('.nav-button')");await pause(1200);await click('Агуулах','.nav-button');await wait("!!document.querySelector('.inventory-item-link')");
- await snap('01-stock-desktop');await click('Туршилтын утасUI-TEST-256','.inventory-item-link');await wait("!!document.querySelector('.detail-body .sync-summary')");
+ await snap('01-stock-desktop');await click('Туршилтын утас1 дугаарын бүртгэл','.inventory-item-link');await wait("!!document.querySelector('.inventory-unit-link')");await evaluate("document.querySelector('.inventory-unit-link').click()");await wait("!!document.querySelector('.detail-body .sync-summary')");
  assert.ok(await evaluate("document.querySelector('.detail-body').textContent.includes('Туршилтын нийлүүлэгч')"));
  assert.ok(await evaluate("document.querySelector('.detail-body').textContent.includes('Тусгай хувилбар')"));
  await click('Мэдээлэл засах');await wait("!!document.querySelector('input[name=sale_price]')");

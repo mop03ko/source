@@ -3,7 +3,7 @@ import {member,Failure,isSameOrigin} from '@/lib/access';
 import {canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {unitsSchema,saveUnits} from '@/lib/serials';
-import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds} from '@/lib/inventory';
+import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey} from '@/lib/inventory';
 import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -32,17 +32,47 @@ export async function GET(req:Request){try{
   const [warehouses,brands,channels,suppliers,categories]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all(),db().prepare("SELECT DISTINCT supplier FROM inventory_items WHERE supplier!='' ORDER BY supplier").all(),db().prepare("SELECT DISTINCT category FROM inventory_items WHERE category!='' ORDER BY category").all()]);
   return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results,suppliers:suppliers.results,categories:categories.results});
  }
+ if(view==='products'){
+  const args:unknown[]=[];let where='1=1';
+  const productId=p.get('id');
+  if(productId){where+=' AND it.group_id=?';args.push(productId);}
+  if(q){where+=' AND (it.name LIKE ? OR it.code LIKE ? OR it.imei LIKE ? OR it.barcode LIKE ? OR it.brand LIKE ? OR it.supplier LIKE ? OR EXISTS(SELECT 1 FROM inventory_units u WHERE u.item_id=it.id AND (u.serial LIKE ? OR u.barcode LIKE ?)))';args.push(...Array(8).fill('%'+q+'%'));}
+  for(const [column,value] of [['brand',brand],['category',category],['supplier',supplier]])if(value){where+=` AND it.${column}=?`;args.push(value);}
+  const moveArgs=warehouse?[warehouse]:[];
+  const cte=`WITH totals AS (SELECT item_id,SUM(qty_delta) stock,SUM(value_cents) value_cents,MAX(cost_estimated) cost_estimated FROM inventory_stock_moves ${warehouse?'WHERE warehouse_id=?':''} GROUP BY item_id),base AS (SELECT it.*,COALESCE(NULLIF(it.product_key,''),it.id) group_id,COALESCE(t.stock,0) stock,COALESCE(t.value_cents,0) value_cents,COALESCE(t.cost_estimated,0) cost_estimated FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id),matched AS (SELECT * FROM base it WHERE ${where}),products AS (SELECT group_id id,group_id product_key,MIN(name) name,MIN(brand) brand,CASE WHEN COUNT(DISTINCT category)>1 THEN 'Олон ангилал' ELSE MIN(category) END category,MIN(capacity) capacity,MIN(color) color,MIN(variant) variant,CASE WHEN COUNT(*)=1 THEN MIN(code) ELSE '' END code,CASE WHEN COUNT(*)=1 THEN MIN(imei) ELSE NULL END imei,CASE WHEN COUNT(*)=1 THEN MIN(barcode) ELSE '' END barcode,CASE WHEN COUNT(DISTINCT supplier)>1 THEN 'Олон нийлүүлэгч' ELSE MIN(supplier) END supplier,CASE WHEN COUNT(*)=1 THEN MIN(id) ELSE NULL END single_item_id,COUNT(*) unit_count,SUM(stock) stock,SUM(value_cents) value_cents,SUM(min_stock) min_stock,MAX(cost_estimated) cost_estimated,MIN(sale_price) sale_price,MAX(sale_price) sale_price_max,MIN(COALESCE(cash_price,sale_price)) cash_price,MAX(COALESCE(cash_price,sale_price)) cash_price_max FROM matched GROUP BY group_id)`;
+  const bindArgs=[...moveArgs,...args];
+  if(productId){
+   const product=await db().prepare(`${cte} SELECT * FROM products`).bind(...bindArgs).first();
+   if(!product)throw new Failure('Бараа олдсонгүй.',404);
+   const uq=(p.get('unit_q')||'').trim().slice(0,200),unitArgs=uq?Array(6).fill('%'+uq+'%'):[];
+   const unitWhere=uq?'WHERE code LIKE ? OR imei LIKE ? OR barcode LIKE ? OR supplier LIKE ? OR EXISTS(SELECT 1 FROM inventory_units u WHERE u.item_id=matched.id AND (u.serial LIKE ? OR u.barcode LIKE ?))':'';
+   const [units,count,history]=await Promise.all([
+    db().prepare(`${cte} SELECT * FROM matched ${unitWhere} ORDER BY stock DESC,code,id LIMIT 50 OFFSET ?`).bind(...bindArgs,...unitArgs,(page-1)*50).all(),
+    db().prepare(`${cte} SELECT COUNT(*) count FROM matched ${unitWhere}`).bind(...bindArgs,...unitArgs).first<{count:number}>(),
+    db().prepare(`${cte} SELECT u.* FROM inventory_units u JOIN matched it ON it.id=u.item_id ORDER BY u.created_at DESC,u.id DESC LIMIT 100`).bind(...bindArgs).all(),
+   ]);
+   return json({product,items:units.results,count:count?.count||0,page,history:history.results});
+  }
+  const stock=p.get('stock')||'';
+  const stockWhere=stock==='positive'?'stock>0':stock==='empty'?'stock<=0':stock==='low'?'stock<=min_stock':stock==='reorder'?'stock>0 AND stock<=min_stock':'1=1';
+  const [rows,summary]=await Promise.all([
+   db().prepare(`${cte} SELECT * FROM products WHERE ${stockWhere} ORDER BY name,id LIMIT ? OFFSET ?`).bind(...bindArgs,limit,limit===5000?0:(page-1)*50).all(),
+   db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(unit_count),0) unit_count,COALESCE(SUM(stock),0) units,COALESCE(SUM(value_cents),0) value_cents,COALESCE(SUM(stock<=min_stock),0) low_stock,COALESCE(MAX(cost_estimated),0) cost_estimated FROM products WHERE ${stockWhere}`).bind(...bindArgs).first(),
+  ]);
+  return json({items:rows.results,count:summary?.count||0,summary,page,truncated:limit===5000&&Number(summary?.count)>limit});
+ }
  if(view==='items'&&p.get('id')){
   const item=await requireRow(db(),'inventory_items',p.get('id')!);
-  const [byWarehouse,moves,stock]=await Promise.all([
+  const [byWarehouse,moves,stock,identifiers]=await Promise.all([
    db().prepare('SELECT w.id warehouse_id,w.name warehouse_name,COALESCE(SUM(m.qty_delta),0) qty,COALESCE(SUM(m.value_cents),0) value_cents,COALESCE(MAX(m.cost_estimated),0) cost_estimated FROM inventory_warehouses w LEFT JOIN inventory_stock_moves m ON m.warehouse_id=w.id AND m.item_id=? GROUP BY w.id ORDER BY w.name').bind(item.id).all(),
    db().prepare('SELECT m.*,w.name warehouse_name FROM inventory_stock_moves m JOIN inventory_warehouses w ON w.id=m.warehouse_id WHERE m.item_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 100').bind(item.id).all(),
    db().prepare('SELECT COALESCE(SUM(qty_delta),0) stock,COALESCE(SUM(value_cents),0) value_cents,COALESCE(MAX(cost_estimated),0) cost_estimated FROM inventory_stock_moves WHERE item_id=?').bind(item.id).first(),
-  ]);return json({item:{...item,...stock},byWarehouse:byWarehouse.results,moves:moves.results});
+   db().prepare('SELECT * FROM inventory_units WHERE item_id=? ORDER BY created_at DESC LIMIT 100').bind(item.id).all(),
+  ]);return json({item:{...item,...stock},byWarehouse:byWarehouse.results,moves:moves.results,identifiers:identifiers.results});
  }
  if(view==='items'||view==='balance'){
   const args:unknown[]=[];let where='1=1';
-  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ?)';args.push(...Array(8).fill('%'+q+'%'));}
+  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ? OR it.barcode LIKE ?)';args.push(...Array(9).fill('%'+q+'%'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
   if(category){where+=' AND it.category=?';args.push(category);}
@@ -129,9 +159,11 @@ export async function POST(req:Request){try{
     const categoryValue=input.category===undefined?(previous?.category??''):input.category;
     const cashPrice=input.cash_price===undefined?(previous?.cash_price??null):input.cash_price;
     if(cashPrice!==null&&Number(cashPrice)>input.sale_price)throw new Failure('Бэлэн төлөлтийн үнэ үндсэн үнээс их байж болохгүй.');
-    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice,categoryValue];
-    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,category,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
-    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,category=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
+    const barcode=input.barcode===undefined?(previous?.barcode??''):input.barcode;
+    const key=await productKey({...input,id});
+    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice,categoryValue,barcode,key];
+    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,category,barcode,product_key,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
+    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,category=?,barcode=?,product_key=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
     return {ok:true,id};
    }
    if(b.action==='save_channel'){
@@ -206,7 +238,7 @@ export async function POST(req:Request){try{
     for(const row of input.rows){
      if(!warehouses.has(row.warehouse)){const id=crypto.randomUUID();warehouses.set(row.warehouse,id);statements.push(d.prepare('INSERT INTO inventory_warehouses(id,name,created_at) VALUES(?,?,?)').bind(id,row.warehouse,now));}
      const id=crypto.randomUUID(),value=row.total_cost!==undefined?cents(row.total_cost):safeTotal(cents(row.unit_cost)*row.qty);
-     statements.push(d.prepare('INSERT INTO inventory_items(id,code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.code,row.brand,row.name,row.variant,row.imei||null,row.sale_price,row.capacity,row.color,row.supplier,row.min_stock,m.email,now,now));
+     statements.push(d.prepare('INSERT INTO inventory_items(id,code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,barcode,product_key,category,cash_price,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,row.code,row.brand,row.name,row.variant,row.imei||null,row.sale_price,row.capacity,row.color,row.supplier,row.min_stock,row.barcode||'',await productKey({...row,id}),row.category||'',row.cash_price??null,m.email,now,now));
      if(row.qty)statements.push(d.prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,value_cents,cost_estimated,occurred_at,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),id,warehouses.get(row.warehouse)!,'opening',row.qty,value/row.qty/100,value,0,input.as_of,b.request_id||id,'Excel Balance эхний үлдэгдэл',m.email,now));
     }
     for(let i=0;i<statements.length;i+=150)await d.batch(statements.slice(i,i+150));

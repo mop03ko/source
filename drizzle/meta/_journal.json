@@ -218,6 +218,13 @@
       "when": 1789979678443,
       "tag": "0030_chemical_bloodstorm",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1789982761368,
+      "tag": "0031_supreme_malice",
+      "breakpoints": true
     }
   ]
 }

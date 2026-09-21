@@ -1,0 +1,66 @@
+import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {spawn,execFileSync} from 'node:child_process';
+import {randomBytes} from 'node:crypto';
+import {encode} from 'next-auth/jwt';
+import assert from 'node:assert/strict';
+
+// Disposable local database. Optional argv[2] exercises the supplied workbook in the browser.
+const dir=await mkdtemp(join(tmpdir(),'antmall-products-')),out=resolve('artifacts/inventory-products-audit');
+await mkdir(out,{recursive:true});
+const base='http://127.0.0.1:34681',secret=randomBytes(32).toString('base64');
+const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true',AUTH_GOOGLE_ID:'test',AUTH_GOOGLE_SECRET:'test',CRM_OWNER_EMAIL:'owner@example.test',TURSO_DATABASE_URL:'file:'+join(dir,'test.db'),TURSO_AUTH_TOKEN:'',ANTMALL_SMS_API_KEY:'',CRM_GOOGLE_SERVICE_ACCOUNT_JSON:'',NEXT_TELEMETRY_DISABLED:'1'};delete env.VERCEL;
+execFileSync(process.execPath,['scripts/migrate.mjs'],{env,stdio:'pipe'});
+const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','34681'],{env,stdio:'ignore',windowsHide:true});
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+let chrome,ws;const evidence={checks:{},screens:[],errors:[]};
+try{
+ for(let i=0;i<80;i++){try{await fetch(base+'/login',{signal:AbortSignal.timeout(1000)});break;}catch{await pause(150);}}
+ const token=await encode({secret,salt:'authjs.session-token',token:{sub:'google:owner',email:'owner@example.test',name:'Inventory test'},maxAge:3600});
+ const headers={cookie:'authjs.session-token='+token,Origin:base,'Content-Type':'application/json'};
+ assert.equal((await fetch(base+'/api/crm',{headers})).status,200);
+ const post=async(action,data,id)=>{const r=await fetch(base+'/api/inventory',{method:'POST',headers,body:JSON.stringify({action,data,id})});const value=await r.json();assert.equal(r.status,200,JSON.stringify(value));return value;};
+ const wh=(await post('create_warehouse',{name:'Product warehouse'})).id;
+ const baseItem={name:'Grouped phone',brand:'Apple',capacity:'256GB',color:'Blue',category:'Гар утас',sale_price:1000,cash_price:900};
+ const first=(await post('create_item',{...baseItem,code:'SERIAL-A',imei:'111111111111111',barcode:'8800000000001',supplier:'Mike'})).id;
+ const second=(await post('create_item',{...baseItem,code:'SERIAL-B',imei:'222222222222222',barcode:'8800000000001',supplier:'Yuna'})).id;
+ await post('create_item',{...baseItem,code:'SERIAL-512',capacity:'512GB'});await post('create_item',{...baseItem,code:'SERIAL-WHITE',color:'White'});
+ for(const id of [first,second])await post('record_purchase',{item_id:id,warehouse_id:wh,qty:1,unit_cost:500,status:'received'});
+ chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9342','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
+ let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9342/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
+ if(!target)throw new Error('Chrome did not start');
+ ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
+ let sequence=0;const pending=new Map();
+ const cdp=(method,params={})=>new Promise((r,j)=>{const id=++sequence,t=setTimeout(()=>{pending.delete(id);j(new Error('CDP timeout: '+method));},30000);pending.set(id,{resolve:v=>{clearTimeout(t);r(v);},reject:e=>{clearTimeout(t);j(e);}});ws.send(JSON.stringify({id,method,params}));});
+ ws.onmessage=event=>{const v=JSON.parse(event.data);if(v.id){const p=pending.get(v.id);if(p){pending.delete(v.id);v.error?p.reject(new Error(v.error.message)):p.resolve(v.result);}}else if(v.method==='Runtime.exceptionThrown')evidence.errors.push(v.params.exceptionDetails.exception?.description||v.params.exceptionDetails.text);else if(v.method==='Page.javascriptDialogOpening')void cdp('Page.handleJavaScriptDialog',{accept:true});};
+ const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.result.description);return r.result.value;};
+ const wait=async(expression)=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await pause(150);}evidence.lastBody=await evaluate('document.body.innerText');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,'failure.png'),Buffer.from(shot.data,'base64'));throw new Error('UI wait timed out: '+expression);};
+ const click=async(text,selector='button')=>{await evaluate(`(()=>{const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.textContent.trim()===${JSON.stringify(text)});if(!e)throw new Error('Missing button: '+${JSON.stringify(text)});e.click();})()`);await pause(300);};
+ const fill=async(selector,value)=>{await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw new Error('Missing input');const proto=e instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`);await pause(200);};
+ const viewport=async(width)=>{await cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});await pause(250);};
+ const snap=async name=>{const metrics=await evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,name+'.png'),Buffer.from(shot.data,'base64'));evidence.screens.push({name,...metrics});assert.ok(metrics.scroll<=metrics.width,name+' overflows');};
+ await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');await viewport(1440);
+ await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
+ await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("document.querySelectorAll('.inventory-item-link').length===3");
+ await click('Grouped phone2 дугаарын бүртгэл','.inventory-item-link');await wait("document.querySelectorAll('.inventory-unit-link').length===2");
+ await snap('product-units-desktop');await viewport(390);await snap('product-units-mobile');await viewport(1440);
+ await fill('input[aria-label="Барааны дотор дугаар хайх"]','222222');await wait("document.querySelectorAll('.inventory-unit-link').length===1");
+ assert.ok(await evaluate("document.querySelector('.inventory-unit-link').textContent.includes('SERIAL-B')"));
+ await evaluate("document.querySelector('.inventory-unit-link').click()");await wait("!!document.querySelector('.inventory-detail .ant-descriptions')");
+ assert.ok(await evaluate("document.querySelector('.inventory-detail').textContent.includes('222222222222222')"));
+ await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('1 ш')");
+ await click('Бүртгэх');await wait("!document.querySelector('select[name=warehouse_id]')");
+ const one=await (await fetch(base+'/api/inventory?view=items&id='+first,{headers})).json(),two=await (await fetch(base+'/api/inventory?view=items&id='+second,{headers})).json();assert.equal(one.item.stock,1);assert.equal(two.item.stock,0);assert.equal(two.identifiers[0].serial,'222222222222222');
+ await evaluate("[...document.querySelectorAll('.ant-drawer-close')].at(-1).click()");await pause(300);
+ await click('Grouped phone2 дугаарын бүртгэл','.inventory-item-link');await wait("document.querySelectorAll('.inventory-unit-link').length===2");
+ await click('Энэ бараанд дугаар нэмэх');await wait("!!document.querySelector('input[name=code]')");
+ assert.equal(await evaluate("document.querySelector('input[name=name]').value"),'Grouped phone');
+ await fill('input[name=code]','SERIAL-C');await fill('input[name=imei]','333333333333333');await fill('input[name=barcode]','8800000000001');await click('Бараа хадгалах');await wait("!document.querySelector('input[name=code]')");await wait("[...document.querySelectorAll('.inventory-item-link')].some(e=>e.textContent==='Grouped phone3 дугаарын бүртгэл')");
+ await click('Худалдан авалт','[role=tab]');await click('Худалдан авалт','.inventory-commandbar button');await wait("!!document.querySelector('input[placeholder=\"Код, IMEI эсвэл нэр бичнэ үү\"]')");
+ await fill('input[placeholder="Код, IMEI эсвэл нэр бичнэ үү"]','Grouped phone');await wait("document.querySelectorAll('.inventory-picker button').length===3");
+ await evaluate("[...document.querySelectorAll('.inventory-picker button')].find(e=>e.textContent.includes('3 дугаарын бүртгэл')).click()");await wait("document.querySelectorAll('.inventory-picker button').length===3&&document.querySelector('.inventory-selection')?.textContent.includes('Дугаараа сонгоно уу')");
+ await evaluate("[...document.querySelectorAll('.inventory-picker button')].find(e=>e.textContent.includes('111111111111111')).click()");await wait("document.querySelector('.inventory-selection')?.textContent.includes('SERIAL-A')");
+ await snap('exact-unit-picker');evidence.checks={groupedCatalog:true,variantSeparation:true,imeiSearch:true,exactUnitSale:true,history:true,addUnit:true,productThenUnitPicker:true};
+ assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));console.log('PASS: consolidated products, per-unit detail/search, exact-unit sale and preserved sibling stock, add unit, nested picker and mobile.');
+}finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

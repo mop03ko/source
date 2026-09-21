@@ -1,0 +1,35 @@
+const fs=require('node:fs');
+const source=fs.readFileSync('tests/inventory.test.cjs','utf8');
+const bootstrap=source.slice(0,source.indexOf('\n(async()=>{'));
+const scenario=String.raw`
+(async()=>{
+ await crmGet();
+ const warehouse=(await invPost('create_warehouse',{name:'Test'}))[1].id;
+ const input={name:'iPhone 17 Pro',brand:'Apple',category:'Phone',capacity:'256GB',color:'Blue',variant:'New',sale_price:1000,cash_price:900};
+ const first=(await invPost('create_item',{...input,code:'UNIT-A',imei:'111111111111111',barcode:'8800000000001',supplier:'Mike'}))[1].id;
+ const second=(await invPost('create_item',{...input,name:' IPHONE   17 PRO ',code:'UNIT-B',imei:'222222222222222',barcode:'8800000000001',supplier:'Yuna',sale_price:1100}))[1].id;
+ for(const [code,change] of [['COLOR',{color:'Silver'}],['CAPACITY',{capacity:'512GB'}],['CONDITION',{code:'UNIT-DISPLAY'}]])assert.equal((await invPost('create_item',{...input,code,...change}))[0],200);
+ for(const id of [first,second])assert.equal((await invPost('record_purchase',{item_id:id,warehouse_id:warehouse,qty:1,unit_cost:500}))[0],200);
+ let [status,d]=await invGet('?view=products');assert.equal(status,200);assert.equal(d.count,4);assert.equal(d.summary.unit_count,5);assert.equal(d.summary.units,2);
+ const product=d.items.find(p=>p.unit_count===2);assert.ok(product);assert.equal(product.stock,2);assert.equal(product.value_cents,100000);assert.equal(product.sale_price,1000);assert.equal(product.sale_price_max,1100);assert.equal(product.single_item_id,null);
+ const productUrl='?view=products&id='+product.id;
+ [status,d]=await invGet(productUrl);assert.equal(d.count,2);assert.deepEqual(new Set(d.items.map(i=>i.id)),new Set([first,second]));assert.ok(d.items.every(i=>i.barcode==='8800000000001'));
+ [status,d]=await invGet(productUrl+'&unit_q=222222');assert.equal(d.count,1);assert.equal(d.items[0].id,second);assert.equal(d.product.stock,2);
+ [status,d]=await invGet('?view=products&q=222222');assert.equal(d.count,1);assert.equal(d.items[0].single_item_id,second);
+ [status,d]=await invGet('?view=items&q=8800000000001');assert.equal(d.count,2);
+ [status,d]=await invGet('?view=products&warehouse_id=missing');assert.equal(d.summary.units,0);
+ [status,d]=await invGet('?view=products&stock=positive');assert.equal(d.count,1);
+ assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100,units:[{serial:'222222222222222',barcode:'HISTORICAL-B',note:''}]}))[0],200);
+ [status,d]=await invGet(productUrl);assert.equal(d.product.stock,1);assert.equal(d.history[0].item_id,second);assert.equal(d.items.find(i=>i.id===first).stock,1);assert.equal(d.items.find(i=>i.id===second).stock,0);
+ [status,d]=await invGet(productUrl+'&unit_q=HISTORICAL-B');assert.equal(d.count,1);assert.equal(d.items[0].id,second);
+ assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100}))[0],409,'Sold unit cannot be sold twice');
+ assert.equal((await invPost('update_item',{...input,code:'UNIT-A',imei:'111111111111111'},first))[0],200);
+ [status,d]=await invGet('?view=items&id='+first);assert.equal(d.item.barcode,'8800000000001','Older clients preserve barcode');assert.equal(d.item.product_key,product.id);
+ assert.equal((await invPost('update_item',{...input,code:'UNIT-A',imei:'111111111111111',color:'Black'},first))[0],200);
+ [status,d]=await invGet(productUrl);assert.equal(d.count,1);assert.equal(d.items[0].id,second);assert.equal(d.product.stock,0);
+ [status,d]=await invGet('?view=items&id='+first);assert.equal(d.item.stock,1);assert.notEqual(d.item.product_key,product.id,'Editing variant regroups without moving ledger');
+ assert.equal((await invGet('?view=products&id=missing'))[0],404);
+ const pk=deps['@/lib/inventory'].productKey;assert.equal(await pk(input),await pk({...input,name:' IPHONE 17 PRO '}));assert.notEqual(await pk(input),await pk({...input,code:'DISPLAY'}));assert.notEqual(await pk(input),await pk({...input,color:''}));assert.notEqual(await pk({...input,color:'',code:'A'}),await pk({...input,color:'',code:'B'}));
+ console.log('PASS: product identity, variant/condition separation, supplier/price preservation, barcode search, exact unit sale, historical links, stock safety and edit regrouping.');
+})().catch(e=>{console.error(e);process.exit(1)});`;
+eval(bootstrap+scenario);

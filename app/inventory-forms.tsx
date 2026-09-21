@@ -3,21 +3,22 @@ import {productCategories} from '@/lib/product-categories';
 import {salePrice} from '@/lib/inventory-pricing';
 import {ChoiceInput} from '@/components/ui/choice-input';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
+import {Pagination} from 'antd';
 import {useRef,useState} from 'react';
 import {Field} from '@/components/form-field';
 import {GuardedForm,useUnsavedChanges} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {useRemote} from '@/hooks/use-remote';
+import {useRemote,readJson} from '@/hooks/use-remote';
 import {fromInput} from '@/lib/crm';
 import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 
-export type Item={id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
+export type Item={product_key?:string;barcode?:string;unit_count?:number;single_item_id?:string|null;sale_price_max?:number;cash_price_max?:number;id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
 export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];categories?:{category:string}[];channels:Channel[]};
-export type Detail={item:Item;byWarehouse:{warehouse_id:string;warehouse_name:string;qty:number;value_cents:number}[];moves:{id:string;kind:string;qty_delta:number;value_cents:number;warehouse_name:string;occurred_at:string;created_at:string;note:string}[]};
+export type Detail={identifiers?:{id:string;serial:string;barcode:string;source:string;created_at:string}[];item:Item;byWarehouse:{warehouse_id:string;warehouse_name:string;qty:number;value_cents:number}[];moves:{id:string;kind:string;qty_delta:number;value_cents:number;warehouse_name:string;occurred_at:string;created_at:string;note:string}[]};
 export type Post=(action:string,data:unknown,id?:string)=>Promise<Record<string,unknown>>;
 const numeric=(f:FormData,k:string)=>Number(f.get(k)||0);
 export const cash=(value:number)=>new Intl.NumberFormat('mn-MN',{maximumFractionDigits:2}).format(value)+' ₮';
@@ -29,10 +30,11 @@ export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(dat
   <h3>Үндсэн мэдээлэл</h3>
   <Field label="Барааны нэр *"><Input name="name" defaultValue={item?.name} required maxLength={300}/></Field>
   <div className="form-grid"><Field label="Код / SKU *"><Input name="code" defaultValue={item?.code} required maxLength={200}/></Field><Field label="IMEI / сериал"><Input name="imei" defaultValue={item?.imei||''} maxLength={80}/></Field></div>
+  <Field label="Баркод"><Input name="barcode" defaultValue={item?.barcode||''} maxLength={120} placeholder="Бүтээгдэхүүний баркод"/></Field>
   <div className="form-grid"><Field label="Брэнд"><Input name="brand" defaultValue={item?.brand} maxLength={120}/></Field><Field label="Нийлүүлэгч"><Input name="supplier" defaultValue={item?.supplier} maxLength={120}/></Field></div>
   <Field label="Барааны ангилал"><SelectControl name="category" defaultValue={item?.category||''}><option value="">Ангилаагүй</option>{[...new Set([...productCategories,...(item?.category?[item.category]:[])])].map(c=><option key={c}>{c}</option>)}</SelectControl></Field>
   <p className="form-help">Жишээ: ангилал — Гар утас; брэнд — Apple; нийлүүлэгч — Mike. Нийлүүлэгч тодорхойгүй бол хоосон үлдээнэ.</p>
-  <h3>Барааны шинж чанар</h3>
+  <h3>Барааны шинж чанар</h3><p className="form-help">Ижил загвар, багтаамж, өнгө автоматаар нэг бараанд орно. Өнгө тодорхойгүй бүртгэлийг тусад нь хадгална.</p>
   <div className="form-grid"><Field label="Багтаамж / хэмжээ"><Input name="capacity" defaultValue={item?.capacity} placeholder="256GB" maxLength={80}/></Field><Field label="Өнгө"><Input name="color" defaultValue={item?.color} maxLength={80}/></Field></div>
   <Field label="Бусад хувилбар"><Input name="variant" defaultValue={item?.variant} maxLength={120}/></Field>
   <h3>Үнэ ба үлдэгдлийн сануулга</h3>
@@ -44,10 +46,17 @@ export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(dat
 }
 
 export function ItemPicker({value,onChange,warehouse,label='Бараа сонгох *'}:{value:Item|null;onChange:(item:Item|null)=>void;warehouse:string;label?:string}){
- const [q,setQ]=useState('');
- const search=useRemote<{items:Item[]}>(!value&&q.trim()?'/api/inventory?'+new URLSearchParams({view:'items',q,warehouse_id:warehouse}):null);
- return <div className="form-stack"><Field label={label}>{value?<div className="inventory-selection"><span><strong>{value.name}</strong><small>{value.code} · {value.imei||[value.capacity,value.color].filter(Boolean).join(' / ')}</small></span><Button type="button" variant="outline" onClick={()=>onChange(null)}>Солих</Button></div>:<Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Код, IMEI эсвэл нэр бичнэ үү"/>}</Field>
-  {!value&&<><AsyncStatus error={search.error} loading={search.loading} retry={search.retry}/><div className="inventory-picker">{search.data?.items.map(item=><button type="button" key={item.id} onClick={()=>onChange(item)}><span><strong>{item.name}</strong><small>{item.code}</small></span><span>{item.stock} ш</span></button>)}</div>{search.data&&!search.data.items.length&&<p className="muted">Тохирох бараа олдсонгүй.</p>}</>}
+ const [q,setQ]=useState(''),[product,setProduct]=useState<Item|null>(null),[page,setPage]=useState(1),[selecting,setSelecting]=useState(false),[selectionError,setSelectionError]=useState('');
+ const search=useRemote<{items:Item[];count:number}>(!value&&q.trim()&&!product?'/api/inventory?'+new URLSearchParams({view:'products',q,warehouse_id:warehouse,page:String(page)}):null);
+ const units=useRemote<{items:Item[];count:number}>(!value&&product?'/api/inventory?'+new URLSearchParams({view:'products',id:product.id,q,warehouse_id:warehouse,page:String(page)}):null);
+ const choose=async(it:Item)=>{
+  setSelectionError('');
+  if(!it.single_item_id){setProduct(it);setPage(1);return;}
+  setSelecting(true);try{const detail=await readJson<Detail>('/api/inventory?view=items&id='+encodeURIComponent(it.single_item_id));onChange(detail.item);}catch(e){setSelectionError((e as Error).message);}finally{setSelecting(false);}
+ };
+ const current=product?units:search;
+ return <div className="form-stack"><Field label={label}>{value?<div className="inventory-selection"><span><strong>{value.name}</strong><small>Код: {value.code} · IMEI/сериал: {value.imei||'—'} · Баркод: {value.barcode||'—'}</small></span><Button type="button" variant="outline" onClick={()=>{onChange(null);setProduct(null);setPage(1);}}>Солих</Button></div>:<Input value={q} onChange={e=>{setQ(e.target.value);setProduct(null);setPage(1);}} placeholder="Код, IMEI эсвэл нэр бичнэ үү"/>}</Field>
+  {!value&&<>{product&&<div className="inventory-selection"><strong>{product.name} · Дугаараа сонгоно уу</strong><Button type="button" variant="ghost" onClick={()=>{setProduct(null);setPage(1);}}>Бараа солих</Button></div>}<AsyncStatus error={current.error||selectionError} loading={current.loading||selecting} retry={current.retry}/><div className="inventory-picker">{current.data?.items.map(it=><button disabled={selecting} type="button" key={it.id} onClick={()=>product?onChange(it):void choose(it)}><span><strong>{it.name}</strong><small>{product?`IMEI: ${it.imei||'—'} · Баркод: ${it.barcode||'—'} · Код: ${it.code} · ${it.supplier||'Нийлүүлэгч бүртгээгүй'}`:`${it.unit_count} дугаарын бүртгэл · ${[it.capacity,it.color].filter(Boolean).join(' / ')}`}</small></span><span>{it.stock} ш</span></button>)}</div>{current.data&&!current.data.items.length&&<p className="muted">Тохирох бараа олдсонгүй.</p>}{current.data&&current.data.count>50&&<Pagination current={page} total={current.data.count} pageSize={50} showSizeChanger={false} onChange={setPage}/>}</>}
  </div>;
 }
 
@@ -57,12 +66,12 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
  const stock=useRemote<Detail>(picked?'/api/inventory?view=items&id='+encodeURIComponent(picked.id):null);
  const available=stock.data?.byWarehouse.find(w=>w.warehouse_id===source);
  const selectedChannel=options.channels.find(c=>c.name===channel);
- const chooseItem=(it:Item|null)=>{setPicked(it);if(kind==='sale')setUnit(salePrice(it,creditOnly||channel?'credit':'cash'));};
+ const chooseItem=(it:Item|null)=>{setPicked(it);setQty(1);if(kind==='sale')setUnit(salePrice(it,creditOnly||channel?'credit':'cash'));};
  const blocked=kind!=='purchase'&&(!available||available.qty<qty);
  return <GuardedForm className="form-stack" onSubmit={async e=>{
   if(!picked||!source)throw new Error('Бараа болон агуулах сонгоно уу.');
   const f=new FormData(e.currentTarget),data={...Object.fromEntries(f),item_id:picked.id,warehouse_id:source,qty,unit_cost:unit,unit_price:unit,additional_cost:extra,commission_rate:numeric(f,'commission_rate'),tax_amount:numeric(f,'tax_amount'),vat_issued:f.get('vat_issued')==='on',ordered_at:fromInput(String(f.get('ordered_at')||'')),received_at:fromInput(String(f.get('received_at')||'')),sold_at:fromInput(String(f.get('sold_at')||''))};
-  await onSave(data);return true;
+  await onSave({...data,...(kind==='sale'&&qty===1&&(picked.imei||picked.barcode)?{units:[{serial:picked.imei||'',barcode:picked.barcode||'',note:''}]}:{})});return true;
  }}>
   <ItemPicker value={picked} onChange={chooseItem} warehouse={source}/>
   <Field label={kind==='purchase'?'Хүлээн авах агуулах *':'Зарлагадах агуулах *'}><SelectControl name="warehouse_id" value={source} onChange={e=>setSource(e.target.value)} required><option value="">Сонгох…</option>{options.warehouses.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}</SelectControl></Field>
