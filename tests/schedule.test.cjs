@@ -15,16 +15,22 @@ async function post(action,data,id,version){const r=await route.POST(new Request
 async function delivPost(action,data,id,version){const r=await delivRoute.POST(new Request('https://crm.test/api/deliveries',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})}));return [r.status,await r.json()];}
 const AS={userId:'a',email:'agent@example.test',displayName:'Сэлэнгэ'};
 const MG={userId:'mg',email:'manager@example.test',displayName:'Manager'};
+const DR={userId:'dr',email:'director@example.test',displayName:'Director'};
 const OW={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
 const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,member_email:email??null});
 (async()=>{
  await crmGet(); // owner → admin
- for(const m of [{email:'manager@example.test',name:'Manager',role:'manager'},{email:'agent@example.test',name:'Сэлэнгэ',role:'agent'},{email:'courier@example.test',name:'Энх Учрал',role:'delivery'}])
+ for(const m of [{email:'manager@example.test',name:'Manager',role:'manager'},{email:'director@example.test',name:'Director',role:'director'},{email:'agent@example.test',name:'Сэлэнгэ',role:'agent'},{email:'courier@example.test',name:'Энх Учрал',role:'delivery'}])
   assert.equal((await crmPost('member',{...m,active:true}))[0],200);
- // Хуваарь засах эрх: агент засахгүй, Ахлах ба Админ засна.
+ // Хуваарь засах эрх: Админ, Удирдлага, Ахлах гурвуулаа засна; агент, хүргэгч засахгүй.
  user=AS;assert.equal((await post('set_shift',shift('2026-09-01','Б.Сэлэнгэ','Олимпик','agent@example.test')))[0],403);
+ user={userId:'c',email:'courier@example.test',displayName:'Энх Учрал'};
+ assert.equal((await post('set_shift',shift('2026-09-01','Б.Сэлэнгэ','Олимпик','agent@example.test')))[0],403);
  user=MG;assert.equal((await post('set_shift',shift('2026-09-01','Б.Сэлэнгэ','Олимпик','agent@example.test')))[0],200);
- user=OW;
+ user=DR;assert.equal((await post('set_shift',shift('2026-09-01','Б.Сэлэнгэ','Түмэнмолл','agent@example.test')))[0],200);
+ assert.equal((await get('?month=2026-09'))[1].can_manage,true);
+ user=AS;assert.equal((await get('?month=2026-09'))[1].can_manage,false);
+ user=OW;assert.equal((await get('?month=2026-09'))[1].can_manage,true);
  assert.equal((await post('set_shift',shift('2026-09-01','О.Энх-Учрал','Хүргэлт','courier@example.test')))[0],200);
  assert.equal((await post('set_shift',shift('2026-09-02','О.Энх-Учрал','Хүргэлт','courier@example.test')))[0],200);
  assert.equal((await post('set_shift',shift('2026-09-03','О.Энх-Учрал','Амралт','courier@example.test')))[0],200);
@@ -56,8 +62,8 @@ const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,m
  [status,d]=await get('?month=2026-09');
  let req=d.requests.find(r=>r.id===leave);
  assert.equal((await post('decide',{approve:true},leave,req.version))[0],403);
- // Ахлах батлана → тэр өдөр Чөлөө болно.
- user=MG;assert.equal((await post('decide',{approve:true},leave,req.version))[0],200);
+ // Удирдлага (director) батлана → тэр өдөр Чөлөө болно.
+ user=DR;assert.equal((await post('decide',{approve:true},leave,req.version))[0],200);
  [status,d]=await get('?month=2026-09');
  assert.equal(d.shifts.find(s=>s.day==='2026-09-01'&&s.person_name==='Б.Сэлэнгэ').assignment,'Чөлөө');
  assert.equal(d.requests.find(r=>r.id===leave).status,'approved');
@@ -100,5 +106,5 @@ const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,m
  user=OW;assert.equal((await post('set_shift',shift('2026-09-04','О.Энх-Учрал','Олимпик','courier@example.test')))[0],200);
  user=MG;[st,res]=await delivPost('create',base({delivered_on:'2026-09-04'}));
  assert.match(res.warning,/Олимпик/); // өөр салбарт томилогдсон → сануулга
- console.log('PASS: work schedule role permissions (manager/director/admin edit, others read-only), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, and delivery logging warnings when the courier is off or assigned elsewhere.');
+ console.log('PASS: work schedule role permissions (admin, director and manager all edit and decide; agents and couriers read-only), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, and delivery logging warnings when the courier is off or assigned elsewhere.');
 })().catch(e=>{console.error(e);process.exit(1)});
