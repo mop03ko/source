@@ -58,6 +58,15 @@ try{
  assert.ok(await evaluate("!!document.querySelector('.balance-detail-table')"));
  await evaluate("[...document.querySelectorAll('.balance-heading .ant-segmented-item')].find(e=>e.textContent==='График').click()");
  await wait("!document.querySelector('.balance-detail-table')&&!!document.querySelector('.balance-charts')");
+
+ for(const label of ['Брэндээр','Нийлүүлэгчээр','Агуулахаар']){
+  await evaluate(`(()=>{[...document.querySelectorAll('.balance-breakdown-control .ant-segmented-item')].find(e=>e.textContent===${JSON.stringify(label)}).click()})()`);
+  await wait(`document.querySelector('.balance-category-list')?.closest('.ant-card').querySelector('.ant-card-head-title').textContent.includes(${JSON.stringify(label)})`);
+ }
+ await viewport(390);await evaluate("document.querySelector('.balance-breakdown-control').scrollIntoView()");await snap('warehouse-breakdown-mobile');await viewport(1440);
+ await evaluate("document.querySelector('.balance-category-list .inventory-chart-link').click()");
+ await wait("!!document.querySelector('.balance-detail-table')&&!document.querySelector('.balance-charts')");
+ assert.equal(await evaluate("document.querySelector('select[aria-label=\"Агуулахаар шүүх\"]').value"),wh);
  assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));
  evidence.checks={totals:true,groupedReport:true,viewModes:true,responsive:true};
  console.log('PASS: balance totals, grouped report, view modes and desktop/tablet/mobile layout.');

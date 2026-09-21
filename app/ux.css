@@ -294,3 +294,5 @@
 .balance-mobile-list{display:grid;gap:12px}.balance-mobile-card{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
 .balance-mobile-stages{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.balance-mobile-stages>div{padding:10px;background:var(--muted);border-radius:6px}.balance-mobile-stages>div:last-child{background:#f0f7ff}.balance-mobile-stages>div>span{display:block;font-size:12px;margin-bottom:8px}.balance-total{margin-top:14px;border-color:#91b6ed}
 @media(max-width:767px){.balance-detail-table{padding:14px}.balance-list-heading{gap:12px}.balance-mobile-card .inventory-item-link{white-space:normal;text-align:left}.balance-mobile-card .ant-tag{margin-top:8px}}
+
+.balance-breakdown-control{margin-bottom:18px;max-width:100%}.balance-breakdown-control .ant-segmented-group{flex-wrap:wrap}

@@ -26,3 +26,6 @@
 - KPI cards explain opening and closing timestamps. Expandable reading guide explains valuation, transfers, returns, adjustments and current metadata grouping. Category bars explicitly represent comparison with the largest category, not percentage shares.
 - Summary is hidden during refresh/errors to avoid showing stale figures under changed filters. Grouping controls are expanded in the balance report.
 - Validation: production build, scoped ESLint, existing inventory API balance reconciliation tests; isolated Chrome audit across 390/768/1440px with totals, supplier grouping and chart/list switching.
+
+## Breakdown dimensions
+The closing-balance chart supports category, brand, supplier and warehouse. The selection persists in the URL. Clicking a group opens its filtered item list. Blank brand/supplier groups can be drilled into. Warehouse quantities and costs come from dated ledger entries for the filtered item set; an item in multiple warehouses is counted once per warehouse, so item counts are not additive. API regression tests reconcile all four dimensions with summary totals under date, warehouse, brand and stock filters. Chrome audit checks dimension switching, mobile layout and warehouse drill-down.

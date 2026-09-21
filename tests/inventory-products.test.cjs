@@ -77,6 +77,17 @@ const scenario=String.raw`
   assert.equal((await invPost('preview_bulk_items',request))[0],role==='manager'?200:403);
   user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  }
+
+ for(const dimension of ['category','brand','supplier','warehouse']){
+  for(const extra of ['', '&warehouse_id='+otherWarehouse,'&stock=positive','&brand=Apple','&from=2000-01-01&to=2000-01-02']){
+   const report=(await invGet('?view=balance&breakdown='+dimension+extra))[1];
+   assert.ok(report.report,JSON.stringify(report));
+   assert.equal(report.report.breakdown.reduce((n,r)=>n+r.stock,0),report.summary.units,dimension+extra+' quantity');
+   assert.equal(report.report.breakdown.reduce((n,r)=>n+r.value_cents,0),report.summary.value_cents,dimension+extra+' value');
+   if(dimension==='warehouse')assert.ok(report.report.breakdown.every(r=>r.key));
+  }
+ }
+ const unknown=(await invGet('?view=balance&brand=__unregistered__'))[1];assert.ok(unknown.items.every(r=>r.brand===''));
  console.log('PASS: product identity, variant/condition separation, supplier/price preservation, barcode search, exact unit sale, historical links, stock safety and edit regrouping.');
 })().catch(e=>{console.error(e);process.exit(1)});`;
 eval(bootstrap+scenario);
