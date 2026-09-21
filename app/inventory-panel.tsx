@@ -1,5 +1,7 @@
 'use client';
-import {Descriptions,Tag} from 'antd';
+import {Descriptions,Tag,Checkbox} from 'antd';
+import {usePageSelection} from '@/hooks/use-page-selection';
+import {BulkSelectionBar} from '@/components/bulk-selection-bar';
 import {ListPagination} from '@/components/list-pagination';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
@@ -49,6 +51,8 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const url='/api/inventory?'+params,list=useRemote<List>(mode==='counts'?null:url);
  const detail=useRemote<Detail>(detailId?'/api/inventory?view=items&id='+encodeURIComponent(detailId)+'&revision='+revision:null);
  const summary=list.data?.summary,rows=list.data?.items||[],total=list.data?.count||0;
+ const selectable=mode==='items'&&!grouped;
+ const selection=usePageSelection(rows,JSON.stringify([url,me.email,me.role]),selectable&&!list.loading&&!list.error);
  const canManage=['admin','director','manager'].includes(me.role);
  const canEditItem=canEditInventoryItem(me.role);
  const post:Post=async(action,data,id)=>{
@@ -65,9 +69,9 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const save=async(action:string,data:unknown,id?:string)=>{await post(action,data,id);toast.success('Амжилттай хадгаллаа.');setModal(null);};
  const setFilter=(setter:(value:string)=>void,value:string)=>{setter(value);setPage(1);};
  const openMovement=(kind:'purchase'|'sale'|'transfer',item?:Item)=>setModal({kind,item});
- const exportCsv=async()=>{
+ const exportCsv=async(selectedOnly=false)=>{
   setExporting(true);try{
-   const d=await readJson<List>(url+'&export=1');if(d.truncated)throw new Error('5,000-аас олон мөр байна. Огноо, агуулахын шүүлтүүрээр багасгана уу.');
+   const d:List=selectedOnly?{items:selection.rows,count:selection.count,summary:{}}:await readJson<List>(url+'&export=1');if(d.truncated)throw new Error('5,000-аас олон мөр байна. Огноо, агуулахын шүүлтүүрээр багасгана уу.');
    let headers:string[],values:unknown[][];
    if(grouped){
     headers=[grouped==='brand'?'Брэнд':'Нийлүүлэгч','Барааны төрөл',...(mode==='balance'?['Эхний тоо','Эхний өртөг','Орлого тоо','Орлого өртөг','Зарлага тоо','Зарлага өртөг']:[]),mode==='sales'?'Борлуулсан тоо':'Үлдэгдэл','Өртөг',...(mode==='sales'?['Борлуулалт','Шимтгэл','Татвар','Ашиг']:[])];
@@ -108,13 +112,16 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
     {mode==='sales'&&<Button disabled={!opts.warehouses.length} onClick={()=>openMovement('sale')}><Plus size={16}/>Борлуулалт</Button>}
     {mode==='moves'&&<Button disabled={opts.warehouses.length<2} onClick={()=>openMovement('transfer')}><ArrowLeftRight size={16}/>Шилжүүлэх</Button>}
     <span className="muted">{list.loading?'Ачаалж байна…':`${total.toLocaleString()} бүртгэл`}</span></div>
-    <Button variant="outline" disabled={exporting||list.loading||!total} onClick={exportCsv}><Download size={16}/>{exporting?'Бэлтгэж байна…':'CSV татах'}</Button>
+    <Button variant="outline" disabled={exporting||list.loading||!total} onClick={()=>void exportCsv()}><Download size={16}/>{exporting?'Бэлтгэж байна…':'CSV татах'}</Button>
    </div>
+   {selectable&&<BulkSelectionBar count={selection.count} total={rows.length} all={selection.all} mixed={selection.mixed} disabled={list.loading||!!list.error||exporting} label="бараа" onAll={selection.toggleAll} onClear={selection.clear} onExport={()=>void exportCsv(true)}/>}
    <AsyncStatus error={list.error} loading={list.loading} retry={list.retry}/>
    {!list.loading&&!list.error&&!rows.length&&!list.data?.groups?.length&&<div className="inventory-empty"><Package size={32}/><h3>Тохирох бүртгэл алга</h3><p>Шүүлтүүрээ өөрчлөх эсвэл шинэ бүртгэл нэмнэ үү.</p></div>}
    {!!rows.length&&!list.data?.groups?.length&&<div className="table-scroll"><Table><TableHeader><TableRow>
+    {selectable&&<TableHead className="selection-cell"><Checkbox aria-label="Энэ хуудасны бүх барааг сонгох" checked={selection.all} indeterminate={selection.mixed} disabled={list.loading||!!list.error} onChange={e=>selection.toggleAll(e.target.checked)}/></TableHead>}
     {(mode==='items'?['БАРАА / КОД','БРЭНД','НИЙЛҮҮЛЭГЧ','БАГТААМЖ / ӨНГӨ / IMEI','ҮЛДЭГДЭЛ / ТӨЛӨВ','НИЙТ ӨРТӨГ','ҮНДСЭН / БЭЛЭН ҮНЭ']:mode==='balance'?['БАРАА / КОД','ЭХНИЙ ТОО / ӨРТӨГ','ОРЛОГО ТОО / ӨРТӨГ','ЗАРЛАГА ТОО / ӨРТӨГ','ЭЦСИЙН ТОО / ӨРТӨГ']:mode==='purchases'?['ОГНОО / ЗАХИАЛГА','БАРАА','АГУУЛАХ','ТОО / БУЦААЛТ','НИЙТ ӨРТӨГ','ТӨЛӨВ / ТӨЛБӨР','ҮЙЛДЭЛ']:mode==='sales'?['ОГНОО / БИЛЛ','БАРАА / АГУУЛАХ','ТОО','БОРЛУУЛАЛТ / ӨРТӨГ','ШИМТГЭЛ / ТАТВАР','АШИГ','ПЛАТФОРМ / ДАНС','ХАРИЛЦАГЧ']:['ОГНОО','БАРАА','АГУУЛАХ','ХӨДӨЛГӨӨН','ТОО','ӨРТӨГ','ТАЙЛБАР']).map(h=><TableHead key={h}>{h}</TableHead>)}
-   </TableRow></TableHeader><TableBody>{rows.map(r=><TableRow key={r.id}>
+   </TableRow></TableHeader><TableBody>{rows.map(r=><TableRow key={r.id} data-state={selectable&&selection.has(r.id)?'selected':undefined}>
+    {selectable&&<TableCell className="selection-cell"><Checkbox aria-label={`${r.name} (${r.code}) барааг сонгох`} checked={selection.has(r.id)} disabled={list.loading||!!list.error} onChange={e=>selection.toggle(r.id,e.target.checked)}/></TableCell>}
     {(mode==='items'||mode==='balance')&&<><TableCell><button className="inventory-item-link" onClick={()=>setDetailId(r.id)}><strong>{r.name}</strong><small>{r.code}</small></button></TableCell>{mode==='items'?<><TableCell>{r.brand||'—'}</TableCell><TableCell>{r.supplier||'—'}</TableCell><TableCell>{[r.capacity,r.color,r.variant].filter(Boolean).join(' / ')||'—'}<small>{r.imei}</small></TableCell><TableCell><span className={r.stock<=r.min_stock?'inventory-low':''}>{r.stock.toLocaleString()} ш</span><small><StockTag item={r}/></small></TableCell><TableCell>{cash(r.value_cents/100)}<small>Нэгж: {cash(r.stock?r.value_cents/r.stock/100:0)}</small></TableCell><TableCell>{cash(r.sale_price)}<small>Бэлэн: {cash(r.cash_price??r.sale_price)}</small></TableCell></>:<>{[[r.opening_qty,r.opening_cents],[r.in_qty,r.in_cents],[r.out_qty,r.out_cents],[r.stock,r.value_cents]].map(([qty,value],i)=><TableCell key={i}><strong>{qty.toLocaleString()} ш</strong><small>{cash(value/100)}</small></TableCell>)}</>}</>}
     {mode==='purchases'&&<><TableCell>{dateLabel(r.received_at||r.created_at)}<small>{r.order_number}</small></TableCell><TableCell><button className="inventory-item-link" onClick={()=>setDetailId(r.item_id)}>{r.item_name}<small>{r.item_code}</small></button></TableCell><TableCell>{r.warehouse_name}</TableCell><TableCell>{r.qty} ш{r.returned_qty>0&&<small>Буцаасан {r.returned_qty}</small>}</TableCell><TableCell>{cash(r.total_cost)}<small>Нэгж {cash(r.unit_cost)}</small></TableCell><TableCell>{purchaseStatuses[r.status]}<small>{r.payment_status}</small></TableCell><TableCell>{r.status==='ordered'?<Button size="sm" disabled={busy} onClick={async()=>{try{await post('receive_purchase',{},r.id);toast.success('Агуулахад хүлээн авлаа.');}catch(e){toast.error((e as Error).message);}}}>Хүлээн авах</Button>:r.returned_qty<r.qty&&<Button size="sm" variant="outline" onClick={()=>setModal({kind:'return',purchase:r})}>Буцаах</Button>}</TableCell></>}
     {mode==='sales'&&<><TableCell>{dateLabel(r.sold_at||r.created_at)}<small>{r.bill_number}</small></TableCell><TableCell><button className="inventory-item-link" onClick={()=>setDetailId(r.item_id)}>{r.item_name}<small>{r.item_code} · {r.warehouse_name}</small></button></TableCell><TableCell>{r.qty} ш</TableCell><TableCell>{cash(r.total_price)}<small>Өртөг {cash(r.cost_cents/100)}</small></TableCell><TableCell>{cash(r.commission_cents/100)}<small>Татвар {cash(r.tax_cents/100)}</small></TableCell><TableCell className={r.profit_cents<0?'inventory-negative':''}>{cash(r.profit_cents/100)}</TableCell><TableCell>{r.platform||'—'}<small>{r.account}{r.vat_issued?' · Баримт олгосон':''}</small></TableCell><TableCell>{r.customer_name||'—'}<small>{r.customer_phone}</small></TableCell></>}

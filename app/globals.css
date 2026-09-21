@@ -184,3 +184,5 @@ body {
 .inventory-detail .detail-body>.ant-descriptions{margin:16px 0;overflow-wrap:anywhere}.inventory-detail .detail-body>h3{margin:20px 0 12px}
 
 .inventory-group-control{padding:0 20px 16px;max-width:360px}
+
+.bulk-selection-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid #eee8f3;border-bottom:1px solid #eee8f3;background:#faf9fc;font-size:12px}.bulk-selection-bar>small{flex-basis:100%;color:#685773}.table-panel .selection-cell{width:48px;min-width:48px;padding:12px!important;text-align:center}.table-panel tr[data-state=selected]>td{background:#fff4e8}.selection-cell .ant-checkbox-wrapper{padding:6px}
