@@ -7,6 +7,9 @@ import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useInventoryQuery} from '@/hooks/use-inventory-query';
 import {useDebouncedValue} from '@/hooks/use-debounced-value';
+import {useCatalogPreferences} from '@/hooks/use-catalog-preferences';
+import InventoryBulkEdit from './inventory-bulk-edit';
+import InventoryRowDetail,{type InventoryRowAction} from './inventory-row-detail';
 import InventoryCatalog from './inventory-catalog';
 import {useRef,useState} from 'react';
 import {Package,Truck,ShoppingCart,ClipboardList,Plus,Search,Download,ArrowLeftRight,Settings2,ChartNoAxesCombined} from 'lucide-react';
@@ -42,9 +45,11 @@ const StockTag=({item}:{item:Item})=><Tag color={item.stock<=0?'default':item.st
 const modalTitle={item:'Барааны бүртгэл',warehouse:'Агуулах / салбар нэмэх',purchase:'Худалдан авалт бүртгэх',sale:'Борлуулалт бүртгэх',transfer:'Агуулах хооронд шилжүүлэх',return:'Нийлүүлэгчид буцаах',import:'Excel-ээс эхний үлдэгдэл импортлох',settings:'Платформын шимтгэл, данс'};
 
 export default function InventoryPanel({me,members}:{me:Member;members:Member[]}){
- const query=useInventoryQuery();
+ const query=useInventoryQuery(),catalogPrefs=useCatalogPreferences(me.email+':'+me.role);
+ const [bulk,setBulk]=useState<{scope:'products'|'items';ids:string[]}|null>(null),[actionTarget,setActionTarget]=useState<{action:InventoryRowAction;item:Item}|null>(null),[opening,setOpening]=useState(false);
+ const scanSequence=useRef(0);
  const mode=(modes.some(m=>m.id===query.get('tab'))?query.get('tab'):'items') as Mode;
- const setMode=(v:Mode)=>query.set('tab',v,true);
+ const setMode=(v:Mode)=>{scanSequence.current++;setOpening(false);query.set('tab',v,true);};
  const q=query.get('q'),setQ=(v:string)=>query.set('q',v),searchQ=useDebouncedValue(q);
  const warehouse=query.get('warehouse'),setWarehouse=(v:string)=>query.set('warehouse',v);
  const brand=query.get('brand'),setBrand=(v:string)=>query.set('brand',v);
@@ -59,7 +64,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const catalog=query.get('catalog','products')==='products',setCatalog=(v:boolean)=>query.set('catalog',v?'products':'units');
  const [product,setProduct]=useState<Item|null>(null);
  const [balanceView,setBalanceView]=useState<BalanceView>('all');
- const sort=query.get(mode+'_sort','name'),setSort=(v:string)=>query.set(mode+'_sort',v);
+ const sort=query.get(mode+'_sort',mode==='items'?catalogPrefs.preferences.sort:'name'),setSort=(v:string)=>{query.set(mode+'_sort',v);if(mode==='items')catalogPrefs.update({sort:v});};
  const [today]=useState(()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10));
  const from=query.get(mode+'_from',today.slice(0,7)+'-01'),setFrom=(v:string)=>query.set(mode+'_from',v),to=query.get(mode+'_to',today),setTo=(v:string)=>query.set(mode+'_to',v);
  const [modal,setModal]=useState<Modal>(null),[detailId,setDetailId]=useState(''),[busy,setBusy]=useState(false),[exporting,setExporting]=useState(false),[channel,setChannel]=useState('');
@@ -90,12 +95,28 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
   try{
    const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id:pending.current.id})});
    const value=await r.json();if(!r.ok)throw new Error(value.error||'Хадгалж чадсангүй.');
-   pending.current=null;if(action!=='preview_import')setRevision(v=>v+1);return value;
+   pending.current=null;if(!['preview_import','preview_bulk_items'].includes(action))setRevision(v=>v+1);return value;
   }finally{busyRef.current=false;setBusy(false);}
  };
  const save=async(action:string,data:unknown,id?:string)=>{await post(action,data,id);if(action==='update_item'&&modal?.item&&product&&(['name','brand','capacity','color','variant'] as const).some(key=>String((data as Partial<Item>)[key]??'')!==String(modal.item?.[key]??'')))setProduct(null);toast.success('Амжилттай хадгаллаа.');setModal(null);};
  const setFilter=(setter:(value:string)=>void,value:string)=>{setter(value);setPage(1);};
  const openMovement=(kind:'purchase'|'sale'|'transfer',item?:Item)=>setModal({kind,item});
+ const rowAction=async(action:InventoryRowAction,item:Item)=>{
+  if(opening)return;
+  if(item.unit_count!==undefined&&!item.single_item_id){setActionTarget({action,item});return;}
+  setOpening(true);
+  try{const result=await readJson<Detail>('/api/inventory?view=items&id='+encodeURIComponent(item.single_item_id||item.id));setActionTarget(null);if(action==='edit'){if(canEditItem)setModal({kind:'item',item:result.item});}else openMovement(action,result.item);}catch(e){toast.error((e as Error).message);}finally{setOpening(false);}
+ };
+ const scan=async()=>{
+  const value=q.trim(),sequence=++scanSequence.current;if(!value)return;
+  setOpening(true);
+  try{const found=await readJson<{items:Item[];count:number}>('/api/inventory?'+new URLSearchParams({view:'products',match:'exact',q:value,warehouse_id:warehouse}));
+   if(sequence!==scanSequence.current)return;
+   if(found.count===1){const item=found.items[0];if(item.single_item_id)setDetailId(item.single_item_id);else setProduct(item);}
+   else if(found.count>1){setStock('');setPage(1);toast.info('Олон бараа таарлаа. Жагсаалтаас сонгоно уу.');}
+   else toast.info('Яг таарсан код, IMEI, баркод эсвэл нэр олдсонгүй.');
+  }catch(e){if(sequence===scanSequence.current)toast.error((e as Error).message);}finally{if(sequence===scanSequence.current)setOpening(false);}
+ };
  const exportCsv=async(selectedOnly=false)=>{
   setExporting(true);try{
    const d:List=selectedOnly?{items:selection.rows,count:selection.count,summary:{}}:await readJson<List>(url+'&export=1');if(d.truncated)throw new Error('5,000-аас олон мөр байна. Огноо, агуулахын шүүлтүүрээр багасгана уу.');
@@ -124,7 +145,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
    {!grouped&&summary&&mode==='sales'&&<MobileDisclosure label="Агуулахын үзүүлэлт"><div className="metrics inventory-metrics">{[['Борлуулалт',summary.revenue_cents],['Борлуулсан өртөг',summary.cost_cents],['Шимтгэл + татвар',summary.commission_cents+summary.tax_cents],['Ашиг',summary.profit_cents]].map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{cash(Number(value)/100)}</strong></div>)}</div></MobileDisclosure>}
    {mode!=='balance'&&!!summary?.cost_estimated&&<p className="inventory-note">Хуучин хөдөлгөөний зарим өртгийг худалдан авалтын дундаж үнээр нөхөн тооцсон тул өртөг, ашиг ойролцоо дүнтэй.</p>}
    <ResponsiveFilters className="filters inventory-filters" active={[warehouse,brand,supplier,category,...(['items','balance'].includes(mode)?[stock]:[]),...(mode==='purchases'?[status]:[]),...(mode==='moves'?[movementKind]:[]),...(mode!=='items'?[from,to]:[])].filter(Boolean).length}>
-    <div className="search"><Search size={17}/><Input aria-label="Бараа хайх" placeholder="Бараа, код, IMEI хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
+    <div className="search"><Search size={17}/><Input aria-label="Бараа хайх" placeholder="Нэр, код, IMEI, баркод · Enter" value={q} onChange={e=>{scanSequence.current++;setOpening(false);setFilter(setQ,e.target.value);}} onKeyDown={e=>{if(mode==='items'&&e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();void scan();}}}/></div>
     <SelectControl aria-label="Агуулахаар шүүх" value={warehouse} onChange={e=>setFilter(setWarehouse,e.target.value)}><option value="">Бүх агуулах</option>{opts.warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</SelectControl>
     <SelectControl aria-label="Ангиллаар шүүх" value={category} onChange={e=>setFilter(setCategory,e.target.value)}><option value="">Бүх ангилал</option><option value="__uncategorized__">Ангилаагүй</option>{(opts.categories||[]).map(c=><option key={c.category}>{c.category}</option>)}</SelectControl>
     <SelectControl aria-label="Брэндээр шүүх" value={brand} onChange={e=>setFilter(setBrand,e.target.value)}><option value="">Бүх брэнд</option>{opts.brands.map(b=><option key={b.brand}>{b.brand}</option>)}</SelectControl><SelectControl aria-label="Нийлүүлэгчээр шүүх" value={supplier} onChange={e=>setFilter(setSupplier,e.target.value)}><option value="">Бүх нийлүүлэгч</option>{(opts.suppliers||[]).map(s=><option key={s.supplier}>{s.supplier}</option>)}</SelectControl>
@@ -138,7 +159,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
    {mode==='items'&&!grouped&&<div className="inventory-catalog-control"><Segmented aria-label="Барааны харагдац" value={catalog?'products':'units'} onChange={v=>{setCatalog(v==='products');setPage(1);}} options={[{value:'products',label:'Бараагаар нэгтгэсэн'},{value:'units',label:'Бүх дугаар'}]}/></div>}
    {mode==='balance'&&<div className="balance-periods" aria-label="Тайлангийн хугацаа"><span>Хугацаа:</span>{[['Өнөөдөр',today],['Энэ сар',today.slice(0,7)+'-01'],['Энэ жил',today.slice(0,4)+'-01-01']].map(([label,start])=><Button key={label} size="sm" variant={from===start&&to===today?'default':'outline'} onClick={()=>{setFrom(start);setTo(today);setPage(1);}}>{label}</Button>)}</div>}
    {mode==='balance'&&summary&&list.data?.report&&<InventoryBalanceReport summary={summary} categories={list.data.report.categories} from={from||today.slice(0,7)+'-01'} to={to||today} warehouse={opts.warehouses.find(w=>w.id===warehouse)?.name||'Бүх агуулах'} view={balanceView} onView={setBalanceView} onStock={value=>setFilter(setStock,value)} onCategory={value=>{setCategory(value);setBalanceView('list');setPage(1);}}/>}
-   {['items','balance','sales'].includes(mode)&&(mode!=='balance'||balanceView!=='charts')&&<details className="inventory-group-control"><summary>Харагдац · {grouped?({brand:'Брэнд',category:'Ангилал',supplier:'Нийлүүлэгч'} as Record<string,string>)[grouped]:'Бараа тус бүрээр'}</summary><Field label="Тайлангийн ангилал"><SelectControl aria-label="Тайлангийн ангилал" value={group} onChange={e=>setFilter(setGroup,e.target.value)}><option value="">Бараа тус бүрээр</option><option value="category">Ангиллаар нэгтгэх</option><option value="brand">Брэндээр нэгтгэх</option><option value="supplier">Нийлүүлэгчээр нэгтгэх</option></SelectControl></Field>{mode==='items'&&!grouped&&<Field label="Жагсаалт эрэмбэлэх"><SelectControl aria-label="Бараа эрэмбэлэх" value={sort} onChange={e=>setFilter(setSort,e.target.value)}><option value="name">Нэрээр</option><option value="stock_asc">Үлдэгдэл багаас</option><option value="value_desc">Өртөг ихээс</option></SelectControl></Field>}</details>}
+   {['items','balance','sales'].includes(mode)&&(mode!=='balance'||balanceView!=='charts')&&<details className="inventory-group-control"><summary>Харагдац · {grouped?({brand:'Брэнд',category:'Ангилал',supplier:'Нийлүүлэгч'} as Record<string,string>)[grouped]:'Бараа тус бүрээр'}</summary><Field label="Тайлангийн ангилал"><SelectControl aria-label="Тайлангийн ангилал" value={group} onChange={e=>setFilter(setGroup,e.target.value)}><option value="">Бараа тус бүрээр</option><option value="category">Ангиллаар нэгтгэх</option><option value="brand">Брэндээр нэгтгэх</option><option value="supplier">Нийлүүлэгчээр нэгтгэх</option></SelectControl></Field>{mode==='items'&&!grouped&&<Field label="Жагсаалт эрэмбэлэх"><SelectControl aria-label="Бараа эрэмбэлэх" value={sort} onChange={e=>setFilter(setSort,e.target.value)}><option value="name">Нэрээр</option><option value="name_desc">Нэр буурахаар</option><option value="stock_asc">Үлдэгдэл багаас</option><option value="stock_desc">Үлдэгдэл ихээс</option><option value="price_asc">Үнэ багаас</option><option value="price_desc">Үнэ ихээс</option><option value="value_desc">Өртөг ихээс</option></SelectControl></Field>}</details>}
    {mode==='balance'&&balanceView!=='charts'&&<div className="balance-list-heading"><div><h3>Дэлгэрэнгүй жагсаалт</h3><p className="muted">Тоо ширхэг болон өртөг (₮). Барааны нэр дээр дарж одоогийн мэдээллийг харна.</p></div>{!grouped&&<SelectControl aria-label="Тайлан эрэмбэлэх" value={sort} onChange={e=>setFilter(setSort,e.target.value)}><option value="name">Нэрээр</option><option value="value_desc">Өртөг ихээс</option><option value="stock_asc">Үлдэгдэл багаас</option><option value="out_desc">Зарлага ихээс</option></SelectControl>}</div>}
    <div className="inventory-commandbar"><div className="row inventory-actions">
 
@@ -148,10 +169,11 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
     <span className="muted">{list.loading?'Ачаалж байна…':`${total.toLocaleString()} ${mode==='items'&&catalog?'бүтээгдэхүүн':'бүртгэл'}`}</span></div>
     <Button variant="outline" disabled={exporting||list.loading||!total} onClick={()=>void exportCsv()}><Download size={16}/>{exporting?'Бэлтгэж байна…':'CSV татах'}</Button>
    </div>
+   {selectable&&canEditItem&&selection.count>0&&<Button className="inventory-bulk-edit-button" onClick={()=>setBulk({scope:catalog?'products':'items',ids:selection.rows.map(r=>r.id)})} disabled={busy}>Сонгосон {selection.count} барааг засах</Button>}
    {selectable&&selection.count>0&&<BulkSelectionBar count={selection.count} total={rows.length} all={selection.all} mixed={selection.mixed} disabled={list.loading||!!list.error||exporting} label="бараа" onAll={selection.toggleAll} onClear={selection.clear} onExport={()=>void exportCsv(true)}/>}
    <AsyncStatus error={list.error} loading={false} retry={list.retry}/>{list.loading&&<div className="inventory-loading" role="status" aria-label="Бүртгэл ачаалж байна"><Skeleton active paragraph={{rows:5}}/></div>}
    {!list.loading&&!list.error&&!rows.length&&!list.data?.groups?.length&&<div className="inventory-empty"><Package size={32}/><h3>Тохирох бүртгэл алга</h3><p>Шүүлтүүрээ өөрчлөх эсвэл шинэ бүртгэл нэмнэ үү.</p></div>}
-   {mode==='items'&&!grouped&&rows.length>0&&<InventoryCatalog items={rows} catalog={catalog} onOpen={r=>catalog?setProduct(r):setDetailId(r.id)} selected={selection.has} onSelect={selection.toggle} all={selection.all} mixed={selection.mixed} onAll={selection.toggleAll} disabled={list.loading||!!list.error}/>}
+   {mode==='items'&&!grouped&&rows.length>0&&<InventoryCatalog items={rows} catalog={catalog} onOpen={r=>catalog?setProduct(r):setDetailId(r.id)} selected={selection.has} onSelect={selection.toggle} all={selection.all} mixed={selection.mixed} onAll={selection.toggleAll} disabled={list.loading||!!list.error||opening} onOpenUnit={setDetailId} canEdit={canEditItem} canTransfer={opts.warehouses.length>1} onAction={(action,item)=>void rowAction(action,item)} warehouse={warehouse} revision={revision} preferences={catalogPrefs.preferences} onPreferences={catalogPrefs.update} onResetPreferences={()=>{catalogPrefs.reset();setSort('name');}} sort={sort} onSort={v=>setFilter(setSort,v)}/>}
    {['balance','purchases','sales','moves'].includes(mode)&&(mode!=='balance'||balanceView!=='charts')&&!!rows.length&&!list.data?.groups?.length&&<div className="table-scroll"><Table><TableHeader><TableRow>
     {selectable&&<TableHead className="selection-cell"><Checkbox aria-label="Энэ хуудасны бүх барааг сонгох" checked={selection.all} indeterminate={selection.mixed} disabled={list.loading||!!list.error} onChange={e=>selection.toggleAll(e.target.checked)}/></TableHead>}
     {(mode==='items'?['БАРАА / КОД','АНГИЛАЛ','БРЭНД','НИЙЛҮҮЛЭГЧ','БАГТААМЖ / ӨНГӨ / IMEI','ҮЛДЭГДЭЛ / ТӨЛӨВ','НИЙТ ӨРТӨГ','ҮНДСЭН / БЭЛЭН ҮНЭ']:mode==='balance'?['БАРАА / КОД','ЭХНИЙ ТОО / ӨРТӨГ','ОРЛОГО ТОО / ӨРТӨГ','ЗАРЛАГА ТОО / ӨРТӨГ','ЭЦСИЙН ТОО / ӨРТӨГ']:mode==='purchases'?['ОГНОО / ЗАХИАЛГА','БАРАА','АГУУЛАХ','ТОО / БУЦААЛТ','НИЙТ ӨРТӨГ','ТӨЛӨВ / ТӨЛБӨР','ҮЙЛДЭЛ']:mode==='sales'?['ОГНОО / БИЛЛ','БАРАА / АГУУЛАХ','ТОО','БОРЛУУЛАЛТ / ӨРТӨГ','ШИМТГЭЛ / ТАТВАР','АШИГ','ПЛАТФОРМ / ДАНС','ХАРИЛЦАГЧ']:['ОГНОО','БАРАА','АГУУЛАХ','ХӨДӨЛГӨӨН','ТОО','ӨРТӨГ','ТАЙЛБАР']).map(h=><TableHead key={h}>{h}</TableHead>)}
@@ -168,6 +190,8 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  return <section className="table-panel inventory-panel">
   <div className="inventory-heading"><div><h2>{modes.find(m=>m.id===mode)?.label}</h2></div><div className="row inventory-actions">{mode==='items'&&<Button onClick={()=>setModal({kind:'item'})}><Plus size={16}/>Бараа нэмэх</Button>}<Dropdown trigger={['click']} menu={{items:[{key:'warehouse',label:'Агуулах / салбар нэмэх'},...(canManage?[{key:'import',label:'Эхний үлдэгдэл импортлох'},{key:'settings',label:'Платформ / шимтгэл / данс'}]:[])],onClick:({key})=>setModal({kind:key as 'warehouse'|'import'|'settings'})}}><Button variant="outline" aria-label="Агуулахын тохиргоо"><Settings2 size={16}/><span>Агуулахын тохиргоо</span></Button></Dropdown></div></div>
   <Tabs className="inventory-tabs" activeKey={mode} onChange={key=>{if(allow())setMode(key as Mode);}} items={modes.map(({id,label,icon:Icon})=>({key:id,label:<span className="row"><Icon size={16}/>{label}</span>,children:mode===id?content:null}))}/>
+  {bulk&&canEditItem&&<InventoryBulkEdit {...bulk} post={post} busy={busy} onClose={()=>setBulk(null)} onDone={updated=>{setBulk(null);selection.clear();toast.success(updated+' дугаарын мэдээлэл шинэчиллээ.');}}/>}
+  <Dialog open={!!actionTarget} onOpenChange={open=>{if(!open&&!opening)setActionTarget(null);}}><DialogContent width={1000} className="inventory-unit-choice"><DialogHeader><DialogTitle>Үйлдэл хийх дугаараа сонгоно уу</DialogTitle><DialogDescription>Барааны зөв IMEI, баркод, кодыг шалгаад сонгоно.</DialogDescription></DialogHeader>{actionTarget&&<InventoryRowDetail item={actionTarget.item} warehouse={warehouse} revision={revision} canEdit={canEditItem} chooseAction={actionTarget.action} onOpen={id=>{setActionTarget(null);setDetailId(id);}} onAction={(action,item)=>void rowAction(action,item)}/>}</DialogContent></Dialog>
   {product&&<InventoryProductDetail key={product.id} id={product.id} initialProduct={product} open={!detailId&&!modal} revision={revision} warehouse={warehouse} onClose={()=>setProduct(null)} onOpenUnit={id=>setDetailId(id)} onAdd={p=>{setModal({kind:'item',template:{...p,id:'',code:'',barcode:'',imei:null,supplier:p.supplier==='Олон нийлүүлэгч'?'':p.supplier,category:p.category==='Олон ангилал'?'':p.category,min_stock:0}});}}/>}
   <Sheet open={!!detailId&&!modal} onOpenChange={o=>{if(!o)setDetailId('');}}><SheetContent className="detail-sheet inventory-detail"><SheetHeader><SheetTitle>{detail.data?.item.name||'Барааны дэлгэрэнгүй'}</SheetTitle><SheetDescription>Агуулах тус бүрийн үлдэгдэл, өртөг, сүүлийн 100 хөдөлгөөн</SheetDescription></SheetHeader><div className="detail-body"><AsyncStatus error={detail.error} loading={detail.loading} retry={detail.retry}/>{detail.data&&<>
    {product&&<Button variant="ghost" onClick={()=>setDetailId('')}>← Барааны дугаарууд</Button>}<StockTag item={detail.data.item}/>{(detail.data.identifiers?.length||0)>0&&<details className="inventory-unit-history"><summary>Гарсан дугаарын бүртгэл</summary>{detail.data.identifiers?.map(u=><p key={u.id}>IMEI/сериал: {u.serial||'—'} · Баркод: {u.barcode||'—'}</p>)}</details>}

@@ -1,4 +1,5 @@
 'use client';
+import {ProductPhoto} from './inventory-product-visual';
 import {productCategories} from '@/lib/product-categories';
 import {salePrice} from '@/lib/inventory-pricing';
 import {ChoiceInput} from '@/components/ui/choice-input';
@@ -17,7 +18,7 @@ import {useRemote,readJson} from '@/hooks/use-remote';
 import {fromInput} from '@/lib/crm';
 import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 
-export type Item={product_key?:string;barcode?:string;unit_count?:number;single_item_id?:string|null;sale_price_max?:number;cash_price_max?:number;id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
+export type Item={image_url?:string;product_key?:string;barcode?:string;unit_count?:number;single_item_id?:string|null;sale_price_max?:number;cash_price_max?:number;id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
 export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];categories?:{category:string}[];channels:Channel[]};
@@ -33,6 +34,7 @@ function Suggestion({name,value,options}:{name:string;value?:string;options:stri
 
 export function ItemForm({item,busy,onSave,options,template=false}:{item?:Item;options?:Options;template?:boolean;busy:boolean;onSave:(data:unknown)=>Promise<void>}){
  const formId=useId();
+ const [imageUrl,setImageUrl]=useState(item?.image_url||'');
  const [identityChanged,setIdentityChanged]=useState(false);
  return <GuardedForm focusError id={formId} className="form-stack" onChange={e=>{const target=e.target;if(target instanceof HTMLInputElement&&['name','brand','capacity','color','variant'].includes(target.name))setIdentityChanged(true);}} onSubmit={async e=>{const f=new FormData(e.currentTarget);if(!String(f.get('name')||'').trim()||!String(f.get('code')||'').trim())throw new Error('Барааны нэр болон кодыг бөглөнө үү.');await onSave({...Object.fromEntries(f),sale_price:numeric(f,'sale_price'),cash_price:String(f.get('cash_price')||'').trim()===''?null:numeric(f,'cash_price'),min_stock:numeric(f,'min_stock')});return true;}}>
   {(template||item?.id)&&<p className="inventory-stock-note">{identityChanged?'Нэр, брэнд, багтаамж, өнгө эсвэл хувилбар өөрчлөгдвөл өөр бүтээгдэхүүнд нэгдэж болно.':!item?.color?'Өнгө тодорхойгүй тул шинэ дугаар тусдаа бүтээгдэхүүн болно.':template?'Энэ бүтээгдэхүүний нэр, багтаамж, өнгийг хадгалж шинэ дугаар нэмнэ.':'Шинж чанарыг өөрчлөхөд бүтээгдэхүүний нэгтгэл шинэчлэгдэнэ.'}</p>}
@@ -40,6 +42,7 @@ export function ItemForm({item,busy,onSave,options,template=false}:{item?:Item;o
   <h3>Үндсэн мэдээлэл</h3>
   <Field label="Барааны нэр *"><Input name="name" defaultValue={item?.name} required maxLength={300}/></Field>
   <div className="form-grid"><Field label="Код / SKU *"><Input name="code" defaultValue={item?.code} required maxLength={200}/></Field><Field label="IMEI / сериал"><Input name="imei" defaultValue={item?.imei||''} maxLength={80}/></Field></div>
+  <Field label="Барааны зургийн холбоос (HTTPS)"><Input name="image_url" type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} maxLength={2048} placeholder="https://…/product.jpg"/></Field><ProductPhoto url={imageUrl.startsWith('https://')?imageUrl:undefined} name={item?.name||'Барааны зураг'}/>
   <Field label="Баркод"><Input name="barcode" defaultValue={item?.barcode||''} maxLength={120} placeholder="Бүтээгдэхүүний баркод"/></Field>
   <div className="form-grid"><Field label="Брэнд"><Suggestion name="brand" value={item?.brand} options={options?.brands.map(b=>b.brand)||[]}/></Field><Field label="Нийлүүлэгч"><Suggestion name="supplier" value={item?.supplier} options={options?.suppliers?.map(b=>b.supplier)||[]}/></Field></div>
   <Field label="Барааны ангилал"><SelectControl name="category" defaultValue={item?.category||''}><option value="">Ангилаагүй</option>{[...new Set([...productCategories,...(item?.category?[item.category]:[])])].map(c=><option key={c}>{c}</option>)}</SelectControl></Field>

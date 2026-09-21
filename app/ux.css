@@ -256,3 +256,30 @@
 :root .ant-modal .inventory-dialog{max-height:none!important;overflow:visible!important}
 :root .ant-modal:has(.inventory-dialog) .ant-modal-body{max-height:calc(90dvh - 190px);overflow-y:auto}
 .ant-modal-footer .inventory-form-actions{position:static;border:0;box-shadow:none;padding:0}
+
+/* Product catalog: readable identities, progressive detail and personal views. */
+.inventory-product-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.inventory-product-identity>div:last-child{min-width:0;flex:1}
+.inventory-photo{width:48px;height:48px;flex:0 0 48px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--muted)}
+.inventory-variant{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted-foreground)}
+.inventory-variant i{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid #999;vertical-align:middle}
+.inventory-row-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.inventory-stock-button{border:0;background:transparent;padding:4px 0;cursor:pointer;text-align:left}
+.inventory-stock-button:focus-visible{outline:2px solid #1677ff;outline-offset:3px}
+.inventory-prices{display:grid;gap:4px;font-variant-numeric:tabular-nums}
+.inventory-prices small{color:var(--muted-foreground)}
+.inventory-catalog-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0}
+.inventory-view-settings{display:grid;gap:14px;width:260px;max-width:calc(100vw - 56px)}
+.inventory-view-settings .ant-checkbox-group{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inventory-warehouse-popover{min-width:220px;max-width:min(360px,calc(100vw - 56px));max-height:360px;overflow:auto}
+.inventory-expanded{padding:12px;min-width:0;background:var(--background);border:1px solid var(--border);border-radius:8px}
+.inventory-expanded>.row{gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.inventory-expanded>.row input{max-width:320px}
+.inventory-expanded .ant-pagination{margin-top:12px}
+.inventory-bulk-fields{display:grid;gap:16px;margin:20px 0}
+.inventory-bulk-fields>div{display:grid;gap:8px}
+.inventory-bulk-values{display:grid;gap:4px}
+.inventory-catalog-table.inventory-density-middle .ant-table-tbody>tr>td{padding:16px 12px!important}
+@media(max-width:767px){.inventory-product-card{display:grid;gap:10px}.inventory-expanded{padding:8px}.inventory-expanded>.row input{max-width:none}.inventory-product-identity{gap:8px}.inventory-catalog-toolbar{align-items:flex-start}}
+
+.inventory-bulk-modal .ant-table-cell small{display:block;color:var(--muted-foreground)}

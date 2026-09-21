@@ -1,22 +1,38 @@
 'use client';
-import {Checkbox,Table,Tag} from 'antd';
+import {Button,Checkbox,Dropdown,Popover,Segmented,Table,Tag} from 'antd';
+import type {ColumnsType} from 'antd/es/table';
+import {useState} from 'react';
 import {useIsMobile} from '@/hooks/use-mobile';
+import type {CatalogPreferences} from '@/hooks/use-catalog-preferences';
+import {ProductPhoto,ProductVariant} from './inventory-product-visual';
+import InventoryRowDetail,{WarehouseBreakdown,type InventoryRowAction} from './inventory-row-detail';
 import {cash,type Item} from './inventory-forms';
 
-type Props={items:Item[];catalog:boolean;onOpen:(item:Item)=>void;selected:(id:string)=>boolean;onSelect:(id:string,value:boolean)=>void;all:boolean;mixed:boolean;onAll:(value:boolean)=>void;disabled:boolean};
-export default function InventoryCatalog({items,catalog,onOpen,selected,onSelect,all,mixed,onAll,disabled}:Props){
- const mobile=useIsMobile();
- const name=(i:Item)=><button className="inventory-item-link" onClick={()=>onOpen(i)}><strong>{i.name}</strong><small>{catalog?`${i.unit_count} дугаарын бүртгэл`:i.code}</small></button>;
- const variant=(i:Item)=>[i.capacity,i.color,i.variant].filter(Boolean).join(' / ');
- const prices=(i:Item)=><div className="inventory-prices"><strong>{cash(i.sale_price)}{i.sale_price_max!==undefined&&i.sale_price_max!==i.sale_price?' – '+cash(i.sale_price_max):''}</strong><small>Бэлэн: {cash(i.cash_price??i.sale_price)}{i.cash_price_max!==undefined&&i.cash_price_max!==(i.cash_price??i.sale_price)?' – '+cash(i.cash_price_max):''}</small></div>;
- const stock=(i:Item)=><Tag color={i.stock<0?'red':i.stock===0?'default':i.stock<=i.min_stock?'orange':'green'}>{i.stock} ш · {i.stock<0?'Сөрөг':i.stock===0?'Үлдэгдэлгүй':i.stock<=i.min_stock?'Нөхөн татах':'Үлдэгдэлтэй'}</Tag>;
- if(mobile)return <div className="inventory-cards"><Checkbox checked={all} indeterminate={mixed} disabled={disabled} onChange={e=>onAll(e.target.checked)}>Энэ хуудасны бүх барааг сонгох</Checkbox>{items.map(i=><article key={i.id} className={'inventory-product-card'+(selected(i.id)?' selected':'')}><div className="inventory-card-title"><Checkbox aria-label={`${i.name} (${i.code}) барааг сонгох`} checked={selected(i.id)} disabled={disabled} onChange={e=>onSelect(i.id,e.target.checked)}/>{name(i)}</div><p>{variant(i)||i.category||'Ангилаагүй'}</p>{stock(i)}{prices(i)}<small>{i.supplier||'Нийлүүлэгч тодорхойгүй'}</small></article>)}</div>;
- return <Table<Item> className="inventory-catalog-table" size="small" rowKey="id" dataSource={items} pagination={false} scroll={{x:1080}} sticky rowSelection={{selectedRowKeys:items.filter(i=>selected(i.id)).map(i=>i.id),onSelect:(i,v)=>onSelect(i.id,v),onSelectAll:v=>onAll(v),getCheckboxProps:i=>({disabled,'aria-label':`${i.name} (${i.code}) барааг сонгох`}),columnTitle:<Checkbox aria-label="Энэ хуудасны бүх барааг сонгох" checked={all} indeterminate={mixed} disabled={disabled} onChange={e=>onAll(e.target.checked)}/>}} columns={[
-  {title:'Бараа / хувилбар',key:'name',fixed:'left',width:260,render:(_,i)=><>{name(i)}<small>{variant(i)}</small></>},
-  {title:'Үлдэгдэл',key:'stock',width:190,render:(_,i)=>stock(i)},
-  {title:'Үндсэн / бэлэн үнэ',key:'price',align:'right',width:220,render:(_,i)=>prices(i)},
-  {title:'Нийлүүлэгч',dataIndex:'supplier',width:140,render:v=>v||'Тодорхойгүй'},
-  {title:'Ангилал / брэнд',key:'brand',width:150,render:(_,i)=><>{i.category||'Ангилаагүй'}<small>{i.brand||'Брэнд бүртгээгүй'}</small></>},
-  {title:'Үлдэгдлийн өртөг',key:'cost',align:'right',width:160,render:(_,i)=>cash(i.value_cents/100)},
- ]}/>;
+type Props={items:Item[];catalog:boolean;onOpen:(item:Item)=>void;onOpenUnit:(id:string)=>void;selected:(id:string)=>boolean;onSelect:(id:string,value:boolean)=>void;all:boolean;mixed:boolean;onAll:(value:boolean)=>void;disabled:boolean;canEdit:boolean;canTransfer:boolean;onAction:(action:InventoryRowAction,item:Item)=>void;warehouse:string;revision:number;preferences:CatalogPreferences;onPreferences:(patch:Partial<CatalogPreferences>)=>void;onResetPreferences:()=>void;sort:string;onSort:(sort:string)=>void};
+function Stock({item,catalog,revision}:{item:Item;catalog:boolean;revision:number}){
+ const [open,setOpen]=useState(false);
+ return <Popover trigger="click" open={open} onOpenChange={setOpen} title="Агуулах тус бүрийн үлдэгдэл" content={open?<WarehouseBreakdown item={item} catalog={catalog} revision={revision}/>:null}><button type="button" className="inventory-stock-button" aria-label={item.name+' агуулах тус бүрийн үлдэгдэл'}><Tag color={item.stock<0?'red':item.stock===0?'default':item.stock<=item.min_stock?'orange':'green'}>{item.stock} ш · {item.stock<0?'Сөрөг':item.stock===0?'Үлдэгдэлгүй':item.stock<=item.min_stock?'Нөхөн татах':'Үлдэгдэлтэй'}</Tag></button></Popover>;
+}
+export default function InventoryCatalog(props:Props){
+ const {items,catalog,onOpen,onOpenUnit,selected,onSelect,all,mixed,onAll,disabled,canEdit,canTransfer,onAction,warehouse,revision,preferences,onPreferences,onResetPreferences,sort,onSort}=props;
+ const mobile=useIsMobile(),[expanded,setExpanded]=useState<React.Key[]>([]);
+ const shown=(key:string)=>preferences.columns.includes(key);
+ const name=(i:Item)=><div className="inventory-product-identity">{shown('photo')&&<ProductPhoto url={i.image_url} name={i.name}/>}<div><button className="inventory-item-link" onClick={()=>onOpen(i)}><strong>{i.name}</strong><small>{catalog?i.unit_count+' дугаарын бүртгэл':i.code}</small></button><ProductVariant {...i}/></div></div>;
+ const prices=(i:Item)=><div className="inventory-prices"><strong>Зээл: {cash(i.sale_price)}{i.sale_price_max!==undefined&&i.sale_price_max!==i.sale_price?' – '+cash(i.sale_price_max):''}</strong><small>Бэлэн: {cash(i.cash_price??i.sale_price)}{i.cash_price_max!==undefined&&i.cash_price_max!==(i.cash_price??i.sale_price)?' – '+cash(i.cash_price_max):''}</small></div>;
+ const actions=(i:Item)=><div className="inventory-row-actions"><Button size="small" disabled={disabled||i.stock<=0} onClick={()=>onAction('sale',i)}>Борлуулах</Button><Dropdown trigger={['click']} menu={{items:[{key:'purchase',label:'Орлого нэмэх'},{key:'transfer',label:'Шилжүүлэх',disabled:!canTransfer||i.stock<=0},...(canEdit?[{key:'edit',label:'Засах'}]:[])],onClick:({key})=>onAction(key as InventoryRowAction,i)}}><Button size="small" disabled={disabled} aria-label={i.name+' нэмэлт үйлдэл'}>•••</Button></Dropdown></div>;
+ const detail=(i:Item)=><InventoryRowDetail key={i.id+':'+revision} item={i} warehouse={warehouse} revision={revision} canEdit={canEdit} onOpen={onOpenUnit} onAction={onAction}/>;
+ const columns:ColumnsType<Item>=[
+  {title:'Бараа / хувилбар',key:'name',fixed:'left',width:300,sorter:true,sortOrder:sort==='name'?'ascend':sort==='name_desc'?'descend':null,render:(_,i)=>name(i)},
+  ...(shown('stock')?[{title:'Үлдэгдэл',key:'stock',width:180,sorter:true,sortOrder:sort==='stock_asc'?'ascend' as const:sort==='stock_desc'?'descend' as const:null,render:(_:unknown,i:Item)=><Stock item={i} catalog={catalog} revision={revision}/>}]:[]),
+  ...(shown('price')?[{title:'Зээл / бэлэн үнэ',key:'price',align:'right' as const,width:230,sorter:true,sortOrder:sort==='price_asc'?'ascend' as const:sort==='price_desc'?'descend' as const:null,render:(_:unknown,i:Item)=>prices(i)}]:[]),
+  ...(shown('supplier')?[{title:'Нийлүүлэгч',dataIndex:'supplier',key:'supplier',width:140,render:(v:string)=>v||'Тодорхойгүй'}]:[]),
+  ...(shown('brand')?[{title:'Ангилал / брэнд',key:'brand',width:150,render:(_:unknown,i:Item)=><>{i.category||'Ангилаагүй'}<small>{i.brand||'Брэнд бүртгээгүй'}</small></>}]:[]),
+  ...(shown('cost')?[{title:'Үлдэгдлийн өртөг',key:'cost',align:'right' as const,width:160,render:(_:unknown,i:Item)=>cash(i.value_cents/100)}]:[]),
+  {title:'Үйлдэл',key:'actions',fixed:'right',width:155,render:(_,i)=>actions(i)},
+ ];
+ const settings=<div className="inventory-view-settings"><Checkbox.Group value={preferences.columns} onChange={columns=>onPreferences({columns:columns.map(String)})} options={[{value:'photo',label:'Зураг'},{value:'stock',label:'Үлдэгдэл'},{value:'price',label:'Үнэ'},{value:'supplier',label:'Нийлүүлэгч'},{value:'brand',label:'Ангилал / брэнд'},{value:'cost',label:'Өртөг'}]}/><span>Мөрийн нягтрал</span><Segmented<'small'|'middle'> value={preferences.density} onChange={density=>onPreferences({density})} options={[{value:'small',label:'Нягт'},{value:'middle',label:'Уужим'}]}/><Button onClick={onResetPreferences}>Анхны харагдац</Button><small>Энэ төхөөрөмж дээр таны хэрэглэгчээр хадгална.</small></div>;
+ return <><div className="inventory-catalog-toolbar"><span className="muted">{catalog?'Мөрийг дэлгэж IMEI, баркодоо сонгоно.':'Дугаар тус бүрийн бүртгэл'}</span><Popover trigger="click" title="Жагсаалтын харагдац" content={settings}><Button>Багана / нягтрал</Button></Popover></div>
+ {mobile?<div className="inventory-cards"><Checkbox checked={all} indeterminate={mixed} disabled={disabled} onChange={e=>onAll(e.target.checked)}>Энэ хуудасны бүх барааг сонгох</Checkbox>{items.map(i=><article key={i.id} className={'inventory-product-card'+(selected(i.id)?' selected':'')}><div className="inventory-card-title"><Checkbox aria-label={i.name+' ('+i.code+') барааг сонгох'} checked={selected(i.id)} disabled={disabled} onChange={e=>onSelect(i.id,e.target.checked)}/>{name(i)}</div>{shown('stock')&&<Stock item={i} catalog={catalog} revision={revision}/>} {shown('price')&&prices(i)}{shown('supplier')&&<small>{i.supplier||'Нийлүүлэгч тодорхойгүй'}</small>}{shown('brand')&&<small>{i.category||'Ангилаагүй'} · {i.brand||'Брэнд тодорхойгүй'}</small>}{shown('cost')&&<small>Үлдэгдлийн өртөг: {cash(i.value_cents/100)}</small>}{actions(i)}{catalog&&<><Button onClick={()=>setExpanded(expanded.includes(i.id)?expanded.filter(id=>id!==i.id):[...expanded,i.id])} aria-expanded={expanded.includes(i.id)}>IMEI / баркод {expanded.includes(i.id)?'хумих':'харах'}</Button>{expanded.includes(i.id)&&detail(i)}</>}</article>)}</div>:
+ <Table<Item> className={'inventory-catalog-table inventory-density-'+preferences.density} size={preferences.density} rowKey="id" dataSource={items} pagination={false} scroll={{x:columns.reduce((total,c)=>total+Number(c.width||150),70)}} sticky onChange={(_,__,sorter)=>{const s=Array.isArray(sorter)?sorter[0]:sorter;onSort(!s.order?'name':s.columnKey==='name'?(s.order==='ascend'?'name':'name_desc'):String(s.columnKey)+(s.order==='ascend'?'_asc':'_desc'));}} expandable={catalog?{expandedRowKeys:expanded,onExpandedRowsChange:keys=>setExpanded([...keys]),expandedRowRender:detail,expandRowByClick:false}:undefined} rowSelection={{selectedRowKeys:items.filter(i=>selected(i.id)).map(i=>i.id),onSelect:(i,v)=>onSelect(i.id,v),onSelectAll:v=>onAll(v),getCheckboxProps:i=>({disabled,'aria-label':i.name+' ('+i.code+') барааг сонгох'}),columnTitle:<Checkbox aria-label="Энэ хуудасны бүх барааг сонгох" checked={all} indeterminate={mixed} disabled={disabled} onChange={e=>onAll(e.target.checked)}/>}} columns={columns}/>}
+ </>;
 }

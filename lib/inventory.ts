@@ -19,7 +19,8 @@ export async function movement(db:DatabaseSession,m:{item:string;warehouse:strin
  await db.prepare('INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,value_cents,cost_estimated,occurred_at,ref_id,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
   .bind(crypto.randomUUID(),m.item,m.warehouse,m.kind,m.qty,m.qty?m.value/m.qty/100:0,m.value,m.estimated||0,m.at,m.ref,m.note||'',m.actor,new Date().toISOString()).run();
 }
-export const itemSchema=z.object({barcode:z.string().trim().max(120).optional(),code:z.string().trim().max(200).default(''),brand:z.string().trim().max(120).refine(v=>!/^(?:YUNA(?: DARAA)?|SOLAR(?:,\s*BELEG)?|MIKE|KHANGAI)$/i.test(v),'Энэ нь нийлүүлэгчийн нэр. Нийлүүлэгчийн талбарт оруулна уу.').default(''),supplier:z.string().trim().max(120).default(''),category:z.string().trim().max(80).optional(),name:z.string().trim().min(1).max(300),variant:z.string().trim().max(120).default(''),capacity:z.string().trim().max(80).default(''),color:z.string().trim().max(80).default(''),imei:z.string().trim().max(80).nullish(),sale_price:money.default(0),cash_price:money.nullable().optional(),min_stock:z.number().int().min(0).max(1_000_000).default(0)});
+export const imageUrlSchema=z.string().trim().max(2048).refine(v=>{if(!v)return true;try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}},'Зургийн HTTPS холбоос оруулна уу.');
+export const itemSchema=z.object({image_url:imageUrlSchema.optional(),barcode:z.string().trim().max(120).optional(),code:z.string().trim().max(200).default(''),brand:z.string().trim().max(120).refine(v=>!/^(?:YUNA(?: DARAA)?|SOLAR(?:,\s*BELEG)?|MIKE|KHANGAI)$/i.test(v),'Энэ нь нийлүүлэгчийн нэр. Нийлүүлэгчийн талбарт оруулна уу.').default(''),supplier:z.string().trim().max(120).default(''),category:z.string().trim().max(80).optional(),name:z.string().trim().min(1).max(300),variant:z.string().trim().max(120).default(''),capacity:z.string().trim().max(80).default(''),color:z.string().trim().max(80).default(''),imei:z.string().trim().max(80).nullish(),sale_price:money.default(0),cash_price:money.nullable().optional(),min_stock:z.number().int().min(0).max(1_000_000).default(0)});
 export const openingSchema=itemSchema.extend({code:z.string().trim().min(1).max(200),warehouse:z.string().trim().min(1).max(120),qty:z.number().int().min(0).max(1_000_000),unit_cost:money,total_cost:money.optional()});
 export type OpeningRow=z.infer<typeof openingSchema>;
 export function dayBounds(from:string,to:string){
@@ -38,4 +39,23 @@ export async function productKey(item:{name:string;brand?:string;capacity?:strin
  const identity=JSON.stringify([unknownVariant?normalize(item.code)||item.id||'unknown':'',...['name','brand','capacity','color','variant'].map(k=>normalize(item[k as keyof typeof item])),flags]);
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity));
  return 'p_'+Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+const bulkItemSchema=z.object({
+ scope:z.enum(['products','items']),
+ ids:z.array(z.string().min(1).max(100)).min(1).max(50).refine(ids=>new Set(ids).size===ids.length,'Сонголт давхардсан.'),
+ patch:itemSchema.pick({category:true,brand:true,supplier:true}).partial().strict().refine(p=>Object.keys(p).length>0,'Өөрчлөх талбар сонгоно уу.'),
+ preview_hash:z.string().optional(),
+});
+type BulkRow=z.infer<typeof itemSchema>&{id:string;product_key:string;updated_at:string;category:string};
+export async function planInventoryBulkEdit(db:DatabaseSession,data:unknown){
+ const input=bulkItemSchema.parse(data);
+ const scope=input.scope==='products'?"COALESCE(NULLIF(product_key,''),id)":'id';
+ const rows=(await db.prepare(`SELECT * FROM inventory_items WHERE ${scope} IN (${input.ids.map(()=>'?').join(',')}) ORDER BY id LIMIT 5001`).bind(...input.ids).all<BulkRow>()).results;
+ if(rows.length>5000)throw new Failure('5,000-аас олон дугаар сонгосон байна. Сонголтоо багасгана уу.');
+ if(input.ids.some(id=>!rows.some(row=>(input.scope==='products'?(row.product_key||row.id):row.id)===id)))throw new Failure('Сонгосон бараа өөрчлөгдсөн эсвэл олдсонгүй. Дахин сонгоно уу.',409);
+ const changes=rows.map(row=>({id:row.id,code:row.code,name:row.name,before:{category:row.category,brand:row.brand,supplier:row.supplier},after:{category:input.patch.category??row.category,brand:input.patch.brand??row.brand,supplier:input.patch.supplier??row.supplier}}));
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({actorScope:input.scope,rows,changes})));
+ const hash=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+ return {input,rows,changes,hash};
 }

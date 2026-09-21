@@ -41,6 +41,42 @@ const scenario=String.raw`
  [status,d]=await invGet('?view=products&sort=stock_asc');assert.ok(d.items.every((item,i)=>i===0||d.items[i-1].stock<=item.stock));
  [status,d]=await invGet('?view=products&sort=value_desc');assert.ok(d.items.every((item,i)=>i===0||d.items[i-1].value_cents>=item.value_cents));
  const pk=deps['@/lib/inventory'].productKey;assert.equal(await pk(input),await pk({...input,name:' IPHONE 17 PRO '}));assert.notEqual(await pk(input),await pk({...input,code:'DISPLAY'}));assert.notEqual(await pk(input),await pk({...input,color:''}));assert.notEqual(await pk({...input,color:'',code:'A'}),await pk({...input,color:'',code:'B'}));
+
+ // Metadata edits preserve ledger identities, prices and omitted fields.
+ const before=(await invGet('?view=items&id='+first))[1].item;
+ const editInput={...input,code:before.code,color:before.color,imei:before.imei,image_url:'https://example.test/phone.png'};
+ assert.equal((await invPost('update_item',editInput,first))[0],200);
+ assert.equal((await invPost('update_item',{...editInput,image_url:'javascript:alert(1)'},first))[0],400);
+ const {image_url,...legacy}=editInput;assert.equal((await invPost('update_item',legacy,first))[0],200);
+ assert.equal((await invGet('?view=items&id='+first))[1].item.image_url,image_url);
+ for(const view of ['items','products']){const found=(await invGet('?view='+view+'&q=UNIT-A'))[1];assert.equal(found.items[0].code,'UNIT-A');}
+ assert.equal((await invGet('?view=products&match=exact&q=UNIT'))[1].count,0);
+ assert.equal((await invGet('?view=products&match=exact&q=UNIT-A'))[1].count,1);
+ const current=(await invGet('?view=items&id='+first))[1];
+ const breakdown=(await invGet('?view=products&id='+current.item.product_key))[1].byWarehouse;
+ assert.equal(breakdown.find(w=>w.warehouse_id===otherWarehouse).qty,1);
+ const request={scope:'items',ids:[first,second],patch:{category:'Accessories'}};
+ let preview=await invPost('preview_bulk_items',request);assert.equal(preview[0],200);assert.equal(preview[1].count,2);
+ assert.ok(preview[1].changes.every(c=>c.before.brand===c.after.brand&&c.before.supplier===c.after.supplier));
+ const ledger=sqlite.prepare('SELECT * FROM inventory_stock_moves ORDER BY id').all();
+ assert.equal((await invPost('bulk_update_items',request))[0],409);
+ const key=crypto.randomUUID(),apply={...request,preview_hash:preview[1].preview_hash};
+ assert.equal((await invPost('bulk_update_items',apply,undefined,key))[0],200);
+ assert.equal((await invPost('bulk_update_items',apply,undefined,key))[0],200);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM inventory_bulk_edits').get().n,1);
+ assert.deepEqual(sqlite.prepare('SELECT * FROM inventory_stock_moves ORDER BY id').all(),ledger);
+ assert.equal((await invGet('?view=items&id='+first))[1].item.sale_price,current.item.sale_price);
+ preview=await invPost('preview_bulk_items',{...request,patch:{supplier:'Solar'}});
+ sqlite.prepare("UPDATE inventory_items SET supplier='Changed' WHERE id=?").run(second);
+ assert.equal((await invPost('bulk_update_items',{...request,patch:{supplier:'Solar'},preview_hash:preview[1].preview_hash}))[0],409);
+ assert.equal((await invPost('preview_bulk_items',{...request,patch:{sale_price:1}}))[0],400);
+ assert.equal((await invPost('preview_bulk_items',{...request,patch:{}}))[0],400);
+ for(const role of ['director','agent','manager']){
+  await crmPost('member',{email:role+'@example.test',name:role,role,active:true});
+  user={userId:role,email:role+'@example.test',displayName:role};
+  assert.equal((await invPost('preview_bulk_items',request))[0],role==='manager'?200:403);
+  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ }
  console.log('PASS: product identity, variant/condition separation, supplier/price preservation, barcode search, exact unit sale, historical links, stock safety and edit regrouping.');
 })().catch(e=>{console.error(e);process.exit(1)});`;
 eval(bootstrap+scenario);
