@@ -606,7 +606,7 @@ export async function POST(req: Request) {
             .email()
             .transform((v) => v.toLowerCase()),
           name: z.string().trim().min(1).max(100),
-          role: z.enum(["admin", "director", "manager", "agent", "marketing", "it"]),
+          role: z.enum(["admin", "director", "manager", "agent", "marketing", "it", "delivery"]),
           active: z.boolean(),
         })
         .parse(b.data);
