@@ -1,6 +1,6 @@
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
-import {canEditInventoryItem,isIsolatedRole,type Member} from '@/lib/crm';
+import {canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {unitsSchema,saveUnits} from '@/lib/serials';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds} from '@/lib/inventory';
@@ -66,9 +66,11 @@ export async function GET(req:Request){try{
   if(warehouse){where+=' AND t.warehouse_id=?';args.push(warehouse);}
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ?)';args.push('%'+q+'%','%'+q+'%');}
   if(view==='purchases'&&p.get('status')){where+=' AND t.status=?';args.push(p.get('status'));}
+  // Шууд бэлэн борлуулалт: зарсан ажилтан бүртгэгдсэн мөрүүд. "__direct__" нь зарагч тодорхой бүхнийг заана.
+  if(view==='sales'&&p.get('seller')){const seller=p.get('seller')!;if(seller==='__direct__')where+=" AND t.seller!=''";else{where+=' AND t.seller=?';args.push(seller);}}
   const date=view==='purchases'?'COALESCE(t.received_at,t.ordered_at,t.created_at)':view==='sales'?'COALESCE(t.sold_at,t.created_at)':'t.occurred_at';
   if(p.get('from')&&p.get('to')){const [from,to]=dayBounds(p.get('from')!,p.get('to')!);where+=` AND ${date}>=? AND ${date}<?`;args.push(from,to);}
-  const rows=await db().prepare(`SELECT t.*,it.name item_name,it.code item_code,w.name warehouse_name ${view==='sales'?',CAST(ROUND(t.total_price*100) AS INTEGER)-t.cost_cents-t.commission_cents-t.tax_cents profit_cents':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id JOIN inventory_warehouses w ON w.id=t.warehouse_id WHERE ${where} ORDER BY ${date} DESC,t.id DESC LIMIT ? OFFSET ?`).bind(...args,limit,limit===5000?0:(page-1)*50).all();
+  const rows=await db().prepare(`SELECT t.*,it.name item_name,it.code item_code,w.name warehouse_name${view==='sales'?',(SELECT name FROM members WHERE email=t.seller) seller_name':''} ${view==='sales'?',CAST(ROUND(t.total_price*100) AS INTEGER)-t.cost_cents-t.commission_cents-t.tax_cents profit_cents':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id JOIN inventory_warehouses w ON w.id=t.warehouse_id WHERE ${where} ORDER BY ${date} DESC,t.id DESC LIMIT ? OFFSET ?`).bind(...args,limit,limit===5000?0:(page-1)*50).all();
   const summary=await db().prepare(`SELECT COUNT(*) count ${view==='sales'?',COALESCE(SUM(ROUND(t.total_price*100)),0) revenue_cents,COALESCE(SUM(t.cost_cents),0) cost_cents,COALESCE(SUM(t.commission_cents),0) commission_cents,COALESCE(SUM(t.tax_cents),0) tax_cents,COALESCE(SUM(ROUND(t.total_price*100)-t.cost_cents-t.commission_cents-t.tax_cents),0) profit_cents,COALESCE(MAX(t.cost_estimated),0) cost_estimated':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id WHERE ${where}`).bind(...args).first();
   return json({items:rows.results,count:summary?.count||0,summary,page,truncated:Number(summary?.count)>limit&&limit===5000});
  }
@@ -132,9 +134,18 @@ export async function POST(req:Request){try{
     }return {ok:true,id:b.id};
    }
    if(b.action==='record_sale'||b.action==='transfer'){
-    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
+    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.string().email().optional(),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
     await requireRow(d,'inventory_items',input.item_id);await requireRow(d,'inventory_warehouses',input.warehouse_id);
     const stock=await stockAt(d,input.item_id,input.warehouse_id),cost=withdrawal(stock,input.qty),id=crypto.randomUUID();
+    // Шууд борлуулалтыг ажилтны үзүүлэлтэд тооцох тул зарагчийг тодорхой хөтөлнө. Агент зөвхөн өөрийн
+    // нэр дээр бүртгэнэ; Ахлах, Удирдлага, Админ өөр ажилтны өмнөөс бүртгэж болно.
+    let seller='';
+    if(b.action==='record_sale'&&input.seller){
+     seller=input.seller;
+     if(!canManageSchedule(m.role)&&seller!==m.email)throw new Failure('Зөвхөн өөрийн борлуулалтаа бүртгэнэ.',403);
+     const who=await d.prepare('SELECT role FROM members WHERE email=? AND active=1').bind(seller).first<{role:string}>();
+     if(!who||isIsolatedRole(who.role))throw new Failure('Идэвхтэй борлуулалтын ажилтан сонгоно уу.');
+    }
     if(b.action==='transfer'){
      if(!input.to_warehouse_id||input.to_warehouse_id===input.warehouse_id)throw new Failure('Өөр хүлээн авах агуулах сонгоно уу.');
      await requireRow(d,'inventory_warehouses',input.to_warehouse_id);
@@ -145,6 +156,7 @@ export async function POST(req:Request){try{
      await d.prepare('INSERT INTO inventory_sales(id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at,bill_number,account,commission_rate,commission_cents,tax_cents,cost_cents,cost_estimated,vat_issued) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,input.item_id,input.warehouse_id,input.qty,input.unit_price,total/100,input.customer_name,input.customer_phone,input.platform,input.sold_at||now,input.note,m.email,now,input.bill_number,input.account||String(channel?.account||''),rate,commission,tax,cost,stock.cost_estimated,input.vat_issued?1:0).run();
      await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'sale',qty:-input.qty,value:-cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:input.note});
      await saveUnits(d,{source:'sale',refId:id,itemId:input.item_id,customerPhone:input.customer_phone,actor:m.email,at:input.sold_at||now},input.units);
+     if(seller)await d.prepare('UPDATE inventory_sales SET seller=? WHERE id=?').bind(seller,id).run();
     }return {ok:true,id};
    }
    if(b.action==='preview_import'||b.action==='import_opening'){

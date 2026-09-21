@@ -396,6 +396,7 @@ export async function GET(req: Request) {
       unreadTeamMsg,
       myToday,
       directory,
+      directSales,
     ] = await Promise.all([
       db()
         .prepare(
@@ -502,6 +503,15 @@ export async function GET(req: Request) {
           "SELECT email,name,role,active,last_seen,phone,avatar FROM members WHERE active=1 ORDER BY name",
         )
         .all(),
+      // Шууд бэлэн борлуулалт: хүсэлтгүй, зарагч нь тодорхой бүртгэгдсэн борлуулалтыг ажилтнаар нэгтгэнэ.
+      isReports
+        ? db()
+            .prepare(
+              `SELECT seller,COUNT(*) sales,COALESCE(SUM(ROUND(total_price*100)),0) amount_cents FROM inventory_sales WHERE seller!=''${reportFromIso ? " AND COALESCE(sold_at,created_at)>=?" : ""}${reportToIso ? " AND COALESCE(sold_at,created_at)<=?" : ""} GROUP BY seller`,
+            )
+            .bind(...[reportFromIso, reportToIso].filter(Boolean))
+            .all<{ seller: string; sales: number; amount_cents: number }>()
+        : Promise.resolve({ results: [] as { seller: string; sales: number; amount_cents: number }[] }),
     ]);
     // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
     const byMemberMap = new Map(
@@ -515,6 +525,9 @@ export async function GET(req: Request) {
         r.actor as string,
         r.count as number,
       ]),
+    );
+    const directMap = new Map(
+      directSales.results.map((r) => [r.seller, r]),
     );
     // Тайлан зөвхөн борлуулалтын ажилтныг харьцуулна; удирдлага/админ хувийн үзүүлэлтгүй.
     const reportMembers = isReports
@@ -534,6 +547,11 @@ export async function GET(req: Request) {
                 Object.keys(stages).map((k) => [k, b?.[`c_${k}`] || 0]),
               ),
               activities: activityMap.get(t.email) || 0,
+              // Шууд бэлэн борлуулалт нь хүсэлтээр ирээгүй тул хөрвөлтийн хуваарьт орохгүй, харин
+              // "нийт борлуулалт"-д худалдан авсан хүсэлттэй нэгтгэн тооцогдоно.
+              direct_sales: Number(directMap.get(t.email)?.sales || 0),
+              direct_amount: Number(directMap.get(t.email)?.amount_cents || 0) / 100,
+              sold_total: (b?.[`c_won`] || 0) + Number(directMap.get(t.email)?.sales || 0),
             };
           })
       : [];
@@ -553,6 +571,9 @@ export async function GET(req: Request) {
           Object.keys(stages).map((k) => [k, unassignedReport[`c_${k}`] || 0]),
         ),
         activities: 0,
+        direct_sales: 0,
+        direct_amount: 0,
+        sold_total: unassignedReport[`c_won`] || 0,
       });
     return Response.json(
       {
