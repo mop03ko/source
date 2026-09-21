@@ -272,12 +272,12 @@ export async function GET(req: Request) {
     const todayStartUB = new Date(ubDateStr + "T00:00:00+08:00").toISOString(),
       todayEndUB = new Date(ubDateStr + "T23:59:59+08:00").toISOString();
     // Зөвхөн хугацаа хэтэрснийг бус, өнөөдрийн үлдсэн товыг бүгдийг харуулж, клиент талд хугацаагаар (хэтэрсэн/1 цагийн дотор/үлдсэн цаг) бүлэглэнэ.
-    if (view === "today") {
+    if (view === "today" || view === "dashboard") {
       where +=
         " AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone) AND (l.recycle_at IS NULL OR l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.owner!='__sheet_unassigned__' AND l.next_at<=?";
       args.push(todayEndUB);
     }
-    const isToday = view === "today";
+    const isToday = view === "today" || view === "dashboard";
     if (view === "recycle") {
       where +=
         " AND l.recycle_at IS NOT NULL AND l.next_at IS NOT NULL AND (l.connected=1 OR julianday(l.recycle_at)>=julianday('now','-14 days')) AND l.status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=l.phone)";

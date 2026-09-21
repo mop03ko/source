@@ -87,14 +87,14 @@ function SerialSearch({q,onQ}:{q:string;onQ:(v:string)=>void}){
  </TableBody></Table></div>:<p className="muted chat-empty-list">Тохирох дугаар олдсонгүй.</p>)}
  </>;
 }
-export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]}){
+export default function DeliveriesPanel({me,members,initialTaskId}:{me:Member;members:Member[];initialTaskId?:string}){
  const [mode,setMode]=useState<'list'|'report'|'serials'>('list');
  const [serialQ,setSerialQ]=useState('');
  const [q,setQ]=useState(''),[status,setStatus]=useState(''),[courier,setCourier]=useState(''),[channel,setChannel]=useState(''),[kind,setKind]=useState('');
  const [from,setFrom]=useState(''),[to,setTo]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
  const [today]=useState(todayUB);
  const [rfrom,setRfrom]=useState(()=>today.slice(0,4)+'-01-01'),[rto,setRto]=useState(today);
- const [create,setCreate]=useState(false),[detailId,setDetailId]=useState(''),[busy,setBusy]=useState(false);
+ const [create,setCreate]=useState(false),[detailId,setDetailId]=useState(initialTaskId||''),[busy,setBusy]=useState(false);
  const courierOnly=isCourierOnly(me.role);
  const listUrl='/api/deliveries?'+new URLSearchParams({q,status,courier,channel,kind,from,to,page:String(page),revision:String(revision)});
  const list=useRemote<List>(mode==='list'?listUrl:null);

@@ -20,7 +20,7 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal((await post('create',{...leadData(),registration:'invalid'}))[0],400);
  [status,d]=await post('create',{...leadData(),registration:'аб99112233'});assert.equal(status,200);const id=d.id;assert.equal(d.added,1);assert.equal((await get('?id='+id))[1].lead.registration,'АБ99112233');
  assert.equal((await post('create',leadData()))[0],409);
- assert.equal((await get('?view=today'))[1].count,1);assert.ok(!(await get('?id='+id))[1].activities.some(a=>a.note.includes('АБ99112233')));
+ assert.equal((await get('?view=today'))[1].count,1);assert.deepEqual((await get('?view=dashboard'))[1].leads,(await get('?view=today'))[1].leads);assert.ok(!(await get('?id='+id))[1].activities.some(a=>a.note.includes('АБ99112233')));
  assert.equal((await post('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
  user={userId:'stranger',email:'stranger@example.test',displayName:'Stranger'};assert.equal((await get())[0],403);
  user={userId:'agent',email:'agent@example.test',displayName:'Agent'};assert.equal((await get())[1].stats.total,0);assert.equal((await get('?id='+id))[0],404);assert.equal((await post('member',{email:'third@example.test',name:'Third',role:'admin',active:true}))[0],403);assert.equal((await post('create',leadData('88112233')))[0],403);

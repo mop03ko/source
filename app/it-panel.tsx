@@ -33,7 +33,7 @@ function TaskForm({task,members,busy,onSubmit}:{task?:ItTask;members:Member[];bu
  <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Хадгалах</Button>
  </GuardedForm>;
 }
-export default function ItPanel({me,members}:{me:Member;members:Member[]}){
+export default function ItPanel({me,members,initialTaskId}:{me:Member;members:Member[];initialTaskId?:string}){
  const [items,setItems]=useState<ItTask[]>([]),[count,setCount]=useState(0),[page,setPage]=useState(1),[status,setStatus]=useState(''),[q,setQ]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[stats,setStats]=useState<Stats|null>(null);
  const [create,setCreate]=useState(false),[busy,setBusy]=useState(false);
  const [detailId,setDetailId]=useState(''),[detail,setDetail]=useState<{task:ItTask;activities:ItActivity[]}|null>(null),[detailError,setDetailError]=useState('');
@@ -52,6 +52,7 @@ export default function ItPanel({me,members}:{me:Member;members:Member[]}){
  const reportState=useRemote<ItReport>(mode==='report'?'/api/it?'+new URLSearchParams({report:'1',rfrom:reportFrom,rto:reportTo,retry:String(retryReport)}):null);
  const report=reportState.data,reportLoading=reportState.loading;
  const openTask=useCallback(async(id:string)=>{const n=++detailSeq.current;setDetailId(id);setDetail(null);setDetailError('');try{const r=await fetch('/api/it?id='+encodeURIComponent(id),{cache:'no-store'});const d=await r.json() as {task?:ItTask;activities?:ItActivity[];error?:string};if(!r.ok)throw new Error(d.error);if(n===detailSeq.current)setDetail(d as {task:ItTask;activities:ItActivity[]});}catch(e){if(n===detailSeq.current)setDetailError((e as Error).message);}},[]);
+ useEffect(()=>{if(!initialTaskId)return;const timer=setTimeout(()=>void openTask(initialTaskId),0);return()=>clearTimeout(timer);},[initialTaskId,openTask]);
  const mutate=async(body:unknown)=>{setBusy(true);try{const r=await api(body);toast.success('Амжилттай хадгаллаа');void load();if(detailId)await openTask(detailId);return r;}catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}};
  const overdue=(t:ItTask)=>!!t.due_at&&t.due_at<new Date().toISOString()&&!itClosed.includes(t.status);
  const ownerName=(email:string)=>members.find(m=>m.email===email)?.name||email;
