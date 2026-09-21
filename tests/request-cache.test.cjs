@@ -1,0 +1,26 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+const mod={exports:{}};
+new Function('module','exports',ts.transpileModule(fs.readFileSync('lib/request-cache.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(mod,mod.exports);
+const {RequestCache}=mod.exports;
+(async()=>{
+ let now=0,calls=0;
+ const cache=new RequestCache('owner',30,2,()=>now),fetcher=async()=>({version:++calls});
+ const [a,b]=await Promise.all([cache.read('September',fetcher),cache.read('September',fetcher)]);
+ assert.equal(calls,1);assert.equal(a,b);
+ now=29;assert.equal((await cache.read('September',fetcher)).version,1);
+ now=30;assert.equal((await cache.read('September',fetcher)).version,2);
+ cache.invalidate();assert.equal(cache.peek('September'),null);
+ let finish;
+ const old=cache.read('September',()=>new Promise(resolve=>{finish=resolve;}));await Promise.resolve();
+ cache.invalidate();const fresh=await cache.read('September',fetcher);finish({version:-1});await old;
+ assert.equal(cache.peek('September'),fresh,'late pre-mutation response must not repopulate cache');
+ const other=new RequestCache('agent',30,2,()=>now);
+ assert.equal(other.peek('September'),null,'identities must not share cache');
+ await assert.rejects(other.read('September',async()=>{throw new Error('403');}));
+ assert.equal(other.peek('September'),null);
+ assert.equal((await other.read('September',fetcher)).version,4,'failed requests must remain retryable');
+ await cache.read('August',fetcher);await cache.read('July',fetcher);
+ assert.equal(cache.peek('September'),null,'bounded cache evicts old months');
+ assert.ok(cache.peek('August'));assert.ok(cache.peek('July'));
+ console.log('PASS: request deduplication, TTL expiry, mutation invalidation, late responses, identity isolation, failures and bounded eviction.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

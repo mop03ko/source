@@ -14,7 +14,7 @@ const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true
 execFileSync(process.execPath,['scripts/migrate.mjs'],{env,stdio:'pipe'});
 const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','34675'],{env,stdio:'ignore',windowsHide:true});
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
-let chrome,ws;const evidence={checks:{},screens:[],errors:[]};
+let chrome,ws;const evidence={checks:{},screens:[],errors:[],scheduleReads:[]};
 try{
  for(let i=0;i<80;i++){try{await fetch(base+'/login',{signal:AbortSignal.timeout(1000)});break;}catch{await pause(150);}}
  const token=await encode({secret,salt:'authjs.session-token',token:{sub:'google:owner',email:'owner@example.test',name:'Inventory test'},maxAge:3600});
@@ -30,7 +30,7 @@ try{
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
  let sequence=0;const pending=new Map();
  const cdp=(method,params={})=>new Promise((r,j)=>{const id=++sequence,t=setTimeout(()=>{pending.delete(id);j(new Error('CDP timeout: '+method));},30000);pending.set(id,{resolve:v=>{clearTimeout(t);r(v);},reject:e=>{clearTimeout(t);j(e);}});ws.send(JSON.stringify({id,method,params}));});
- ws.onmessage=event=>{const v=JSON.parse(event.data);if(v.id){const p=pending.get(v.id);if(p){pending.delete(v.id);v.error?p.reject(new Error(v.error.message)):p.resolve(v.result);}}else if(v.method==='Runtime.exceptionThrown')evidence.errors.push(v.params.exceptionDetails.exception?.description||v.params.exceptionDetails.text);else if(v.method==='Page.javascriptDialogOpening')void cdp('Page.handleJavaScriptDialog',{accept:true});};
+ ws.onmessage=event=>{const v=JSON.parse(event.data);if(v.id){const p=pending.get(v.id);if(p){pending.delete(v.id);v.error?p.reject(new Error(v.error.message)):p.resolve(v.result);}}else if(v.method==='Network.requestWillBeSent'&&v.params.request.method==='GET'&&v.params.request.url.includes('/api/schedule?'))evidence.scheduleReads.push({url:v.params.request.url,time:Date.now()});else if(v.method==='Runtime.exceptionThrown')evidence.errors.push(v.params.exceptionDetails.exception?.description||v.params.exceptionDetails.text);else if(v.method==='Page.javascriptDialogOpening')void cdp('Page.handleJavaScriptDialog',{accept:true});};
  const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.result.description);return r.result.value;};
  const wait=async(expression)=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await pause(150);}evidence.lastBody=await evaluate('document.body.innerText');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,'failure.png'),Buffer.from(shot.data,'base64'));throw new Error('UI wait timed out: '+expression);};
  const click=async(text,selector='button')=>{await evaluate(`(()=>{const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.textContent.trim()===${JSON.stringify(text)});if(!e)throw new Error('Missing button: '+${JSON.stringify(text)});e.click();})()`);await pause(300);};
@@ -41,6 +41,32 @@ try{
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
  await cdp('Page.navigate',{url:base+'/?view=schedule&month=2026-09'});
  await wait("!!document.querySelector('.schedule-grid')");
+ await pause(1000);
+ assert.equal(evidence.scheduleReads.length,1,'initial Sheets sync must not reload schedule');
+ assert.equal(await evaluate("[...document.querySelectorAll('.nav-button')].filter(e=>e.textContent.includes('Баг ба хуваарь')).length"),1);
+ assert.equal(await evaluate("[...document.querySelectorAll('.nav-button')].filter(e=>e.textContent.includes('Ажлын хуваарь')).length"),0);
+ const tab=async key=>{await evaluate(`document.querySelector('.team-workspace-tabs [data-node-key="${key}"] [role=tab]').click()`);await pause(400);};
+ await tab('team');assert.ok(await evaluate("location.search.includes('view=team')"));assert.equal(await evaluate("document.querySelectorAll('.schedule-panel').length"),0);
+ await tab('schedule');await wait("!!document.querySelector('.schedule-grid')");
+ assert.equal(evidence.scheduleReads.length,1,'returning to a fresh month must reuse its cache');
+ await evaluate('history.back()');await pause(400);assert.ok(await evaluate("location.search.includes('view=team')"));
+ await evaluate('history.forward()');await pause(400);await wait("!!document.querySelector('.schedule-grid')");
+ assert.equal(evidence.scheduleReads.length,1);
+ console.log('PASS: initial read, grouped tabs, browser history and fresh cache reuse. Waiting for the Sheets polling boundary.');
+ await pause(31_000);
+ assert.equal(evidence.scheduleReads.length,1,'30-second Sheets poll must not reload schedule');
+ // Force a slow manual response and verify the existing grid stays mounted while refreshing.
+ await evaluate("window.auditOriginalFetch=window.fetch;window.fetch=async(...args)=>{const r=await window.auditOriginalFetch(...args);if(String(args[0]).startsWith('/api/schedule?'))await new Promise(resolve=>setTimeout(resolve,700));return r;};window.auditGrid=document.querySelector('.schedule-grid');document.querySelector('.head-actions button').click()");
+ await pause(250);assert.equal(await evaluate("window.auditGrid===document.querySelector('.schedule-grid')"),true);
+ await pause(1000);assert.equal(evidence.scheduleReads.length,2,'manual refresh must fetch once');
+ await evaluate('window.fetch=window.auditOriginalFetch');
+ evidence.checks.scheduleFetches={initial:1,afterTabsAndSheetsPoll:1,afterManualRefresh:2,gridPreserved:true};
+ console.log('PASS: Sheets polling no longer reloads schedule; manual refresh retains the grid.');
+ await evaluate("window.fetch=(...args)=>String(args[0]).startsWith('/api/schedule?')?Promise.resolve(new Response(JSON.stringify({error:'Test permission revoked'}),{status:403,headers:{'Content-Type':'application/json'}})):window.auditOriginalFetch(...args);document.querySelector('.head-actions button').click()");
+ await wait("!!document.querySelector('.schedule-panel [role=alert]')");
+ assert.equal(await evaluate("!!document.querySelector('.schedule-grid')"),false,'permission denial must clear previously cached rows');
+ await evaluate("window.fetch=window.auditOriginalFetch;document.querySelector('.schedule-panel [role=alert] button').click()");
+ await wait("!!document.querySelector('.schedule-grid')");evidence.checks.permissionDenialClearsCachedRows=true;
  await fill('.schedule-date input[type=date]','2026-09-21');
  await snap('01-month-desktop');
  assert.equal(await evaluate("document.querySelectorAll('.schedule-grid tbody tr').length"),4);
@@ -77,6 +103,6 @@ try{
  await click('Томилгоо нэмэх');await wait("!!document.querySelector('input[name=day]')");assert.equal(await evaluate("document.querySelector('input[name=day]').value"),'2026-08-01');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(400);
  await evaluate("document.querySelector('button[aria-label=\"Өмнөх сар\"]').click()");await wait("!!document.querySelector('.schedule-empty')");await snap('08-empty-month');
  assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));
- evidence.checks={filters:true,monthlyAndDaily:true,mobile320:true,preservedNote:true,conditionalMoveDate:true,rejectionValidation:true,approvalUpdatesShift:true,toolbarRefresh:true,monthUrlReload:true,selectedMonthAddDate:true,runtimeErrors:0};
+ evidence.checks={...evidence.checks,filters:true,monthlyAndDaily:true,mobile320:true,preservedNote:true,conditionalMoveDate:true,rejectionValidation:true,approvalUpdatesShift:true,toolbarRefresh:true,monthUrlReload:true,selectedMonthAddDate:true,runtimeErrors:0};
  console.log('PASS: schedule month/day UI, filters, mobile layouts, notes, request decisions and URL persistence.');
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

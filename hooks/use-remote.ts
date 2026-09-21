@@ -1,11 +1,13 @@
 'use client';
 import {useCallback,useEffect,useState} from 'react';
 
+export class RemoteError extends Error{constructor(message:string,readonly status:number){super(message);}}
+
 export async function readJson<T>(url:string,signal?:AbortSignal):Promise<T>{
  const timeout=AbortSignal.timeout(20000);
  const response=await fetch(url,{cache:'no-store',signal:signal?AbortSignal.any([signal,timeout]):timeout}).catch(error=>{if(signal?.aborted)throw error;throw new Error(timeout.aborted?'Хүлээлгийн хугацаа дууслаа. Дахин оролдоно уу.':'Сервертэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.');});
  const value=await response.json();
- if(!response.ok)throw new Error(response.status===401?'Нэвтрэх хугацаа дууссан. Дахин нэвтэрнэ үү.':value.error||'Мэдээлэл ачаалж чадсангүй. Дахин оролдоно уу.');
+ if(!response.ok)throw new RemoteError(response.status===401?'Нэвтрэх хугацаа дууссан. Дахин нэвтэрнэ үү.':value.error||'Мэдээлэл ачаалж чадсангүй. Дахин оролдоно уу.',response.status);
  return value as T;
 }
 export function useRemote<T>(url:string|null){

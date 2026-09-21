@@ -10,7 +10,8 @@ import {Field} from '@/components/form-field';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
-import {useRemote} from '@/hooks/use-remote';
+import {useCachedRemote} from '@/hooks/use-cached-remote';
+import type {RequestCache} from '@/lib/request-cache';
 import {toast} from '@/components/ui/sonner';
 import {shiftAssignments,shiftOff,shiftIsWork,shiftRequestKinds,shiftRequestStatuses,requestDateLabel,type WorkShift,type ShiftRequest} from '@/lib/crm';
 type Data={month:string;shifts:WorkShift[];requests:ShiftRequest[];people:{person_name:string;member_email:string|null;days:number}[];can_manage:boolean;scoped?:boolean;me:{name:string;email:string;names:string[]}};
@@ -23,7 +24,7 @@ const shiftMonth=(m:string,delta:number)=>{const [y,mo]=m.split('-').map(Number)
 function monthDays(month:string){const [y,mo]=month.split('-').map(Number);const out:string[]=[];const last=new Date(Date.UTC(y,mo,0)).getUTCDate();for(let d=1;d<=last;d++)out.push(`${month}-${String(d).padStart(2,'0')}`);return out;}
 const weekdayOf=(day:string)=>WEEKDAYS[new Date(day+'T00:00:00Z').getUTCDay()];
 const isWeekend=(day:string)=>[0,6].includes(new Date(day+'T00:00:00Z').getUTCDay());
-export default function SchedulePanel({month,onMonthChange,refresh=0}:{month:string;onMonthChange:(month:string)=>void;refresh?:number}){
+export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{month:string;onMonthChange:(month:string)=>void;cache:RequestCache;refresh?:number}){
  const setMonth=onMonthChange;
  const mobile=useIsMobile(),gridRef=useRef<HTMLDivElement>(null);
  const [layout,setLayout]=useState<'auto'|'month'|'day'>('auto');
@@ -34,13 +35,13 @@ export default function SchedulePanel({month,onMonthChange,refresh=0}:{month:str
  const [requestStatus,setRequestStatus]=useState('pending'),[requestKind,setRequestKind]=useState('leave');
  const [decision,setDecision]=useState<{request:ShiftRequest;approve:boolean}|null>(null);
  const [mode,setMode]=useState<'grid'|'requests'>('grid');
- const [revision,setRevision]=useState(0),[busy,setBusy]=useState(false);
+ const [busy,setBusy]=useState(false);
  const [cell,setCell]=useState<{person:string;day:string;email:string|null;assignment:string;note:string}|null>(null);
  const [addOpen,setAddOpen]=useState(false);
- const data=useRemote<Data>('/api/schedule?'+new URLSearchParams({month,revision:String(revision),refresh:String(refresh)}));
+ const data=useCachedRemote<Data>('/api/schedule?'+new URLSearchParams({month}),cache,refresh);
  const d=data.data;
  const days=monthDays(month);
- useEffect(()=>{const grid=gridRef.current,header=grid?.querySelector('thead .schedule-selected');if(!daily&&d&&grid&&header)grid.scrollLeft+=header.getBoundingClientRect().left-grid.getBoundingClientRect().left-grid.clientWidth/2+header.clientWidth/2;},[daily,selectedDay,d]);
+ useEffect(()=>{const grid=gridRef.current,header=grid?.querySelector('thead .schedule-selected');if(!daily&&grid&&header)grid.scrollLeft+=header.getBoundingClientRect().left-grid.getBoundingClientRect().left-grid.clientWidth/2+header.clientWidth/2;},[daily,selectedDay,data.loading]);
  const byPerson=new Map<string,Map<string,WorkShift>>();
  for(const s of d?.shifts||[]){if(!byPerson.has(s.person_name))byPerson.set(s.person_name,new Map());byPerson.get(s.person_name)!.set(s.day,s);}
  const people=[...byPerson.keys()].sort((a,b)=>a.localeCompare(b,'mn'));
@@ -58,7 +59,7 @@ export default function SchedulePanel({month,onMonthChange,refresh=0}:{month:str
    const j=await r.json() as {error?:string;fieldErrors?:Record<string,string>};
    const form=document.activeElement?.closest('form')||null;
    if(!r.ok){markFormError(form,j.error||'Хүсэлт амжилтгүй.',j.fieldErrors);throw new Error(j.error||'Хүсэлт амжилтгүй.');}
-   markFormSaved(form);setRevision(v=>v+1);toast.success('Амжилттай.');return j;
+   markFormSaved(form);data.retry();toast.success('Амжилттай.');return j;
   }catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}
  };
  // Тухайн өдрийн байршил тус бүрийн хүний тоо — доод мөрөнд хамралтыг харуулна.
@@ -73,7 +74,7 @@ export default function SchedulePanel({month,onMonthChange,refresh=0}:{month:str
  <div className="schedule-navigation"><div className="view-toggle" aria-label="Хуваарийн хэсэг"><Button variant={mode==='grid'?'default':'outline'} aria-pressed={mode==='grid'} onClick={()=>setMode('grid')}><CalendarDays size={16}/>Хуваарь</Button><Button variant={mode==='requests'?'default':'outline'} aria-pressed={mode==='requests'} onClick={()=>setMode('requests')}><Inbox size={16}/>Хүсэлт {pending.length>0&&<span className="schedule-count">{pending.length}</span>}</Button></div><p>{d?.can_manage?'Томилгоог засахын тулд ажилтны өдрийг сонгоно уу.':'Өөрийн ажлын өдрийг сонгож чөлөө, өдөр шилжүүлэх хүсэлт гаргана.'}</p></div>
  <AsyncStatus error={data.error} loading={data.loading} retry={data.retry}/>
  {d?.scoped&&<p className="muted text-sm" style={{padding:'0 4px 8px'}}>Танд зөвхөн өөрийн хуваарь харагдана. Чөлөө авах, өдөр шилжүүлэх хүсэлтээ нүд дээрээ дарж гаргана уу.</p>}
- {d&&!data.error&&<>
+ {d&&<>
  <div className="schedule-filters"><Input aria-label="Хуваарьт ажилтан хайх" placeholder="Ажилтны нэрээр хайх…" value={query} onChange={e=>setQuery(e.target.value)}/><Button variant={onlyMine?'default':'outline'} aria-pressed={onlyMine} onClick={()=>setOnlyMine(v=>!v)}><Users size={16}/>Миний хуваарь</Button>
  {mode==='grid'?<><SelectControl aria-label="Томилгоогоор шүүх" value={location} onChange={e=>setLocation(e.target.value)}><option value="">Бүх томилгоо</option>{shiftAssignments.map(a=><option key={a}>{a}</option>)}</SelectControl><div className="view-toggle schedule-layout"><Button variant={!daily?'default':'outline'} aria-pressed={!daily} onClick={()=>setLayout('month')}>Сараар</Button><Button variant={daily?'default':'outline'} aria-pressed={daily} onClick={()=>setLayout('day')}>Өдрөөр</Button></div></>:<SelectControl aria-label="Хүсэлтийн төлөв" value={requestStatus} onChange={e=>setRequestStatus(e.target.value)}><option value="">Бүх хүсэлт</option>{Object.entries(shiftRequestStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>}
  {(query||onlyMine||location)&&<Button variant="link" onClick={()=>{setQuery('');setOnlyMine(false);setLocation('');}}>Шүүлтүүр цэвэрлэх</Button>}</div>

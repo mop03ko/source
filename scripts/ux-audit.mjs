@@ -139,7 +139,9 @@ try{
  await click('Цуцлах','[role=dialog] button');
  assert.equal(await evaluate("document.querySelectorAll('.sms-rule-row').length"),ruleCount);
  await evaluate("document.querySelector('.sms-rule-row button[aria-label$=\"устгах\"]').click()");await pause(150);
- await click('Тийм, дүрмийг устгах');assert.equal(await evaluate("document.querySelectorAll('.sms-rule-row').length"),ruleCount-1);
+ await click('Тийм, дүрмийг устгах');
+ for(let i=0;i<30;i++){if(await evaluate("document.querySelectorAll('.sms-rule-row').length")===ruleCount-1)break;await pause(150);}
+ assert.equal(await evaluate("document.querySelectorAll('.sms-rule-row').length"),ruleCount-1);
  evidence.checks.smsExplicitSaveAndDelete=true;
  await click('Профайл','[role=tab]');
  await click('Ажилтны чат','.nav-button');await snap('09-chat-desktop');
