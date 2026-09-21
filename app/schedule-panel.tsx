@@ -127,64 +127,101 @@ export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{mon
    onDone={(written:number,skipped:number)=>{setPlanOpen(false);data.retry();toast.success(`${written} өдрийн томилгоо бүртгэв.`+(skipped?` ${skipped} нүд аль хэдийн томилгоотой тул хөндөөгүй.`:''));}}/>}
  </section>;
 }
-const PLAN_WEEKDAYS=[{value:1,label:'Да'},{value:2,label:'Мя'},{value:3,label:'Лх'},{value:4,label:'Пү'},{value:5,label:'Ба'},{value:6,label:'Бя'},{value:0,label:'Ня'}];
-type PlanRow={person:string;email:string|null;include:boolean;assignment:string;rest:number[]};
-// Шинэ сарын хуваарь: ажилтан тус бүрийн томилгоо, амрах гарагийг сонгоод бүтэн сарыг нэг дор тавина.
-// Хувиарлалт нь хүн тус бүрээр өөр байдаг тул хадгалсны дараа нүд тус бүрийг гараар тааруулна.
+const PLAN_WEEKDAYS=['Ня','Да','Мя','Лх','Пү','Ба','Бя'];
+type PlanRow={person:string;email:string|null;include:boolean;assignment:string;rest:string[]};
+// Шинэ сарын хуваарь. Ажилчид тогтмол гарагаар амардаггүй (зарим нь Бя/Ня, зарим нь 5/2 мөчлөгөөр
+// гарагаас хамаарахгүй шилждэг, зарим нь жигд бус) тул амрах өдрийг нүдэн дээр дарж шууд сонгоно.
+// Түргэн товчнууд нь зөвхөн эхлэлийг тавина — дараа нь өдөр тус бүрийг дарж тааруулна.
 function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;onClose:()=>void;month:string;people:{person_name:string;member_email:string|null}[];shifts:WorkShift[];onDone:(written:number,skipped:number)=>void}){
  const [target,setTarget]=useState(()=>shiftMonth(month,1));
  const [rows,setRows]=useState<PlanRow[]>([]);
  const [busy,setBusy]=useState(false),[loaded,setLoaded]=useState('');
- // Диалог нээгдэх/сар солигдох үед ажилтны жагсаалтыг одоогийн хуваарийн томилгоогоор урьдчилж бөглөнө.
+ const days=monthDays(target);
+ const weekday=(day:string)=>new Date(day+'T00:00:00Z').getUTCDay();
+ const isWeekend=(day:string)=>[0,6].includes(weekday(day));
  useEffect(()=>{
   if(!open)return;
   const key=month+'|'+target;
   if(loaded===key)return;
-  const common=new Map<string,string>();
-  for(const s of shifts)if(shiftIsWork(s.assignment))common.set(s.person_name,(common.get(s.person_name)===undefined||common.get(s.person_name)===s.assignment)?s.assignment:common.get(s.person_name)!);
-  setRows(people.map(p=>({person:p.person_name,email:p.member_email,include:true,assignment:common.get(p.person_name)||shiftAssignments[0],rest:[6,0]})));
+  // Томилгоог одоогийн сард хамгийн олон тохиолдсоноор нь урьдчилж сонгоно.
+  const seen=new Map<string,Map<string,number>>();
+  for(const shift of shifts)if(shiftIsWork(shift.assignment)){
+   if(!seen.has(shift.person_name))seen.set(shift.person_name,new Map());
+   const tally=seen.get(shift.person_name)!;tally.set(shift.assignment,(tally.get(shift.assignment)||0)+1);
+  }
+  setRows(people.map(person=>{
+   const tally=[...(seen.get(person.person_name)||new Map<string,number>()).entries()].sort((a,b)=>b[1]-a[1]);
+   return {person:person.person_name,email:person.member_email,include:true,
+    assignment:tally[0]?.[0]||shiftAssignments[0],rest:monthDays(target).filter(day=>[0,6].includes(new Date(day+'T00:00:00Z').getUTCDay()))};
+  }));
   setLoaded(key);
  },[open,month,target,people,shifts,loaded]);
- const days=monthDays(target);
  const update=(person:string,patch:Partial<PlanRow>)=>setRows(list=>list.map(r=>r.person===person?{...r,...patch}:r));
- const toggleRest=(person:string,weekday:number)=>setRows(list=>list.map(r=>r.person!==person?r:{...r,rest:r.rest.includes(weekday)?r.rest.filter(v=>v!==weekday):[...r.rest,weekday]}));
- const countWork=(r:PlanRow)=>days.filter(day=>!r.rest.includes(new Date(day+'T00:00:00Z').getUTCDay())).length;
+ const toggleDay=(person:string,day:string)=>setRows(list=>list.map(r=>r.person!==person?r:{...r,rest:r.rest.includes(day)?r.rest.filter(v=>v!==day):[...r.rest,day]}));
+ // Баганын толгойг дарахад тухайн өдөр бүх сонгосон ажилтанд ажил ↔ амралт болно (нийтийн амралт).
+ const toggleColumn=(day:string)=>setRows(list=>{
+  const active=list.filter(r=>r.include);
+  const allRest=active.length>0&&active.every(r=>r.rest.includes(day));
+  return list.map(r=>!r.include?r:{...r,rest:allRest?r.rest.filter(v=>v!==day):[...new Set([...r.rest,day])]});
+ });
+ // 5 ажил / 2 амралт мөчлөг: гарагаас хамаарахгүй, сарын эхний өдрөөс тоолно.
+ const rotation=(person:string)=>update(person,{rest:days.filter((_,i)=>i%7>=5)});
  const chosen=rows.filter(r=>r.include);
  const save=async()=>{
   if(!chosen.length){toast.error('Дор хаяж нэг ажилтан сонгоно уу.');return;}
   setBusy(true);
   try{
    const entries=chosen.map(r=>({person_name:r.person,member_email:r.email,
-    days:days.map(day=>({day,assignment:r.rest.includes(new Date(day+'T00:00:00Z').getUTCDay())?'Амралт':r.assignment}))}));
+    days:days.map(day=>({day,assignment:r.rest.includes(day)?'Амралт':r.assignment}))}));
    const res=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'plan_month',data:{month:target,entries}})});
-   const j=await res.json() as {error?:string;written?:number;skipped?:number};
-   if(!res.ok)throw new Error(j.error||'Хадгалж чадсангүй.');
-   onDone(j.written||0,j.skipped||0);
+   const value=await res.json() as {error?:string;written?:number;skipped?:number};
+   if(!res.ok)throw new Error(value.error||'Хадгалж чадсангүй.');
+   onDone(value.written||0,value.skipped||0);
   }catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
  };
  return <Dialog open={open} onOpenChange={o=>{if(!o)onClose();}}><DialogContent className="form-dialog schedule-planner">
-  <DialogHeader><DialogTitle>Шинэ сарын хуваарь төлөвлөх</DialogTitle><DialogDescription>Ажилтан тус бүрийн томилгоо, амрах гарагийг сонгоход бүтэн сар бүрдэнэ. Аль хэдийн томилгоотой нүдийг хөндөхгүй — хадгалсны дараа нүд тус бүрийг гараар тааруулж болно.</DialogDescription></DialogHeader>
+  <DialogHeader><DialogTitle>Шинэ сарын хуваарь төлөвлөх</DialogTitle><DialogDescription>Амрах өдрийг нүдэн дээр дарж сонгоно — саарал нь амралт, цэнхэр нь ажлын өдөр. Баганын толгойг дарвал тэр өдөр бүх ажилтанд нэгэн зэрэг солигдоно. Аль хэдийн томилгоотой нүдийг хөндөхгүй.</DialogDescription></DialogHeader>
   <div className="form-stack">
    <div className="form-grid">
     <Field label="Төлөвлөх сар *"><Input type="month" value={target} onChange={e=>{setTarget(e.target.value||target);setLoaded('');}}/></Field>
-    <Field label="Сонгосон ажилтан"><Input value={`${chosen.length} / ${rows.length}`} disabled/></Field>
+    <Field label="Сонгосон ажилтан"><Input value={chosen.length+' / '+rows.length} disabled/></Field>
    </div>
    {!rows.length&&<p className="muted">Одоогийн сард хуваарьтай ажилтан байхгүй тул төлөвлөх хүн алга. "Томилгоо нэмэх"-ээр ажилтан бүртгэнэ үү.</p>}
-   {!!rows.length&&<div className="table-scroll"><table className="schedule-plan-table" style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
-    <thead><tr>
-     <th style={{textAlign:'left',padding:'6px 8px'}}>Ажилтан</th>
-     <th style={{textAlign:'left',padding:'6px 8px',minWidth:140}}>Томилгоо</th>
-     <th style={{textAlign:'left',padding:'6px 8px'}}>Амрах гараг</th>
-     <th style={{padding:'6px 8px'}}>Ажил / Амралт</th>
-    </tr></thead>
-    <tbody>{rows.map(r=><tr key={r.person} style={{opacity:r.include?1:0.45}}>
-     <td style={{padding:'4px 8px'}}><label className="row" style={{gap:6}}><input type="checkbox" checked={r.include} onChange={e=>update(r.person,{include:e.target.checked})} aria-label={r.person+' оруулах'}/><strong>{r.person}</strong></label></td>
-     <td style={{padding:'4px 8px'}}><SelectControl aria-label={r.person+' томилгоо'} value={r.assignment} onChange={e=>update(r.person,{assignment:e.target.value})} disabled={!r.include}>{shiftAssignments.filter(a=>shiftIsWork(a)).map(a=><option key={a} value={a}>{a}</option>)}</SelectControl></td>
-     <td style={{padding:'4px 8px'}}><div className="row" style={{gap:4,flexWrap:'wrap'}}>{PLAN_WEEKDAYS.map(w=><Button key={w.value} type="button" size="sm" disabled={!r.include} variant={r.rest.includes(w.value)?'default':'outline'} className={r.rest.includes(w.value)?'primary':''} onClick={()=>toggleRest(r.person,w.value)}>{w.label}</Button>)}</div></td>
-     <td style={{padding:'4px 8px',textAlign:'center',whiteSpace:'nowrap'}}><strong>{countWork(r)}</strong> / {days.length-countWork(r)}</td>
-    </tr>)}</tbody>
-   </table></div>}
-   <Button className="primary full" disabled={busy||!chosen.length} onClick={save}>{busy?<Loader2 className="spin" size={16}/>:<CalendarPlus size={16}/>}{`${target} сарын хуваарь бүртгэх`}</Button>
+   {!!rows.length&&<div className="table-scroll" style={{overflowX:'auto'}}>
+    <table style={{borderCollapse:'collapse',fontSize:12,whiteSpace:'nowrap'}}>
+     <thead><tr>
+      <th style={{position:'sticky',left:0,background:'var(--background,#fff)',textAlign:'left',padding:'6px 8px',minWidth:150,zIndex:1}}>Ажилтан</th>
+      <th style={{textAlign:'left',padding:'6px 8px',minWidth:130}}>Томилгоо</th>
+      <th style={{padding:'6px 8px'}}>Түргэн</th>
+      {days.map(day=><th key={day} style={{padding:'2px 1px',minWidth:26,textAlign:'center'}}>
+       <button type="button" onClick={()=>toggleColumn(day)} title={day+' — бүх ажилтанд солих'} style={{border:0,background:'transparent',font:'inherit',cursor:'pointer',padding:2,lineHeight:1.15,opacity:isWeekend(day)?0.6:1}}>
+        <div>{PLAN_WEEKDAYS[weekday(day)]}</div><div>{Number(day.slice(8))}</div>
+       </button></th>)}
+      <th style={{padding:'6px 8px'}}>Ажил/Амр</th>
+     </tr></thead>
+     <tbody>{rows.map(r=>{
+      const work=days.length-r.rest.length;
+      return <tr key={r.person} style={{opacity:r.include?1:0.45}}>
+       <td style={{position:'sticky',left:0,background:'var(--background,#fff)',padding:'4px 8px',zIndex:1}}><label className="row" style={{gap:6}}><input type="checkbox" checked={r.include} onChange={e=>update(r.person,{include:e.target.checked})} aria-label={r.person+' оруулах'}/><strong>{r.person}</strong></label></td>
+       <td style={{padding:'4px 8px'}}><SelectControl aria-label={r.person+' томилгоо'} value={r.assignment} onChange={e=>update(r.person,{assignment:e.target.value})} disabled={!r.include}>{shiftAssignments.filter(a=>shiftIsWork(a)).map(a=><option key={a} value={a}>{a}</option>)}</SelectControl></td>
+       <td style={{padding:'4px 6px'}}><div className="row" style={{gap:3}}>
+        <Button type="button" size="sm" variant="outline" disabled={!r.include} onClick={()=>update(r.person,{rest:days.filter(isWeekend)})} title="Бямба, Ням амраах">Бя+Ня</Button>
+        <Button type="button" size="sm" variant="outline" disabled={!r.include} onClick={()=>rotation(r.person)} title="5 ажил / 2 амралт мөчлөг, сарын эхнээс">5/2</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={!r.include} onClick={()=>update(r.person,{rest:[]})} title="Бүх өдөр ажил">Цэвэр</Button>
+       </div></td>
+       {days.map(day=>{const off=r.rest.includes(day);
+        return <td key={day} style={{padding:0,border:'1px solid rgba(0,0,0,.08)'}}>
+         <button type="button" disabled={!r.include} onClick={()=>toggleDay(r.person,day)}
+          title={r.person+' · '+day+' · '+(off?'Амралт':r.assignment)}
+          aria-label={r.person+' '+day+' '+(off?'амралт':'ажил')}
+          style={{width:'100%',minHeight:24,border:0,cursor:r.include?'pointer':'default',font:'inherit',fontSize:11,
+           background:off?'#eceff1':'#e8f1ff',color:off?'#78909c':'#1d4ed8'}}>{off?'а':'•'}</button>
+        </td>;})}
+       <td style={{padding:'4px 8px',textAlign:'center',whiteSpace:'nowrap'}}><strong>{work}</strong> / {r.rest.length}</td>
+      </tr>;})}</tbody>
+    </table>
+   </div>}
+   <Button className="primary full" disabled={busy||!chosen.length} onClick={save}>{busy?<Loader2 className="spin" size={16}/>:<CalendarPlus size={16}/>}{target+' сарын хуваарь бүртгэх'}</Button>
   </div>
  </DialogContent></Dialog>;
 }
