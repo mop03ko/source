@@ -5,6 +5,7 @@ import {cents,safeTotal,stockAt,withdrawal,movement,money,quantity} from '@/lib/
 import {sendSms} from '@/lib/sms';
 import type {DatabaseSession} from '@/lib/database';
 import {z} from 'zod';
+import {unitsSchema,saveUnits} from '@/lib/serials';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
 const db=()=>env.DB;
@@ -26,14 +27,15 @@ const input=z.object({
  item_id:z.string().min(1).max(80),warehouse_id:z.string().min(1).max(80),qty:quantity,unit_price:money,
  platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),
  commission_rate:z.number().finite().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),
- sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default(''),
+ sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default(''),units:unitsSchema,
 });
 export async function GET(req:Request){try{
  const m=await member();access(m);
  const id=z.string().min(1).max(80).parse(new URL(req.url).searchParams.get('id'));
  await leadFor(db(),id,m);
  const purchase=await db().prepare('SELECT s.id,s.lead_id,s.item_id,s.warehouse_id,s.qty,s.unit_price,s.total_price,s.sold_at,s.created_by,s.platform,s.bill_number,i.name item_name,i.code item_code,i.imei,w.name warehouse_name FROM inventory_sales s JOIN inventory_items i ON i.id=s.item_id JOIN inventory_warehouses w ON w.id=s.warehouse_id WHERE s.lead_id=?').bind(id).first();
- return Response.json({purchase},{headers:{'Cache-Control':'no-store'}});
+ const units=purchase?await db().prepare("SELECT * FROM inventory_units WHERE source='lead_purchase' AND ref_id=? ORDER BY created_at").bind((purchase as {id:string}).id).all():null;
+ return Response.json({purchase,units:units?.results||[]},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return error(e);}}
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -64,6 +66,7 @@ export async function POST(req:Request){try{
   await movement(d,{item:item.id,warehouse:b.warehouse_id,kind:'sale',qty:-b.qty,value:-cost,estimated:stock.cost_estimated,ref:saleId,actor:m.email,at,note:`Зээлийн хүсэлт ${lead.id}: ${b.note}`});
   await d.prepare('INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),lead.id,lead.phone,'update',`Худалдан авалт баталгаажуулав: ${item.name} (${item.code}), ${warehouse.name}, ${b.qty} ш, нийт ${total/100} ₮. Борлуулалт: ${saleId}`,m.email,now).run();
   const response={ok:true,id:saleId,lead_id:lead.id};
+  await saveUnits(d,{source:'lead_purchase',refId:saleId,itemId:item.id,leadId:lead.id,customerPhone:lead.phone,actor:m.email,at:now},b.units);
   await d.prepare('INSERT INTO inventory_requests(id,action,payload,response,created_at) VALUES(?,?,?,?,?)').bind(request_id,'confirm_lead_purchase',payload,JSON.stringify(response),now).run();
   return {response,notify:lead.status!=='won',lead};
  });

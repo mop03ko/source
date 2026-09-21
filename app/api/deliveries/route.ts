@@ -2,6 +2,7 @@ import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
 import {deliveryStatuses,deliveryDone,canSeeDeliveries,isCourierOnly,shiftOff,personKey,type Member,type Delivery} from '@/lib/crm';
+import {unitsSchema,saveUnits,duplicateUnits,duplicateWarning} from '@/lib/serials';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 // Маркетинг, IT хоёул хүргэлтэд хамааралгүй тул хаана. Хүргэгч (delivery) зөвхөн өөрийн хүргэлтээ
@@ -13,6 +14,7 @@ const deliverySchema=z.object({
  delivered_on:day,
  kind:z.string().trim().max(60).default(''),
  item_id:z.string().trim().max(80).nullish(),
+ units:unitsSchema,
  item_info:z.string().trim().max(400).default(''),
  customer_phone:z.string().trim().max(120).default(''),
  address:z.string().trim().max(500).default(''),
@@ -79,7 +81,8 @@ export async function GET(req:Request){try{
   const row=await db().prepare('SELECT d.*,it.code item_code,it.name item_name,it.brand item_brand FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE d.id=?').bind(id).first<Delivery&{item_code:string|null;item_name:string|null}>();
   if(!row)throw new Failure('Хүргэлт олдсонгүй.',404);
   if(isCourierOnly(m.role)&&!(row.courier_email===m.email||(!row.courier_email&&row.courier_name===m.name)))throw new Failure('Энэ хүргэлтийг харах эрхгүй.',403);
-  return Response.json({delivery:row},{headers:{'Cache-Control':'no-store'}});
+  const units=await db().prepare("SELECT * FROM inventory_units WHERE source='delivery' AND ref_id=? ORDER BY created_at").bind(id).all();
+  return Response.json({delivery:row,units:units.results},{headers:{'Cache-Control':'no-store'}});
  }
  if(url.searchParams.get('report')==='1'){
   const rfrom=url.searchParams.get('rfrom')||'',rto=url.searchParams.get('rto')||'';
@@ -137,7 +140,11 @@ export async function POST(req:Request){try{
   const id=crypto.randomUUID();
   await db().prepare('INSERT INTO deliveries(id,delivered_on,kind,item_id,item_info,customer_phone,address,payment_channel,contents,courier_email,courier_name,entered_by_email,entered_by_name,status,sale_id,lead_id,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
    .bind(id,d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,m.email,m.name,d.status,d.sale_id||null,d.lead_id||null,d.note,m.email,now,now).run();
-  return Response.json({ok:true,id,warning:await scheduleWarning(d.delivered_on,courier.name)});
+  const itemId=await resolveItem(d.item_id);
+  const dupes=await duplicateUnits(db(),{source:'delivery',refId:id},d.units);
+  if(d.units?.length&&!itemId)throw new Failure('Сериал бүртгэхийн тулд агуулахын барааг сонгоно уу.');
+  if(itemId)await saveUnits(db(),{source:'delivery',refId:id,itemId,customerPhone:d.customer_phone,actor:m.email,at:now},d.units);
+  return Response.json({ok:true,id,warning:[await scheduleWarning(d.delivered_on,courier.name),duplicateWarning(dupes)].filter(Boolean).join(' ')});
  }
  if(!b.id||!b.version)throw new Failure('Хүргэлтийн хувилбар дутуу.');
  const row=await getDelivery(b.id);
@@ -157,7 +164,11 @@ export async function POST(req:Request){try{
   const r=await db().prepare('UPDATE deliveries SET delivered_on=?,kind=?,item_id=?,item_info=?,customer_phone=?,address=?,payment_channel=?,contents=?,courier_email=?,courier_name=?,status=?,sale_id=?,lead_id=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?')
    .bind(d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,d.status,d.sale_id||null,d.lead_id||null,d.note,now,row.id,b.version).run();
   if(!r.meta.changes)throw new Failure('Хүргэлт шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
-  return Response.json({ok:true,warning:await scheduleWarning(d.delivered_on,courier.name)});
+  const itemId=await resolveItem(d.item_id);
+  const dupes=await duplicateUnits(db(),{source:'delivery',refId:row.id},d.units);
+  if(d.units?.length&&!itemId)throw new Failure('Сериал бүртгэхийн тулд агуулахын барааг сонгоно уу.');
+  if(itemId)await saveUnits(db(),{source:'delivery',refId:row.id,itemId,customerPhone:d.customer_phone,actor:m.email,at:now},d.units);
+  return Response.json({ok:true,warning:[await scheduleWarning(d.delivered_on,courier.name),duplicateWarning(dupes)].filter(Boolean).join(' ')});
  }
  throw new Failure('Тодорхойгүй үйлдэл.');
 }catch(e){return err(e);}}

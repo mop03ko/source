@@ -18,6 +18,9 @@ type Stats={total:number;done:number;pending:number;failed:number;linked:number}
 type CourierRow={name:string;total:number;done:number;failed:number;cancelled:number;pending:number;last_day:string;active_days:number};
 type Report={total:number;byCourier:CourierRow[];byMonth:{month:string;total:number;done:number}[];byChannel:{channel:string;total:number}[];byKind:{kind:string;total:number}[];byStatus:{status:string;total:number}[];byItem:{name:string;code:string;total:number}[]};
 type Linked=Delivery&{item_code:string|null;item_name:string|null;item_brand:string|null};
+type Unit={id?:string;serial:string;barcode:string;note:string};
+type Found=Unit&{item_name:string;item_code:string;source:string;created_at:string;customer_phone:string;delivered_on:string|null;courier_name:string|null;sold_at:string|null;lead_name:string|null;lead_phone:string|null};
+const sourceLabel:Record<string,string>={delivery:'Хүргэлт',sale:'Агуулахын борлуулалт',lead_purchase:'Зээлийн худалдан авалт'};
 type List={items:Linked[];count:number;stats:Stats;couriers:{name:string;total:number}[];channels:{name:string}[]};
 const todayUB=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 const pct=(n:number,of:number)=>of?Math.round(n/of*100):0;
@@ -25,7 +28,7 @@ const statusClass=(s:string)=>deliveryDone.includes(s)?'stage-won':s==='pending'
 // Хүргэгчийн сонголт: и-мэйлтэй гишүүн бол value=и-мэйл, Excel-ээс импортолсон и-мэйлгүй хуучин нэр бол
 // value='name:<нэр>' — ингэснээр хуучин мөрийг засахад нэр нь хадгалагдана.
 const courierValue=(d?:Delivery)=>!d?'':d.courier_email||'name:'+d.courier_name;
-function DeliveryForm({row,members,legacy,busy,onSubmit}:{row?:Linked;members:Member[];legacy:string[];busy:boolean;onSubmit:(d:unknown)=>unknown}){
+function DeliveryForm({row,units:initialUnits=[],members,legacy,busy,onSubmit}:{row?:Linked;units?:Unit[];members:Member[];legacy:string[];busy:boolean;onSubmit:(d:unknown)=>unknown}){
  // Хүргэж буй барааг агуулахын бүртгэлтэй холбоно. Гэрээ, баримт хүргэх мөрүүд бий тул сонголттой.
  const [day,setDay]=useState(row?.delivered_on||todayUB());
  const [courier,setCourier]=useState(courierValue(row));
@@ -35,11 +38,22 @@ function DeliveryForm({row,members,legacy,busy,onSubmit}:{row?:Linked;members:Me
  const dutyNames=duty.map(x=>x.person_name).join(', ');
  const chosen=members.find(m=>m.email===courier)?.name||(courier.startsWith('name:')?courier.slice(5):'');
  const offDuty=!!chosen&&!!duty.length&&!duty.some(x=>personKey(x.person_name)===personKey(chosen));
+ // Гарсан нэгж бүрийн сериал (IMEI); сериалгүй бараанд баркодыг бичнэ.
+ const [units,setUnits]=useState<Unit[]>(initialUnits.length?initialUnits:[]);
  const [item,setItem]=useState<Item|null>(row?.item_id?{id:row.item_id,code:row.item_code||'',name:row.item_name||'',brand:row.item_brand||''} as Item:null);
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const c=String(f.get('courier')||'');
-  onSubmit({delivered_on:f.get('delivered_on'),kind:f.get('kind'),item_id:item?.id||null,item_info:f.get('item_info'),customer_phone:f.get('customer_phone'),address:f.get('address'),payment_channel:f.get('payment_channel'),contents:f.get('contents'),courier_email:c.startsWith('name:')?null:c,courier_name:c.startsWith('name:')?c.slice(5):'',status:f.get('status'),note:f.get('note')});}}>
+  onSubmit({delivered_on:f.get('delivered_on'),kind:f.get('kind'),item_id:item?.id||null,units:units.filter(u=>u.serial.trim()||u.barcode.trim()),item_info:f.get('item_info'),customer_phone:f.get('customer_phone'),address:f.get('address'),payment_channel:f.get('payment_channel'),contents:f.get('contents'),courier_email:c.startsWith('name:')?null:c,courier_name:c.startsWith('name:')?c.slice(5):'',status:f.get('status'),note:f.get('note')});}}>
  <div className="form-grid"><Field label="Огноо (УБ) *"><Input name="delivered_on" type="date" required value={day} onChange={e=>setDay(e.target.value)}/></Field><Field label="Төрөл"><SelectControl name="kind" defaultValue={row?.kind||'24 цаг'}>{[...new Set([...deliveryKinds,...(row?.kind?[row.kind]:[])])].map(k=><option key={k}>{k}</option>)}</SelectControl></Field></div>
  <ItemPicker value={item} onChange={setItem} warehouse="" label="Агуулахын бараа (сонголттой)"/>
+ {!!item&&<div className="form-stack">
+  <div className="row between"><strong className="text-sm">Гарсан нэгжийн сериал / баркод</strong><Button type="button" variant="outline" size="sm" onClick={()=>setUnits(u=>[...u,{serial:'',barcode:'',note:''}])}><Plus size={14}/>Нэгж нэмэх</Button></div>
+  {!units.length&&<p className="form-help">Сериалтай бараа бол сериалыг, сериалгүй бол баркодыг бүртгээрэй. Дараа нь дугаараар хайж хэн авсныг олно.</p>}
+  {units.map((u,i)=><div className="form-grid" key={i}>
+   <Field label={'Сериал / IMEI '+(i+1)}><Input value={u.serial} maxLength={120} placeholder={item.imei||'351234567890123'} onChange={e=>setUnits(list=>list.map((x,j)=>j===i?{...x,serial:e.target.value}:x))}/></Field>
+   <Field label="Баркод (сериалгүй бол)"><Input value={u.barcode} maxLength={120} onChange={e=>setUnits(list=>list.map((x,j)=>j===i?{...x,barcode:e.target.value}:x))}/></Field>
+   <Button type="button" variant="ghost" size="sm" onClick={()=>setUnits(list=>list.filter((_,j)=>j!==i))}>Хасах</Button>
+  </div>)}
+ </div>}
  <Field label="Барааны нэмэлт тайлбар"><Input name="item_info" maxLength={400} defaultValue={row?.item_info} placeholder="Агуулахын бүртгэлд байхгүй бол гараар бичнэ"/></Field>
  <div className="form-grid"><Field label="Харилцагчийн утас"><Input name="customer_phone" maxLength={120} defaultValue={row?.customer_phone} placeholder="99112233"/></Field><Field label="Төлбөрийн суваг"><Input name="payment_channel" maxLength={60} defaultValue={row?.payment_channel} placeholder="Зөгий, Гэгээн, Storepay…"/></Field></div>
  <Field label="Хаягийн мэдээлэл"><TextareaControl name="address" rows={2} maxLength={500} defaultValue={row?.address} placeholder="Дүүрэг, хороо, байр, орц, тоот…"/></Field>
@@ -52,8 +66,26 @@ function DeliveryForm({row,members,legacy,busy,onSubmit}:{row?:Linked;members:Me
  <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Хадгалах</Button>
  </GuardedForm>;
 }
+// Сериал, баркод эсвэл харилцагчийн утсаар хайж, аль үйлдлээр гарсныг харуулна (баталгаат засварт).
+function SerialSearch({q,onQ}:{q:string;onQ:(v:string)=>void}){
+ const [term,setTerm]=useState(q);
+ const found=useRemote<{items:Found[];count:number}>(term.trim().length>=2?'/api/serials?q='+encodeURIComponent(term.trim()):null);
+ return <>
+ <div className="filters"><div className="search"><Search size={17}/><Input aria-label="Сериал хайх" placeholder="Сериал, IMEI, баркод эсвэл харилцагчийн утас…" value={term} onChange={e=>{setTerm(e.target.value);onQ(e.target.value);}}/></div>{found.loading&&<Loader2 size={17} className="spin muted"/>}</div>
+ {term.trim().length<2&&<p className="muted chat-empty-list">Хайх дугаараа 2-оос дээш тэмдэгтээр бичнэ үү.</p>}
+ <AsyncStatus error={found.error} loading={found.loading} retry={found.retry}/>
+ {found.data&&!found.error&&(found.data.count?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>СЕРИАЛ / БАРКОД</TableHead><TableHead>БАРАА</TableHead><TableHead>ГАРСАН ҮЙЛДЭЛ</TableHead><TableHead>ОГНОО</TableHead><TableHead>ХАРИЛЦАГЧ</TableHead></TableRow></TableHeader><TableBody>
+  {found.data.items.map((u,i)=><TableRow key={u.id||i}><TableCell><strong>{u.serial||u.barcode}</strong>{u.serial&&u.barcode&&<small>баркод: {u.barcode}</small>}</TableCell>
+  <TableCell>{u.item_name}<small>{u.item_code}</small></TableCell>
+  <TableCell><span className="owner-label">{sourceLabel[u.source]||u.source}</span>{u.courier_name&&<small>хүргэгч: {u.courier_name}</small>}</TableCell>
+  <TableCell>{u.delivered_on||(u.sold_at||u.created_at).slice(0,10)}</TableCell>
+  <TableCell>{u.lead_name||'—'}<small>{u.lead_phone||u.customer_phone||''}</small></TableCell></TableRow>)}
+ </TableBody></Table></div>:<p className="muted chat-empty-list">Тохирох дугаар олдсонгүй.</p>)}
+ </>;
+}
 export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]}){
- const [mode,setMode]=useState<'list'|'report'>('list');
+ const [mode,setMode]=useState<'list'|'report'|'serials'>('list');
+ const [serialQ,setSerialQ]=useState('');
  const [q,setQ]=useState(''),[status,setStatus]=useState(''),[courier,setCourier]=useState(''),[channel,setChannel]=useState(''),[kind,setKind]=useState('');
  const [from,setFrom]=useState(''),[to,setTo]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
  const [today]=useState(todayUB);
@@ -63,7 +95,7 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  const listUrl='/api/deliveries?'+new URLSearchParams({q,status,courier,channel,kind,from,to,page:String(page),revision:String(revision)});
  const list=useRemote<List>(mode==='list'?listUrl:null);
  const report=useRemote<Report>(mode==='report'?'/api/deliveries?'+new URLSearchParams({report:'1',rfrom,rto,revision:String(revision)}):null);
- const detail=useRemote<{delivery:Linked}>(detailId?'/api/deliveries?id='+encodeURIComponent(detailId)+'&revision='+revision:null);
+ const detail=useRemote<{delivery:Linked;units:Unit[]}>(detailId?'/api/deliveries?id='+encodeURIComponent(detailId)+'&revision='+revision:null);
  const rows=list.data?.items||[],total=list.data?.count||0,stats=list.data?.stats,totalPages=Math.max(1,Math.ceil(total/50));
  const activeMembers=members.filter(m=>m.active);
  const legacy=(list.data?.couriers||[]).map(c=>c.name).filter(n=>!activeMembers.some(m=>m.name===n));
@@ -83,8 +115,8 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  const reportDays=report.data?.byCourier.reduce((n,c)=>Math.max(n,c.active_days),0)||0;
  const maxMonth=Math.max(1,...(report.data?.byMonth||[]).map(b=>b.total));
  return <section className="table-panel">
- <div className="table-toolbar"><h2>{courierOnly?'Миний хүргэлтүүд':'Хүргэлтийн журнал'}<span>{mode==='report'?report.data?.total||0:total}</span></h2><div className="row">{!courierOnly&&<Button className="primary" size="sm" onClick={()=>setCreate(true)}><Plus size={16}/>Шинэ хүргэлт</Button>}<div className="view-toggle"><Button variant={mode==='list'?'default':'outline'} className={mode==='list'?'primary':''} size="sm" onClick={()=>setMode('list')}><List size={14}/>Жагсаалт</Button><Button variant={mode==='report'?'default':'outline'} className={mode==='report'?'primary':''} size="sm" onClick={()=>setMode('report')}><ChartNoAxesCombined size={14}/>Дашбоард</Button></div></div></div>
- {mode==='list'?<>
+ <div className="table-toolbar"><h2>{courierOnly?'Миний хүргэлтүүд':'Хүргэлтийн журнал'}<span>{mode==='report'?report.data?.total||0:total}</span></h2><div className="row">{!courierOnly&&<Button className="primary" size="sm" onClick={()=>setCreate(true)}><Plus size={16}/>Шинэ хүргэлт</Button>}<div className="view-toggle"><Button variant={mode==='serials'?'default':'outline'} className={mode==='serials'?'primary':''} size="sm" onClick={()=>setMode('serials')}><Search size={14}/>Сериал хайх</Button><Button variant={mode==='list'?'default':'outline'} className={mode==='list'?'primary':''} size="sm" onClick={()=>setMode('list')}><List size={14}/>Жагсаалт</Button><Button variant={mode==='report'?'default':'outline'} className={mode==='report'?'primary':''} size="sm" onClick={()=>setMode('report')}><ChartNoAxesCombined size={14}/>Дашбоард</Button></div></div></div>
+ {mode==='serials'?<SerialSearch q={serialQ} onQ={setSerialQ}/>:mode==='list'?<>
  {stats&&<div className="metrics"><div className="metric"><div><span>Нийт хүргэлт</span><Truck size={19}/></div><strong>{stats.total.toLocaleString()}</strong><small>Шүүлтүүрт тохирсон</small></div><div className="metric"><div><span>Хүргэсэн</span><CheckCircle2 size={19}/></div><strong>{stats.done.toLocaleString()}</strong><small>{pct(stats.done,stats.total)}% гүйцэтгэл</small></div><div className="metric metric-focus"><div><span>Хүлээгдэж буй</span><Clock size={19}/></div><strong>{stats.pending.toLocaleString()}</strong><small>Хүргэгдэх шаардлагатай</small></div><div className={'metric'+(stats.failed?' metric-alert':'')}><div><span>Хүргэгдээгүй</span><CircleX size={19}/></div><strong>{stats.failed.toLocaleString()}</strong><small>Цуцалсан, бүтээгүй</small></div><div className="metric"><div><span>Бараатай холбогдсон</span><Link2 size={19}/></div><strong>{stats.linked.toLocaleString()}</strong><small>{pct(stats.linked,stats.total)}% агуулахын бүртгэлтэй</small></div></div>}
  <div className="filters"><div className="search"><Search size={17}/><Input aria-label="Хүргэлт хайх" placeholder="Утас, хаяг, бараагаар хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
  <SelectControl aria-label="Төлөвөөр шүүх" value={status} onChange={e=>setFilter(setStatus,e.target.value)}><option value="">Бүх төлөв</option>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>
@@ -113,10 +145,10 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  <Sheet open={!!detailId} onOpenChange={o=>{if(!o)setDetailId('');}}><SheetContent className="detail-sheet"><SheetHeader><SheetTitle>{d?d.delivered_on+' · '+d.courier_name:'Хүргэлтийн дэлгэрэнгүй'}</SheetTitle><SheetDescription>{d?`${deliveryStatuses[d.status]||d.status} · ${d.kind||'төрөл тодорхойгүй'}`:'Мэдээлэл ачаалж байна'}</SheetDescription></SheetHeader>
  <AsyncStatus error={detail.error} loading={detail.loading} retry={detail.retry}/>
  {d&&!detail.error&&<div className="detail-body">
- <div className="next-box"><Truck size={18}/><div><strong>{d.item_name||d.item_info||'Барааны мэдээлэл бүртгээгүй'}</strong>{d.item_name&&<p className="muted"><Link2 size={12}/> Агуулахын бараа: {d.item_code} {d.item_brand?'· '+d.item_brand:''}</p>}<p>{d.customer_phone||'утасгүй'} · {d.address||'хаяггүй'}</p><p className="muted">Бүртгэсэн: {d.entered_by_name||d.created_by} · {requestDateLabel(d.created_at)}</p></div></div>
+ <div className="next-box"><Truck size={18}/><div><strong>{d.item_name||d.item_info||'Барааны мэдээлэл бүртгээгүй'}</strong>{d.item_name&&<p className="muted"><Link2 size={12}/> Агуулахын бараа: {d.item_code} {d.item_brand?'· '+d.item_brand:''}</p>}{!!detail.data?.units.length&&<p className="muted">Сериал: {detail.data.units.map(u=>u.serial||u.barcode).join(', ')}</p>}<p>{d.customer_phone||'утасгүй'} · {d.address||'хаяггүй'}</p><p className="muted">Бүртгэсэн: {d.entered_by_name||d.created_by} · {requestDateLabel(d.created_at)}</p></div></div>
  <div className="row">{Object.entries(deliveryStatuses).filter(([k])=>k!==d.status).map(([k,v])=><Button key={k} size="sm" variant="outline" disabled={busy} onClick={()=>post('set_status',{status:k},d.id,d.version)}>{v}</Button>)}</div>
  {!courierOnly&&<><div className="section-heading"><div><h2>Мэдээлэл засах</h2><p className="muted">Огноо, хаяг, суваг, хүргэгчийг шинэчилнэ.</p></div></div>
- <DeliveryForm key={d.version} row={d} members={activeMembers} legacy={legacy} busy={busy} onSubmit={v=>post('update',v,d.id,d.version)}/></>}
+ <DeliveryForm key={d.version} row={d} units={detail.data?.units||[]} members={activeMembers} legacy={legacy} busy={busy} onSubmit={v=>post('update',v,d.id,d.version)}/></>}
  </div>}
  </SheetContent></Sheet>
  </section>;

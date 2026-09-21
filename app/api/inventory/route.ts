@@ -2,6 +2,7 @@ import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {canEditInventoryItem,isIsolatedRole,type Member} from '@/lib/crm';
 import {z} from 'zod';
+import {unitsSchema,saveUnits} from '@/lib/serials';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds} from '@/lib/inventory';
 import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
@@ -131,7 +132,7 @@ export async function POST(req:Request){try{
     }return {ok:true,id:b.id};
    }
    if(b.action==='record_sale'||b.action==='transfer'){
-    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
+    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
     await requireRow(d,'inventory_items',input.item_id);await requireRow(d,'inventory_warehouses',input.warehouse_id);
     const stock=await stockAt(d,input.item_id,input.warehouse_id),cost=withdrawal(stock,input.qty),id=crypto.randomUUID();
     if(b.action==='transfer'){
@@ -143,6 +144,7 @@ export async function POST(req:Request){try{
      const rate=input.commission_rate??Number(channel?.commission_rate||0),total=safeTotal(cents(input.unit_price)*input.qty),commission=Math.round(total*rate/100),tax=cents(input.tax_amount);
      await d.prepare('INSERT INTO inventory_sales(id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at,bill_number,account,commission_rate,commission_cents,tax_cents,cost_cents,cost_estimated,vat_issued) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,input.item_id,input.warehouse_id,input.qty,input.unit_price,total/100,input.customer_name,input.customer_phone,input.platform,input.sold_at||now,input.note,m.email,now,input.bill_number,input.account||String(channel?.account||''),rate,commission,tax,cost,stock.cost_estimated,input.vat_issued?1:0).run();
      await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'sale',qty:-input.qty,value:-cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:input.note});
+     await saveUnits(d,{source:'sale',refId:id,itemId:input.item_id,customerPhone:input.customer_phone,actor:m.email,at:input.sold_at||now},input.units);
     }return {ok:true,id};
    }
    if(b.action==='preview_import'||b.action==='import_opening'){
