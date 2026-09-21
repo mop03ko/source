@@ -75,22 +75,22 @@ export async function unreadTotal(email:string){
  const r=await db().prepare('SELECT COUNT(*) total FROM messages WHERE recipient=? AND read_at IS NULL').bind(email).first<{total:number}>();
  return r?.total||0;
 }
-export async function thread(email:string,peer:string){
- const r=await db().prepare('SELECT * FROM messages WHERE pair_key=? ORDER BY created_at ASC LIMIT 200').bind(pairKey(email,peer)).all<Message>();
- return attachReactions('dm',r.results,email);
+export async function thread(email:string,peer:string,before?:string){
+ const r=await db().prepare(`SELECT * FROM messages WHERE pair_key=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM messages WHERE id=? AND pair_key=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(pairKey(email,peer),...(before?[before,pairKey(email,peer)]:[])).all<Message>();
+ return attachReactions('dm',r.results.reverse(),email);
 }
 export async function send(sender:string,recipient:string,body:string,replyTo?:ReplySnapshot|null,image?:string|null){
  const id=crypto.randomUUID(),now=new Date().toISOString();
  await db().prepare('INSERT INTO messages(id,pair_key,sender,recipient,body,created_at,reply_to_id,reply_to_sender,reply_to_body,image) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,pairKey(sender,recipient),sender,recipient,body,now,replyTo?.id||null,replyTo?.sender||null,replyTo?.body.slice(0,300)||null,image||null).run();
  return {id,created_at:now};
 }
-export async function markRead(email:string,peer:string){
- await db().prepare('UPDATE messages SET read_at=? WHERE recipient=? AND sender=? AND read_at IS NULL').bind(new Date().toISOString(),email,peer).run();
+export async function markRead(email:string,peer:string,through?:string){
+ await db().prepare('UPDATE messages SET read_at=? WHERE recipient=? AND sender=? AND read_at IS NULL AND created_at<=?').bind(new Date().toISOString(),email,peer,through||new Date().toISOString()).run();
 }
 export type TeamMessage={id:string;channel:string;sender:string;body:string;created_at:string;reply_to_id:string|null;reply_to_sender:string|null;reply_to_body:string|null;image:string|null;mentions:string[];mentions_all:boolean;reactions:Reaction[]};
-export async function teamMessages(viewer:string,channel:string){
- const r=await db().prepare('SELECT * FROM team_messages WHERE channel=? ORDER BY created_at ASC LIMIT 200').bind(channel).all<Omit<TeamMessage,'mentions'|'mentions_all'|'reactions'>&{mentions:string|null;mentions_all:number}>();
- const rows=r.results.map(row=>({...row,mentions:row.mentions?JSON.parse(row.mentions) as string[]:[],mentions_all:!!row.mentions_all}));
+export async function teamMessages(viewer:string,channel:string,before?:string){
+ const r=await db().prepare(`SELECT * FROM team_messages WHERE channel=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM team_messages WHERE id=? AND channel=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(channel,...(before?[before,channel]:[])).all<Omit<TeamMessage,'mentions'|'mentions_all'|'reactions'>&{mentions:string|null;mentions_all:number}>();
+ const rows=r.results.reverse().map(row=>({...row,mentions:row.mentions?JSON.parse(row.mentions) as string[]:[],mentions_all:!!row.mentions_all}));
  return attachReactions('team',rows,viewer);
 }
 export async function lastTeamMessage(channel:string){
@@ -101,8 +101,8 @@ export async function sendTeam(sender:string,channel:string,body:string,replyTo?
  await db().prepare('INSERT INTO team_messages(id,channel,sender,body,created_at,reply_to_id,reply_to_sender,reply_to_body,image,mentions,mentions_all) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,channel,sender,body,now,replyTo?.id||null,replyTo?.sender||null,replyTo?.body.slice(0,300)||null,image||null,mentions?.length?JSON.stringify(mentions):null,mentionsAll?1:0).run();
  return {id,created_at:now};
 }
-export async function markTeamRead(email:string,channel:string){
- await db().prepare('INSERT INTO team_reads(email,channel,last_read_at) VALUES(?,?,?) ON CONFLICT(email,channel) DO UPDATE SET last_read_at=excluded.last_read_at').bind(email,channel,new Date().toISOString()).run();
+export async function markTeamRead(email:string,channel:string,through?:string){
+ await db().prepare('INSERT INTO team_reads(email,channel,last_read_at) VALUES(?,?,?) ON CONFLICT(email,channel) DO UPDATE SET last_read_at=MAX(team_reads.last_read_at,excluded.last_read_at)').bind(email,channel,through||new Date().toISOString()).run();
 }
 // Багийн мессеж бүрт хэн уншсаныг тус тусад нь хадгалдаггүй тул тухайн сувгийн идэвхтэй гишүүн бүрийн
 // сүүлд уншсан цагийг буцааж, клиент талд мессеж бүрийн "үзсэн" тоог тооцоолно.

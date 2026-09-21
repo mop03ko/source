@@ -159,6 +159,30 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  assert.ok((await sidebar()).unreadTeam<joined);
  user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  assert.equal((await sidebar()).unreadTeam,(await get('?summary=1'))[1].team);
+ // Long conversations return the newest page and stable cursor pages, even with equal timestamps.
+ const pageGroup=(await msgLib.createGroupChat('Pagination','owner@example.test',['agent@example.test'])).id;
+ const pageStamp='2026-01-01T00:00:00.000Z';
+ for(let i=0;i<205;i++){
+  const id='page-'+String(i).padStart(3,'0');
+  sqlite.prepare('INSERT INTO team_messages(id,channel,sender,body,created_at) VALUES(?,?,?,?,?)').run(id,pageGroup,'owner@example.test',id,pageStamp);
+  sqlite.prepare('INSERT INTO messages(id,pair_key,sender,recipient,body,created_at) VALUES(?,?,?,?,?,?)').run(id,'agent@example.test|second@example.test','second@example.test','agent@example.test',id,pageStamp);
+ }
+ const newest=await msgLib.teamMessages('agent@example.test',pageGroup);
+ assert.equal(newest.length,200);assert.equal(newest[0].id,'page-005');assert.equal(newest.at(-1).id,'page-204');
+ const older=await msgLib.teamMessages('agent@example.test',pageGroup,newest[0].id);
+ assert.equal(older.length,5);assert.equal(older[0].id,'page-000');
+ assert.equal((await msgLib.teamMessages('agent@example.test','all',newest[0].id)).length,0,'cursor cannot escape channel');
+ const dmNewest=await msgLib.thread('agent@example.test','second@example.test');
+ assert.equal(dmNewest.length,200);assert.ok(dmNewest.some(m=>m.id==='page-204'));
+ const dmOlder=await msgLib.thread('agent@example.test','second@example.test','page-005');assert.equal(dmOlder.length,5);
+ await msgLib.markTeamRead('agent@example.test',pageGroup,pageStamp);
+ await msgLib.sendTeam('owner@example.test',pageGroup,'Arrived after loaded snapshot');
+ assert.equal(await msgLib.teamUnread('agent@example.test',pageGroup),1);
+ await msgLib.markTeamRead('agent@example.test',pageGroup,'2025-01-01T00:00:00.000Z');
+ assert.equal(await msgLib.teamUnread('agent@example.test',pageGroup),1,'stale reads cannot move the cursor backwards');
+ await msgLib.markRead('agent@example.test','second@example.test',pageStamp);
+ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM messages WHERE id LIKE 'page-%' AND read_at IS NULL").get().n,0);
+ console.log('PASS: latest chat pages, stable history cursors, cross-channel cursor isolation and bounded read receipts.');
  console.log('PASS: sidebar unread count respects director channel isolation, group membership and per-channel read timestamps.');
  console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), manager/admin-created group chats with membership-based access control, and @mention/@all detection with per-channel "mentioned" summary flag.');
 })().catch(e=>{console.error(e);process.exit(1)});

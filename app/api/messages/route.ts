@@ -31,6 +31,7 @@ const MAX_IMAGE_B64=Math.ceil(5*1024*1024/3)*4+64;
 const imageSchema=z.string().refine(v=>/^data:image\/(png|jpeg|webp|gif);base64,/.test(v),'Зөвхөн PNG/JPEG/WEBP/GIF зураг оруулна уу.').refine(v=>v.length<=MAX_IMAGE_B64,'Зургийн хэмжээ 5MB-аас бага байна.');
 export async function GET(req:Request){try{
  const m=await member(),url=new URL(req.url),myChannels=channelsForRole(m.role);
+ const before=z.string().min(1).max(80).optional().parse(url.searchParams.get('before')||undefined);
  if(url.searchParams.get('summary')==='1'){
   const groups=await myGroupChats(m.email);
   const [dm,perChannel,perGroup]=await Promise.all([
@@ -47,11 +48,11 @@ export async function GET(req:Request){try{
   if(!channel.success)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
   const access=await channelAccess(m,channel.data);
   if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
-  const [items,reads,roster]=await Promise.all([teamMessages(m.email,channel.data),teamReadState(m.email,channel.data),channelRoster(channel.data)]);
+  const [items,reads,roster]=await Promise.all([teamMessages(m.email,channel.data,before),teamReadState(m.email,channel.data),channelRoster(channel.data)]);
   return Response.json({items,reads,members:roster.filter(r=>r.email!==m.email)},{headers:{'Cache-Control':'no-store'}});
  }
  const peer=(url.searchParams.get('peer')||'').trim().toLowerCase();
- if(peer)return Response.json({items:await thread(m.email,peer)},{headers:{'Cache-Control':'no-store'}});
+ if(peer)return Response.json({items:await thread(m.email,peer,before)},{headers:{'Cache-Control':'no-store'}});
  return Response.json({items:await conversations(m.email)},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return respondError(e);}}
 export async function POST(req:Request){try{
@@ -60,9 +61,9 @@ export async function POST(req:Request){try{
  const m=await member();const text=await req.text();if(text.length>MAX_IMAGE_B64+10000)return Response.json({error:'Хүсэлт хэт том.'},{status:413});
  const b=z.discriminatedUnion('action',[
   z.object({action:z.literal('send'),peer:z.string().email(),body:z.string().trim().max(2000).default(''),image:imageSchema.optional(),replyTo:z.string().max(80).optional()}),
-  z.object({action:z.literal('read'),peer:z.string().email()}),
+  z.object({action:z.literal('read'),peer:z.string().email(),through:z.string().datetime().optional()}),
   z.object({action:z.literal('send_team'),channel:channelSchema,body:z.string().trim().max(2000).default(''),image:imageSchema.optional(),replyTo:z.string().max(80).optional()}),
-  z.object({action:z.literal('read_team'),channel:channelSchema}),
+  z.object({action:z.literal('read_team'),channel:channelSchema,through:z.string().datetime().optional()}),
   z.object({action:z.literal('react'),kind:z.enum(['dm','team']),messageId:z.string().max(80),emoji:z.string().trim().min(1).max(8)}),
   z.object({action:z.literal('create_group'),name:z.string().trim().min(1).max(80),members:z.array(z.string().email()).min(1).max(200)}),
  ]).parse(JSON.parse(text));
@@ -89,7 +90,7 @@ export async function POST(req:Request){try{
  if(b.action==='read_team'){
   const access=await channelAccess(m,b.channel);
   if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
-  await markTeamRead(m.email,b.channel);return Response.json({ok:true});
+  await markTeamRead(m.email,b.channel,b.through&&b.through<new Date().toISOString()?b.through:new Date().toISOString());return Response.json({ok:true});
  }
  if(b.action==='react'){
   // Reaction зөвхөн харах эрхтэй мессежид л зөвшөөрнө (DM бол sender/recipient, суваг бол channelsForRole); messageSnapshot энэ шалгалтыг хийнэ.
@@ -109,5 +110,5 @@ export async function POST(req:Request){try{
   if(b.replyTo){replyTo=await messageSnapshot('dm',b.replyTo,m);if(!replyTo)throw new Failure('Хариулах мессеж олдсонгүй.');}
   const r=await send(m.email,peer,b.body,replyTo,b.image);return Response.json({ok:true,...r});
  }
- await markRead(m.email,peer);return Response.json({ok:true});
+ await markRead(m.email,peer,b.through&&b.through<new Date().toISOString()?b.through:new Date().toISOString());return Response.json({ok:true});
 }catch(e){return respondError(e);}}
