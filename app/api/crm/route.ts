@@ -9,10 +9,12 @@ import {
   closed,
   isAdminLike,
   isIsolatedRole,
+  canManageSchedule,
   type Member,
   type Lead,
 } from "@/lib/crm";
 import { getSettings } from "@/lib/settings";
+import { dutyRoster, createRotation, ubDay } from "@/lib/assign";
 import { sendSms } from "@/lib/sms";
 export const dynamic = "force-dynamic";
 const db = () => env.DB!;
@@ -54,6 +56,7 @@ const bodySchema = z.object({
     "member",
     "import",
     "bulk_recycle",
+    "auto_assign",
     "assign",
     "delete",
     "restore",
@@ -722,6 +725,64 @@ export async function POST(req: Request) {
         added,
         skipped: incoming.length - added,
       });
+    }
+    // Ухаалаг хуваарилалт: тухайн өдөр ажлын хуваарьт байгаа борлуулалтын ажилтнуудад, өнөөдөр хамгийн
+    // бага хүсэлт авсанд нь эхлүүлж тэнцвэртэй тараана. Зөвхөн хариуцагч хүлээж буй, сүүлийн үеийн
+    // хүсэлтүүдэд хамаарна — хуучин овоог хөдөлгөхгүй.
+    if (b.action === "auto_assign") {
+      if (!canManageSchedule(m.role))
+        throw new Failure("Зөвхөн админ, удирдлага, ахлах хуваарилна.", 403);
+      const v = z
+        .object({ days: z.number().int().min(1).max(30).optional() })
+        .parse(b.data ?? {});
+      const day = ubDay();
+      const roster = await dutyRoster(day);
+      if (!roster.length)
+        throw new Failure(
+          "Өнөөдөр ажлын хуваарьт байгаа борлуулалтын ажилтан байхгүй тул хуваарилах боломжгүй.",
+        );
+      const since = new Date(
+        Date.now() - (v.days ?? 7) * 86400000,
+      ).toISOString();
+      const waiting = await db()
+        .prepare(
+          "SELECT id,version,status FROM leads WHERE deleted_at IS NULL AND owner='__sheet_unassigned__' AND created_at>=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone) ORDER BY created_at LIMIT 200",
+        )
+        .bind(since)
+        .all<{ id: string; version: number; status: string }>();
+      const rotation = createRotation(roster);
+      const byOwner: Record<string, number> = {};
+      let assigned = 0;
+      for (const lead of waiting.results) {
+        const pick = rotation.next();
+        if (!pick) break;
+        const op = crypto.randomUUID();
+        const active = !closed.includes(lead.status) && lead.status !== "review";
+        const res = await db().batch([
+          db()
+            .prepare(
+              "UPDATE leads SET owner=?,next_at=CASE WHEN ? THEN ? ELSE next_at END,next_action=CASE WHEN ? THEN 'Хуваарилагдсан • Эхний дуудлага' ELSE next_action END,updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND owner='__sheet_unassigned__'",
+            )
+            .bind(pick.email, active ? 1 : 0, now, active ? 1 : 0, now, op, lead.id, lead.version),
+          db()
+            .prepare(
+              "INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'auto_assign',?,?,? FROM leads WHERE id=? AND op=?",
+            )
+            .bind(op, "Ухаалгаар хуваарилав: " + pick.name + " (тэр өдөр ажлын хуваарьт байсан).", m.email, now, lead.id, op),
+          // Sheet-ээс ирсэн хүсэлтийн холбоосыг ч шинэчилнэ, эс тэгвээс дараагийн sync буцааж хуваарилаагүй болгоно.
+          db()
+            .prepare(
+              "UPDATE sheet_links SET owner_email=?,auto_assigned=1,updated_at=? WHERE lead_id=? AND EXISTS(SELECT 1 FROM leads WHERE id=? AND op=?)",
+            )
+            .bind(pick.email, now, lead.id, lead.id, op),
+          assignmentNotice(lead.id, op, now, "__sheet_unassigned__"),
+        ]);
+        if (res[0].meta.changes) {
+          assigned++;
+          byOwner[pick.email] = (byOwner[pick.email] ?? 0) + 1;
+        }
+      }
+      return Response.json({ ok: true, assigned, byOwner, roster: roster.length });
     }
     if (b.action === "bulk_recycle") {
       if (m.role === "agent")

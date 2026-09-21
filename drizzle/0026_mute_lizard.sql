@@ -1,0 +1,1 @@
+ALTER TABLE `sheet_links` ADD `auto_assigned` integer DEFAULT 0 NOT NULL;
