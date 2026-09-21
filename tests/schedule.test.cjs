@@ -123,5 +123,38 @@ const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,m
  user=OW;assert.equal((await post('set_shift',shift('2026-09-04','О.Энх-Учрал','Олимпик','courier@example.test')))[0],200);
  user=MG;[st,res]=await delivPost('create',base({delivered_on:'2026-09-04'}));
  assert.match(res.warning,/Олимпик/); // өөр салбарт томилогдсон → сануулга
- console.log('PASS: work schedule role permissions (admin, director and manager all edit, decide and see everyone; agents and couriers are server-side scoped to their own rows and requests), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, and delivery logging warnings when the courier is off or assigned elsewhere.');
+ // Шинэ сарын хуваарийг багцаар тавих: ажилтан тус бүрийн ажиллах/амрах өдрөөр.
+ user=AS;
+ assert.equal((await post('plan_month',{month:'2026-10',entries:[{person_name:'Б.Сэлэнгэ',days:[{day:'2026-10-01',assignment:'Олимпик'}]}]}))[0],403); // агент төлөвлөхгүй
+ user=MG;
+ const octDays=(a,off)=>Array.from({length:31},(_,i)=>{const day=`2026-10-${String(i+1).padStart(2,'0')}`;
+  return {day,assignment:off.includes(new Date(day+'T00:00:00Z').getUTCDay())?'Амралт':a};});
+ [status,d]=await post('plan_month',{month:'2026-10',entries:[
+  {person_name:'Б.Сэлэнгэ',member_email:'agent@example.test',days:octDays('Түмэнмолл',[6,0])},
+  {person_name:'О.Энх-Учрал',member_email:'courier@example.test',days:octDays('Хүргэлт',[1,2])},
+ ]});
+ assert.equal(status,200);assert.equal(d.written,62);assert.equal(d.skipped,0);
+ [status,d]=await get('?month=2026-10');
+ assert.equal(status,200);assert.equal(d.shifts.length,62);
+ const oct=Object.fromEntries(d.shifts.filter(x=>x.person_name==='Б.Сэлэнгэ').map(x=>[x.day,x.assignment]));
+ assert.equal(oct['2026-10-01'],'Түмэнмолл');   // Пүрэв — ажил
+ assert.equal(oct['2026-10-03'],'Амралт');      // Бямба — амралт
+ assert.equal(oct['2026-10-04'],'Амралт');      // Ням — амралт
+ assert.equal(oct['2026-10-05'],'Түмэнмолл');   // Даваа — ажил
+ // Амрах гараг хүн тус бүрээр өөр байж болно.
+ const ider=Object.fromEntries(d.shifts.filter(x=>x.person_name==='О.Энх-Учрал').map(x=>[x.day,x.assignment]));
+ assert.equal(ider['2026-10-05'],'Амралт');     // Даваа
+ assert.equal(ider['2026-10-06'],'Амралт');     // Мягмар
+ assert.equal(ider['2026-10-03'],'Хүргэлт');    // Бямба — хүргэлт ажиллана
+ // Дахин төлөвлөвөл байгаа нүдийг хөндөхгүй, зөвхөн хоосныг нөхнө.
+ sqlite.prepare("DELETE FROM work_shifts WHERE day='2026-10-07' AND person_name='Б.Сэлэнгэ'").run();
+ [status,d]=await post('plan_month',{month:'2026-10',entries:[{person_name:'Б.Сэлэнгэ',member_email:'agent@example.test',days:octDays('Олимпик',[6,0])}]});
+ assert.equal(d.written,1);assert.equal(d.skipped,30);
+ assert.equal((await get('?month=2026-10'))[1].shifts.find(x=>x.day==='2026-10-07'&&x.person_name==='Б.Сэлэнгэ').assignment,'Олимпик');
+ assert.equal((await get('?month=2026-10'))[1].shifts.find(x=>x.day==='2026-10-08'&&x.person_name==='Б.Сэлэнгэ').assignment,'Түмэнмолл'); // хуучин хэвээр
+ // Өөр сарын өдөр хольж оруулахгүй, томилгоо/сар шалгагдана.
+ assert.equal((await post('plan_month',{month:'2026-10',entries:[{person_name:'Б.Сэлэнгэ',days:[{day:'2026-11-01',assignment:'Олимпик'}]}]}))[0],400);
+ assert.equal((await post('plan_month',{month:'2026-10',entries:[{person_name:'Б.Сэлэнгэ',days:[{day:'2026-10-09',assignment:'Сарнай'}]}]}))[0],400);
+ assert.equal((await post('plan_month',{month:'2026',entries:[{person_name:'Б.Сэлэнгэ',days:[{day:'2026-10-09',assignment:'Олимпик'}]}]}))[0],400);
+ console.log('PASS: work schedule role permissions (admin, director and manager all edit, decide and see everyone; agents and couriers are server-side scoped to their own rows and requests), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, delivery logging warnings when the courier is off or assigned elsewhere, and manager-only bulk month planning that lays out work and rest days per employee without overwriting cells that already exist.');
 })().catch(e=>{console.error(e);process.exit(1)});

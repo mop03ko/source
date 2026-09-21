@@ -18,7 +18,7 @@ export function balanceRows(rows:{number:number;cells:Record<string,string>}[]):
   else if(!qty&&total!==0)issue='Тэг үлдэгдэлтэй боловч өртөгтэй';
   if(issue){result.warnings.push(`Balance ${number}-р мөр (${code||'кодгүй'}): ${issue}`);continue;}
   seen.add(code);
-  result.rows.push({code,brand:(r.C||'').trim(),supplier:(r.C||'').trim(),name:r.D.trim(),capacity:r.E||'',color:r.F||'',imei:identifier(r.G||''),warehouse:r.H.trim(),qty,unit_cost:amount(r.Q),total_cost:total,sale_price:amount(r.S),variant:'',min_stock:0});
+  result.rows.push({code,brand:/^(?:YUNA(?: DARAA)?|SOLAR(?:,\s*BELEG)?|MIKE|KHANGAI)$/i.test((r.C||'').trim())?'':(r.C||'').trim(),supplier:(r.C||'').trim(),name:r.D.trim(),capacity:r.E||'',color:r.F||'',imei:identifier(r.G||''),warehouse:r.H.trim(),qty,unit_cost:amount(r.Q),total_cost:total,sale_price:amount(r.S),variant:'',min_stock:0});
  }
  if(!result.rows.length)throw new Error('Balance sheet-д импортлох бараа олдсонгүй.');
  return result;

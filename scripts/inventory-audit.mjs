@@ -23,7 +23,7 @@ try{
  const post=async(action,data,id)=>{const r=await fetch(base+'/api/inventory',{method:'POST',headers,body:JSON.stringify({action,data,id})});const value=await r.json();assert.equal(r.status,200,JSON.stringify(value));return value;};
  const wh=(await post('create_warehouse',{name:'Туршилтын агуулах'})).id;
  await post('create_warehouse',{name:'Туршилтын салбар'});
- const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',brand:'SearchBrand',supplier:'Туршилтын нийлүүлэгч',variant:'Тусгай хувилбар',capacity:'256GB',color:'Silver',sale_price:2000000,cash_price:1800000,min_stock:2})).id;
+ const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',brand:'SearchBrand',category:'Гар утас',supplier:'Туршилтын нийлүүлэгч',variant:'Тусгай хувилбар',capacity:'256GB',color:'Silver',sale_price:2000000,cash_price:1800000,min_stock:2})).id;
  for(const q of ['SearchBrand','256GB','Silver','Тусгай хувилбар']){
   const result=await (await fetch(base+'/api/inventory?view=items&q='+encodeURIComponent(q),{headers})).json();
   assert.equal(result.items[0]?.id,item,'Search field: '+q);
@@ -54,11 +54,11 @@ try{
  await viewport(390);await snap('product-form-mobile');await viewport(1440);
  await fill('input[name=sale_price]','');
  assert.equal(await evaluate("document.querySelector('input[name=sale_price]').checkValidity()"),false);
- await fill('input[name=sale_price]','2100000');await fill('input[name=supplier]','Шинэ нийлүүлэгч');
+ assert.equal(await evaluate("document.querySelector('select[name=category]').value"),'Гар утас');await fill('select[name=category]','Таблет');await fill('input[name=sale_price]','2100000');await fill('input[name=supplier]','Шинэ нийлүүлэгч');
  await click('Бараа хадгалах');await wait("!document.querySelector('input[name=sale_price]')");
  await wait("document.querySelector('.detail-body')?.textContent.includes('Шинэ нийлүүлэгч')");
  const updated=await (await fetch(base+'/api/inventory?view=items&id='+item,{headers})).json();
- assert.equal(updated.item.sale_price,2100000);assert.equal(updated.item.stock,4);assert.equal(updated.item.supplier,'Шинэ нийлүүлэгч');
+ assert.equal(updated.item.category,'Таблет');assert.equal(updated.item.sale_price,2100000);assert.equal(updated.item.stock,4);assert.equal(updated.item.supplier,'Шинэ нийлүүлэгч');
  evidence.checks.productEditPreservesStock=true;await snap('detail-edited');
  await viewport(390);await snap('product-detail-mobile');await viewport(1440);
  await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');await fill('select[name=platform]','STOREPAY');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'2100000');await fill('select[name=platform]','');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');evidence.checks.cashCreditPrices=true;await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
@@ -72,6 +72,11 @@ try{
  await wait("document.querySelector('.inventory-panel table')?.textContent.includes('Шинэ нийлүүлэгч')");
  assert.equal(await evaluate("document.querySelectorAll('.inventory-panel tbody tr').length"),1);
  await snap('supplier-report');await viewport(390);await snap('supplier-report-mobile');await viewport(1440);
+ await fill('select[aria-label="Ангиллаар шүүх"]','Таблет');
+ await fill('select[aria-label="Тайлангийн ангилал"]','category');
+ await wait("document.querySelector('.inventory-panel table')?.textContent.includes('Таблет')");
+ assert.equal(await evaluate("document.querySelectorAll('.inventory-panel tbody tr').length"),1);
+ await snap('category-report');evidence.checks.categories=true;
  await fill('select[aria-label="Тайлангийн ангилал"]','brand');
  await wait("document.querySelector('.inventory-panel table')?.textContent.includes('SearchBrand')");
  await click('Борлуулалт','[role=tab]');

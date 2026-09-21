@@ -28,7 +28,7 @@ function err(e:unknown){
  console.error('Schedule request failed',e instanceof Error?e.message:'error');
  return Response.json({error:'Хадгалж чадсангүй. Дахин оролдоно уу.'},{status:500});
 }
-const bodySchema=z.object({action:z.enum(['set_shift','request','decide','cancel_request']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
+const bodySchema=z.object({action:z.enum(['set_shift','plan_month','request','decide','cancel_request']),id:z.string().max(80).optional(),version:z.number().int().positive().optional(),data:z.unknown()});
 export async function GET(req:Request){try{
  const m=await member();
  const url=new URL(req.url);
@@ -89,6 +89,30 @@ export async function POST(req:Request){try{
   const d=z.object({day,person_name:z.string().trim().min(1).max(120),member_email:z.string().email().nullish(),assignment,note:z.string().trim().max(400).optional()}).parse(b.data);
   const id=await writeShift({...d,member_email:d.member_email||null},m.email);
   return Response.json({ok:true,id});
+ }
+ // Шинэ сарын хуваарийг багцаар тавина: ажилтан тус бүрийн өдөр бүрийн томилгоог нэг хүсэлтээр бичнэ.
+ // Аль хэдийн томилгоотой нүдийг хөнддөггүй — гараар зассан, батлагдсан чөлөөг дарж бичихгүй.
+ if(b.action==='plan_month'){
+  assertManage(m);
+  const d=z.object({
+   month,
+   entries:z.array(z.object({
+    person_name:z.string().trim().min(1).max(120),
+    member_email:z.string().email().nullish(),
+    days:z.array(z.object({day,assignment})).min(1).max(31),
+   })).min(1).max(100),
+  }).parse(b.data);
+  let written=0,skipped=0;
+  for(const entry of d.entries){
+   for(const cell of entry.days){
+    if(!cell.day.startsWith(d.month+'-'))throw new Failure(`${cell.day} нь ${d.month} сард хамаарахгүй.`);
+    const existing=await db().prepare('SELECT id FROM work_shifts WHERE day=? AND person_name=?').bind(cell.day,entry.person_name).first();
+    if(existing){skipped++;continue;}
+    await writeShift({day:cell.day,person_name:entry.person_name,member_email:entry.member_email||null,assignment:cell.assignment,note:'Сарын хуваарь төлөвлөлтөөр бүртгэв.'},m.email);
+    written++;
+   }
+  }
+  return Response.json({ok:true,written,skipped});
  }
  // Чөлөө авах / өдөр шилжүүлэх хүсэлт гаргах.
  if(b.action==='request'){

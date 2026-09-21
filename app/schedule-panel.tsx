@@ -2,7 +2,7 @@
 import {Disclosure} from '@/components/disclosure';
 import {useState,useRef,useEffect} from 'react';
 import {useIsMobile} from '@/hooks/use-mobile';
-import {CalendarDays,ChevronLeft,ChevronRight,Check,X,Loader2,Inbox,Plus,Users,Clock} from 'lucide-react';
+import {CalendarDays,ChevronLeft,ChevronRight,Check,X,Loader2,Inbox,Plus,Users,Clock,CalendarPlus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -37,7 +37,7 @@ export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{mon
  const [mode,setMode]=useState<'grid'|'requests'>('grid');
  const [busy,setBusy]=useState(false);
  const [cell,setCell]=useState<{person:string;day:string;email:string|null;assignment:string;note:string}|null>(null);
- const [addOpen,setAddOpen]=useState(false);
+ const [addOpen,setAddOpen]=useState(false),[planOpen,setPlanOpen]=useState(false);
  const data=useCachedRemote<Data>('/api/schedule?'+new URLSearchParams({month}),cache,refresh);
  const d=data.data;
  const days=monthDays(month);
@@ -69,7 +69,7 @@ export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{mon
  return <section className="table-panel schedule-panel" aria-label="Ажлын хуваарь">
  <div className="schedule-toolbar">
   <div className="schedule-month"><Button type="button" variant="outline" size="icon" aria-label="Өмнөх сар" onClick={()=>setMonth(shiftMonth(month,-1))}><ChevronLeft/></Button><h2 aria-live="polite">{month.slice(0,4)} оны {Number(month.slice(5))} сар</h2><Button type="button" variant="outline" size="icon" aria-label="Дараагийн сар" onClick={()=>setMonth(shiftMonth(month,1))}><ChevronRight/></Button></div>
-  <div className="schedule-primary-actions"><Button variant="outline" onClick={goToday}>Өнөөдөр</Button>{d?.can_manage&&<Button className="primary" onClick={()=>setAddOpen(true)}><Plus size={16}/>Томилгоо нэмэх</Button>}</div>
+  <div className="schedule-primary-actions"><Button variant="outline" onClick={goToday}>Өнөөдөр</Button>{d?.can_manage&&<><Button variant="outline" onClick={()=>setPlanOpen(true)}><CalendarPlus size={16}/>Сар төлөвлөх</Button><Button className="primary" onClick={()=>setAddOpen(true)}><Plus size={16}/>Томилгоо нэмэх</Button></>}</div>
  </div>
  <div className="schedule-navigation"><div className="view-toggle" aria-label="Хуваарийн хэсэг"><Button variant={mode==='grid'?'default':'outline'} aria-pressed={mode==='grid'} onClick={()=>setMode('grid')}><CalendarDays size={16}/>Хуваарь</Button><Button variant={mode==='requests'?'default':'outline'} aria-pressed={mode==='requests'} onClick={()=>setMode('requests')}><Inbox size={16}/>Хүсэлт {pending.length>0&&<span className="schedule-count">{pending.length}</span>}</Button></div><p>{d?.can_manage?'Томилгоог засахын тулд ажилтны өдрийг сонгоно уу.':'Өөрийн ажлын өдрийг сонгож чөлөө, өдөр шилжүүлэх хүсэлт гаргана.'}</p></div>
  <AsyncStatus error={data.error} loading={data.loading} retry={data.retry}/>
@@ -123,5 +123,68 @@ export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{mon
    <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Users size={16}/>}Нэмэх</Button>
   </GuardedForm>
  </DialogContent></Dialog>
+ {d?.can_manage&&<MonthPlanner open={planOpen} onClose={()=>setPlanOpen(false)} month={month} people={d.people} shifts={d.shifts}
+   onDone={(written:number,skipped:number)=>{setPlanOpen(false);data.retry();toast.success(`${written} өдрийн томилгоо бүртгэв.`+(skipped?` ${skipped} нүд аль хэдийн томилгоотой тул хөндөөгүй.`:''));}}/>}
  </section>;
+}
+const PLAN_WEEKDAYS=[{value:1,label:'Да'},{value:2,label:'Мя'},{value:3,label:'Лх'},{value:4,label:'Пү'},{value:5,label:'Ба'},{value:6,label:'Бя'},{value:0,label:'Ня'}];
+type PlanRow={person:string;email:string|null;include:boolean;assignment:string;rest:number[]};
+// Шинэ сарын хуваарь: ажилтан тус бүрийн томилгоо, амрах гарагийг сонгоод бүтэн сарыг нэг дор тавина.
+// Хувиарлалт нь хүн тус бүрээр өөр байдаг тул хадгалсны дараа нүд тус бүрийг гараар тааруулна.
+function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;onClose:()=>void;month:string;people:{person_name:string;member_email:string|null}[];shifts:WorkShift[];onDone:(written:number,skipped:number)=>void}){
+ const [target,setTarget]=useState(()=>shiftMonth(month,1));
+ const [rows,setRows]=useState<PlanRow[]>([]);
+ const [busy,setBusy]=useState(false),[loaded,setLoaded]=useState('');
+ // Диалог нээгдэх/сар солигдох үед ажилтны жагсаалтыг одоогийн хуваарийн томилгоогоор урьдчилж бөглөнө.
+ useEffect(()=>{
+  if(!open)return;
+  const key=month+'|'+target;
+  if(loaded===key)return;
+  const common=new Map<string,string>();
+  for(const s of shifts)if(shiftIsWork(s.assignment))common.set(s.person_name,(common.get(s.person_name)===undefined||common.get(s.person_name)===s.assignment)?s.assignment:common.get(s.person_name)!);
+  setRows(people.map(p=>({person:p.person_name,email:p.member_email,include:true,assignment:common.get(p.person_name)||shiftAssignments[0],rest:[6,0]})));
+  setLoaded(key);
+ },[open,month,target,people,shifts,loaded]);
+ const days=monthDays(target);
+ const update=(person:string,patch:Partial<PlanRow>)=>setRows(list=>list.map(r=>r.person===person?{...r,...patch}:r));
+ const toggleRest=(person:string,weekday:number)=>setRows(list=>list.map(r=>r.person!==person?r:{...r,rest:r.rest.includes(weekday)?r.rest.filter(v=>v!==weekday):[...r.rest,weekday]}));
+ const countWork=(r:PlanRow)=>days.filter(day=>!r.rest.includes(new Date(day+'T00:00:00Z').getUTCDay())).length;
+ const chosen=rows.filter(r=>r.include);
+ const save=async()=>{
+  if(!chosen.length){toast.error('Дор хаяж нэг ажилтан сонгоно уу.');return;}
+  setBusy(true);
+  try{
+   const entries=chosen.map(r=>({person_name:r.person,member_email:r.email,
+    days:days.map(day=>({day,assignment:r.rest.includes(new Date(day+'T00:00:00Z').getUTCDay())?'Амралт':r.assignment}))}));
+   const res=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'plan_month',data:{month:target,entries}})});
+   const j=await res.json() as {error?:string;written?:number;skipped?:number};
+   if(!res.ok)throw new Error(j.error||'Хадгалж чадсангүй.');
+   onDone(j.written||0,j.skipped||0);
+  }catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
+ };
+ return <Dialog open={open} onOpenChange={o=>{if(!o)onClose();}}><DialogContent className="form-dialog schedule-planner">
+  <DialogHeader><DialogTitle>Шинэ сарын хуваарь төлөвлөх</DialogTitle><DialogDescription>Ажилтан тус бүрийн томилгоо, амрах гарагийг сонгоход бүтэн сар бүрдэнэ. Аль хэдийн томилгоотой нүдийг хөндөхгүй — хадгалсны дараа нүд тус бүрийг гараар тааруулж болно.</DialogDescription></DialogHeader>
+  <div className="form-stack">
+   <div className="form-grid">
+    <Field label="Төлөвлөх сар *"><Input type="month" value={target} onChange={e=>{setTarget(e.target.value||target);setLoaded('');}}/></Field>
+    <Field label="Сонгосон ажилтан"><Input value={`${chosen.length} / ${rows.length}`} disabled/></Field>
+   </div>
+   {!rows.length&&<p className="muted">Одоогийн сард хуваарьтай ажилтан байхгүй тул төлөвлөх хүн алга. "Томилгоо нэмэх"-ээр ажилтан бүртгэнэ үү.</p>}
+   {!!rows.length&&<div className="table-scroll"><table className="schedule-plan-table" style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
+    <thead><tr>
+     <th style={{textAlign:'left',padding:'6px 8px'}}>Ажилтан</th>
+     <th style={{textAlign:'left',padding:'6px 8px',minWidth:140}}>Томилгоо</th>
+     <th style={{textAlign:'left',padding:'6px 8px'}}>Амрах гараг</th>
+     <th style={{padding:'6px 8px'}}>Ажил / Амралт</th>
+    </tr></thead>
+    <tbody>{rows.map(r=><tr key={r.person} style={{opacity:r.include?1:0.45}}>
+     <td style={{padding:'4px 8px'}}><label className="row" style={{gap:6}}><input type="checkbox" checked={r.include} onChange={e=>update(r.person,{include:e.target.checked})} aria-label={r.person+' оруулах'}/><strong>{r.person}</strong></label></td>
+     <td style={{padding:'4px 8px'}}><SelectControl aria-label={r.person+' томилгоо'} value={r.assignment} onChange={e=>update(r.person,{assignment:e.target.value})} disabled={!r.include}>{shiftAssignments.filter(a=>shiftIsWork(a)).map(a=><option key={a} value={a}>{a}</option>)}</SelectControl></td>
+     <td style={{padding:'4px 8px'}}><div className="row" style={{gap:4,flexWrap:'wrap'}}>{PLAN_WEEKDAYS.map(w=><Button key={w.value} type="button" size="sm" disabled={!r.include} variant={r.rest.includes(w.value)?'default':'outline'} className={r.rest.includes(w.value)?'primary':''} onClick={()=>toggleRest(r.person,w.value)}>{w.label}</Button>)}</div></td>
+     <td style={{padding:'4px 8px',textAlign:'center',whiteSpace:'nowrap'}}><strong>{countWork(r)}</strong> / {days.length-countWork(r)}</td>
+    </tr>)}</tbody>
+   </table></div>}
+   <Button className="primary full" disabled={busy||!chosen.length} onClick={save}>{busy?<Loader2 className="spin" size={16}/>:<CalendarPlus size={16}/>}{`${target} сарын хуваарь бүртгэх`}</Button>
+  </div>
+ </DialogContent></Dialog>;
 }

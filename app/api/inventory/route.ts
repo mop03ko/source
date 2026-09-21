@@ -25,12 +25,12 @@ export async function GET(req:Request){try{
  access(await member());
  const p=new URL(req.url).searchParams,view=p.get('view')||'items';
  const page=Math.max(1,Math.min(10000,Math.floor(Number(p.get('page'))||1))),limit=p.get('export')==='1'?5000:50;
- const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'',supplier=p.get('supplier')||'';
- const group=p.get('group')==='brand'?'brand':p.get('group')==='supplier'?'supplier':null;
+ const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'',supplier=p.get('supplier')||'',category=p.get('category')||'';
+ const group=p.get('group')==='brand'?'brand':p.get('group')==='supplier'?'supplier':p.get('group')==='category'?'category':null;
  if(view==='warehouses')return json({items:(await db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all()).results});
  if(view==='options'){
-  const [warehouses,brands,channels,suppliers]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all(),db().prepare("SELECT DISTINCT supplier FROM inventory_items WHERE supplier!='' ORDER BY supplier").all()]);
-  return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results,suppliers:suppliers.results});
+  const [warehouses,brands,channels,suppliers,categories]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all(),db().prepare("SELECT DISTINCT supplier FROM inventory_items WHERE supplier!='' ORDER BY supplier").all(),db().prepare("SELECT DISTINCT category FROM inventory_items WHERE category!='' ORDER BY category").all()]);
+  return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results,suppliers:suppliers.results,categories:categories.results});
  }
  if(view==='items'&&p.get('id')){
   const item=await requireRow(db(),'inventory_items',p.get('id')!);
@@ -45,6 +45,7 @@ export async function GET(req:Request){try{
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ?)';args.push(...Array(8).fill('%'+q+'%'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
+  if(category){where+=' AND it.category=?';args.push(category);}
   const moveArgs:unknown[]=warehouse?[warehouse]:[];let cte='';
   if(view==='balance'){
    const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -75,6 +76,7 @@ export async function GET(req:Request){try{
   if(view==='purchases'&&p.get('status')){where+=' AND t.status=?';args.push(p.get('status'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
+  if(category){where+=' AND it.category=?';args.push(category);}
   // Шууд бэлэн борлуулалт: зарсан ажилтан бүртгэгдсэн мөрүүд. "__direct__" нь зарагч тодорхой бүхнийг заана.
   if(view==='sales'&&p.get('seller')){const seller=p.get('seller')!;if(seller==='__direct__')where+=" AND t.seller!=''";else{where+=' AND t.seller=?';args.push(seller);}}
   const date=view==='purchases'?'COALESCE(t.received_at,t.ordered_at,t.created_at)':view==='sales'?'COALESCE(t.sold_at,t.created_at)':'t.occurred_at';
@@ -114,11 +116,12 @@ export async function POST(req:Request){try{
     if(input.code&&await d.prepare('SELECT 1 FROM inventory_items WHERE code=? AND id!=?').bind(input.code,id).first())throw new Failure('Барааны код давхардсан.',409);
     if(input.imei&&await d.prepare('SELECT 1 FROM inventory_items WHERE imei=? AND id!=?').bind(input.imei,id).first())throw new Failure('IMEI / сериал давхардсан.',409);
     const previous=b.action==='update_item'?await requireRow(d,'inventory_items',id):null;
+    const categoryValue=input.category===undefined?(previous?.category??''):input.category;
     const cashPrice=input.cash_price===undefined?(previous?.cash_price??null):input.cash_price;
     if(cashPrice!==null&&Number(cashPrice)>input.sale_price)throw new Failure('Бэлэн төлөлтийн үнэ үндсэн үнээс их байж болохгүй.');
-    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice];
-    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
-    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
+    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice,categoryValue];
+    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,category,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
+    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,category=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
     return {ok:true,id};
    }
    if(b.action==='save_channel'){

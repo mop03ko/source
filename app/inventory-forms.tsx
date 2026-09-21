@@ -1,4 +1,5 @@
 'use client';
+import {productCategories} from '@/lib/product-categories';
 import {salePrice} from '@/lib/inventory-pricing';
 import {ChoiceInput} from '@/components/ui/choice-input';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
@@ -12,10 +13,10 @@ import {useRemote} from '@/hooks/use-remote';
 import {fromInput} from '@/lib/crm';
 import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 
-export type Item={id:string;code:string;brand:string;supplier:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
+export type Item={id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
-export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];channels:Channel[]};
+export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];categories?:{category:string}[];channels:Channel[]};
 export type Detail={item:Item;byWarehouse:{warehouse_id:string;warehouse_name:string;qty:number;value_cents:number}[];moves:{id:string;kind:string;qty_delta:number;value_cents:number;warehouse_name:string;occurred_at:string;created_at:string;note:string}[]};
 export type Post=(action:string,data:unknown,id?:string)=>Promise<Record<string,unknown>>;
 const numeric=(f:FormData,k:string)=>Number(f.get(k)||0);
@@ -29,6 +30,8 @@ export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(dat
   <Field label="Барааны нэр *"><Input name="name" defaultValue={item?.name} required maxLength={300}/></Field>
   <div className="form-grid"><Field label="Код / SKU *"><Input name="code" defaultValue={item?.code} required maxLength={200}/></Field><Field label="IMEI / сериал"><Input name="imei" defaultValue={item?.imei||''} maxLength={80}/></Field></div>
   <div className="form-grid"><Field label="Брэнд"><Input name="brand" defaultValue={item?.brand} maxLength={120}/></Field><Field label="Нийлүүлэгч"><Input name="supplier" defaultValue={item?.supplier} maxLength={120}/></Field></div>
+  <Field label="Барааны ангилал"><SelectControl name="category" defaultValue={item?.category||''}><option value="">Ангилаагүй</option>{[...new Set([...productCategories,...(item?.category?[item.category]:[])])].map(c=><option key={c}>{c}</option>)}</SelectControl></Field>
+  <p className="form-help">Жишээ: ангилал — Гар утас; брэнд — Apple; нийлүүлэгч — Mike. Нийлүүлэгч тодорхойгүй бол хоосон үлдээнэ.</p>
   <h3>Барааны шинж чанар</h3>
   <div className="form-grid"><Field label="Багтаамж / хэмжээ"><Input name="capacity" defaultValue={item?.capacity} placeholder="256GB" maxLength={80}/></Field><Field label="Өнгө"><Input name="color" defaultValue={item?.color} maxLength={80}/></Field></div>
   <Field label="Бусад хувилбар"><Input name="variant" defaultValue={item?.variant} maxLength={120}/></Field>

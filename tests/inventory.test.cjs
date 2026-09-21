@@ -76,7 +76,7 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  // Reports aggregate all matching rows, independently of the product list page.
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  for(let i=0;i<51;i++){
-  const created=await invPost('create_item',{code:'REPORT-'+i,name:'Report item '+i,brand:i%2?'Brand B':'Brand A',supplier:'Report Vendor'});
+  const created=await invPost('create_item',{code:'REPORT-'+i,name:'Report item '+i,brand:i%2?'Brand B':'Brand A',supplier:'Report Vendor',category:i%2?'Чихэвч':'Гар утас'});
   assert.equal(created[0],200);
   assert.equal((await invPost('record_purchase',{item_id:created[1].id,warehouse_id:whId,qty:2,unit_cost:10,status:'received',received_at:'2026-09-21T01:00:00.000Z'}))[0],200);
   if(i===0)assert.equal((await invPost('record_sale',{item_id:created[1].id,warehouse_id:whId,qty:1,unit_price:20,sold_at:'2026-09-21T02:00:00.000Z'}))[0],200);
@@ -90,6 +90,18 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  [status,d]=await invGet('?view=sales&group=brand&'+vendor+'&from=2026-09-22&to=2026-09-22');assert.equal(d.groups.length,0);
  [status,d]=await invGet('?view=items&group=supplier&'+vendor+'&warehouse_id=missing');assert.equal(d.groups[0].stock,0);
  [status,d]=await invGet('?view=options');assert.ok(d.suppliers.some(s=>s.supplier==='Report Vendor'));assert.ok(d.brands.some(b=>b.brand==='Brand A'));
+ [status,d]=await invGet('?view=items&group=category&'+vendor);assert.equal(status,200);assert.equal(d.groups.length,2);assert.equal(d.groups.reduce((n,g)=>n+g.item_count,0),51);
+ const phoneCategory='&category='+encodeURIComponent('Гар утас');
+ [status,d]=await invGet('?view=items&'+vendor+phoneCategory);assert.equal(d.count,26);assert.ok(d.items.every(i=>i.category==='Гар утас'));
+ [status,d]=await invGet('?view=balance&group=category&'+vendor+phoneCategory+'&from=2026-09-21&to=2026-09-21');assert.equal(d.groups[0].stock,51);
+ [status,d]=await invGet('?view=sales&group=category&'+vendor+phoneCategory);assert.equal(d.groups[0].revenue_cents,2000);
+ [status,d]=await invGet('?view=options');assert.ok(d.categories.some(c=>c.category==='Гар утас'));
+ for(const supplier of ['Yuna','solar','mike','khangai'])assert.equal((await invPost('create_item',{code:'BAD-'+supplier,name:'Invalid brand',brand:supplier}))[0],400);
+ const categorized=await invPost('create_item',{code:'CATEGORY',name:'Test phone',brand:'Apple',supplier:'Mike',category:'Гар утас'});assert.equal(categorized[0],200);
+ assert.equal((await invPost('update_item',{code:'CATEGORY',name:'Test phone',brand:'Apple',supplier:'Mike'},categorized[1].id))[0],200);
+ assert.equal((await invGet('?view=items&id='+categorized[1].id))[1].item.category,'Гар утас','Old clients preserve category');
+ assert.equal((await invPost('update_item',{code:'CATEGORY',name:'Test phone',brand:'Apple',supplier:'Mike',category:''},categorized[1].id))[0],200);
+ assert.equal((await invGet('?view=items&id='+categorized[1].id))[1].item.category,'');
  console.log('PASS: separate supplier/brand filters; grouped stock, date balances and sales cents aggregate across all pages.');
  const priced=await invPost('create_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1000,cash_price:800});assert.equal(priced[0],200);
  assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,800);
