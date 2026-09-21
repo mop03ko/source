@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {parseProducts,brandPlan} from '../scripts/product-brand-sync.mjs';
+const rows=parseProducts('Product code;Product name;Features;Secondary categories\r\n"A";"Camera; pro\nversion";"Брэнд: E[DJI]";""\r\n"B";"Phone";"";"Брэндүүд///Apple"');
+assert.equal(rows[0]['Product name'],'Camera; pro\nversion');
+const item=(id,name,brand='SUPPLIER')=>({id,code:id,name,brand,supplier:'Vendor',updated_at:'old'});
+let plan=brandPlan(rows,[item('legacy','Camera; pro\nversion'),item('other','Phone'),item('unmatched','Phone Pro')]);
+assert.deepEqual(plan.changes.map(c=>c.brand),['DJI','APPLE']);
+assert.equal(plan.changes[0].supplier,'Vendor');assert.equal(plan.issues.length,1);
+assert.equal(plan.changes[0].match,'exact name');
+const conflict={...rows[1],Features:'Брэнд: E[Samsung]'};
+plan=brandPlan([...rows,conflict],[item('old','Phone')]);
+assert.equal(plan.changes.length,0);assert.equal(plan.issues[0].reason,'conflicting brands');
+plan=brandPlan(rows,[item('old','Phone','APPLE')]);assert.equal(plan.unchanged,1);assert.equal(plan.changes.length,0);
+assert.throws(()=>parseProducts('Product code;Features;Secondary categories\n"bad'),/Unclosed/);
+console.log('PASS: quoted product CSV, exact-name matching, explicit brand precedence, conflicting names, supplier preservation and repeat-run idempotency.');

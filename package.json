@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint app lib hooks components auth.ts --max-warnings 0",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
-    "test": "node tests/crm.test.cjs && node tests/it.test.cjs && node tests/marketing.test.cjs && node tests/messages.test.cjs && node tests/sheets.test.cjs && node tests/sms-rules.test.cjs && node tests/inventory-counts.test.cjs && node tests/inventory.test.cjs && node tests/inventory-workflows.test.cjs && node tests/lead-purchases.test.cjs && node tests/deliveries.test.cjs && node tests/schedule.test.cjs && node tests/auto-assign.test.cjs && node tests/serials.test.cjs && node tests/direct-sales.test.cjs && node tests/xlsx.test.cjs && node tests/vercel.test.cjs && node tests/request-cache.test.cjs",
+    "test": "node tests/crm.test.cjs && node tests/it.test.cjs && node tests/marketing.test.cjs && node tests/messages.test.cjs && node tests/sheets.test.cjs && node tests/sms-rules.test.cjs && node tests/inventory-counts.test.cjs && node tests/inventory.test.cjs && node tests/inventory-workflows.test.cjs && node tests/lead-purchases.test.cjs && node tests/deliveries.test.cjs && node tests/schedule.test.cjs && node tests/auto-assign.test.cjs && node tests/serials.test.cjs && node tests/direct-sales.test.cjs && node tests/xlsx.test.cjs && node tests/vercel.test.cjs && node tests/request-cache.test.cjs && node tests/product-brand-sync.test.mjs",
     "test:production": "node tests/production.mjs",
     "test:ux": "node scripts/ux-audit.mjs"
   },

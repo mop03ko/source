@@ -14,7 +14,7 @@ import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 export type Item={id:string;code:string;brand:string;supplier:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
-export type Options={warehouses:Warehouse[];brands:{brand:string}[];channels:Channel[]};
+export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];channels:Channel[]};
 export type Detail={item:Item;byWarehouse:{warehouse_id:string;warehouse_name:string;qty:number;value_cents:number}[];moves:{id:string;kind:string;qty_delta:number;value_cents:number;warehouse_name:string;occurred_at:string;created_at:string;note:string}[]};
 export type Post=(action:string,data:unknown,id?:string)=>Promise<Record<string,unknown>>;
 const numeric=(f:FormData,k:string)=>Number(f.get(k)||0);

@@ -182,3 +182,5 @@ body {
 .auth-page{min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f5f3f8}.auth-card{width:min(100%,450px);padding:42px;background:white;border:1px solid #e9e4ef;border-radius:24px;box-shadow:0 20px 70px #27143c0d;color:#27143c}.auth-logo{font-size:38px;font-weight:800;letter-spacing:-2px}.auth-logo span{color:#f58a22}.auth-kicker{font-size:12px;letter-spacing:2px;margin:4px 0 34px;color:#867491}.auth-card h1{font-size:26px;font-weight:700;margin-bottom:12px}.auth-card p{line-height:1.6}.auth-card small{display:block;margin-top:24px;color:#807687}.auth-button{width:100%;margin:24px 0 12px;padding:14px;border-radius:10px;background:#28143e;color:white;font-weight:600;cursor:pointer}.auth-error{color:#9a342c;background:#fff1ef;padding:12px;border-radius:8px;margin-top:16px;font-size:14px}
 
 .inventory-detail .detail-body>.ant-descriptions{margin:16px 0;overflow-wrap:anywhere}.inventory-detail .detail-body>h3{margin:20px 0 12px}
+
+.inventory-group-control{padding:0 20px 16px;max-width:360px}

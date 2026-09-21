@@ -66,6 +66,19 @@ try{
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');
  await click('Үлдэгдлийн тайлан','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('04-balance');
  await viewport(390);await snap('05-balance-mobile');await click('Бараа, үлдэгдэл','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('06-stock-mobile');await viewport(1440);
+ await fill('select[aria-label="Нийлүүлэгчээр шүүх"]','Шинэ нийлүүлэгч');
+ await wait("!!document.querySelector('.inventory-item-link')");
+ await fill('select[aria-label="Тайлангийн ангилал"]','supplier');
+ await wait("document.querySelector('.inventory-panel table')?.textContent.includes('Шинэ нийлүүлэгч')");
+ assert.equal(await evaluate("document.querySelectorAll('.inventory-panel tbody tr').length"),1);
+ await snap('supplier-report');await viewport(390);await snap('supplier-report-mobile');await viewport(1440);
+ await fill('select[aria-label="Тайлангийн ангилал"]','brand');
+ await wait("document.querySelector('.inventory-panel table')?.textContent.includes('SearchBrand')");
+ await click('Борлуулалт','[role=tab]');
+ await wait("document.querySelector('.inventory-panel table')?.textContent.includes('SearchBrand')");
+ await snap('brand-sales-report');
+ await fill('select[aria-label="Тайлангийн ангилал"]','');await click('Бараа, үлдэгдэл','[role=tab]');await click('Шүүлтүүр цэвэрлэх');
+ await wait("!!document.querySelector('.inventory-item-link')");evidence.checks.brandSupplierReports=true;
  if(process.argv[2]){
   await click('Excel импорт');await wait("!!document.querySelector('input[type=file]')");
   const root=await cdp('DOM.getDocument');const node=await cdp('DOM.querySelector',{nodeId:root.root.nodeId,selector:'input[type=file]'});

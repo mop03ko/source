@@ -73,5 +73,23 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  assert.equal((await invPost('update_item',edit,itemId,editRequest))[0],403);
  assert.deepEqual(sqlite.prepare('SELECT * FROM inventory_items WHERE id=?').get(itemId),beforeReplay);
  assert.equal((await invGet('?view=items&id='+itemId))[0],200,'Agent may still view inventory');
+ // Reports aggregate all matching rows, independently of the product list page.
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ for(let i=0;i<51;i++){
+  const created=await invPost('create_item',{code:'REPORT-'+i,name:'Report item '+i,brand:i%2?'Brand B':'Brand A',supplier:'Report Vendor'});
+  assert.equal(created[0],200);
+  assert.equal((await invPost('record_purchase',{item_id:created[1].id,warehouse_id:whId,qty:2,unit_cost:10,status:'received',received_at:'2026-09-21T01:00:00.000Z'}))[0],200);
+  if(i===0)assert.equal((await invPost('record_sale',{item_id:created[1].id,warehouse_id:whId,qty:1,unit_price:20,sold_at:'2026-09-21T02:00:00.000Z'}))[0],200);
+ }
+ const vendor='supplier=Report%20Vendor';
+ [status,d]=await invGet('?view=items&'+vendor);assert.equal(status,200);assert.equal(d.items.length,50);assert.equal(d.count,51);
+ [status,d]=await invGet('?view=items&group=supplier&'+vendor+'&page=2');assert.equal(status,200);assert.equal(d.groups.length,1);assert.equal(d.groups[0].item_count,51);assert.equal(d.groups[0].stock,101);assert.equal(d.groups[0].value_cents,101000);
+ [status,d]=await invGet('?view=items&group=brand&'+vendor+'&brand=Brand%20A');assert.equal(d.groups.length,1);assert.equal(d.groups[0].item_count,26);assert.equal(d.groups[0].stock,51);
+ [status,d]=await invGet('?view=balance&group=supplier&'+vendor+'&from=2026-09-21&to=2026-09-21');assert.equal(d.groups[0].opening_qty,0);assert.equal(d.groups[0].in_qty,102);assert.equal(d.groups[0].out_qty,1);assert.equal(d.groups[0].stock,101);
+ [status,d]=await invGet('?view=sales&group=supplier&'+vendor+'&from=2026-09-21&to=2026-09-21');assert.equal(d.groups.length,1);assert.equal(d.groups[0].revenue_cents,2000);assert.equal(d.groups[0].value_cents,1000);assert.equal(d.groups[0].profit_cents,1000);
+ [status,d]=await invGet('?view=sales&group=brand&'+vendor+'&from=2026-09-22&to=2026-09-22');assert.equal(d.groups.length,0);
+ [status,d]=await invGet('?view=items&group=supplier&'+vendor+'&warehouse_id=missing');assert.equal(d.groups[0].stock,0);
+ [status,d]=await invGet('?view=options');assert.ok(d.suppliers.some(s=>s.supplier==='Report Vendor'));assert.ok(d.brands.some(b=>b.brand==='Brand A'));
+ console.log('PASS: separate supplier/brand filters; grouped stock, date balances and sales cents aggregate across all pages.');
  console.log('PASS: inventory role isolation, admin/manager-only item edits, denied-edit immutability, revoked-role request replay, item creation, purchases/sales and stock enforcement.');
 })().catch(e=>{console.error(e);process.exit(1)});

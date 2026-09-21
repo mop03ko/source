@@ -25,11 +25,12 @@ export async function GET(req:Request){try{
  access(await member());
  const p=new URL(req.url).searchParams,view=p.get('view')||'items';
  const page=Math.max(1,Math.min(10000,Math.floor(Number(p.get('page'))||1))),limit=p.get('export')==='1'?5000:50;
- const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'';
+ const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'',supplier=p.get('supplier')||'';
+ const group=p.get('group')==='brand'?'brand':p.get('group')==='supplier'?'supplier':null;
  if(view==='warehouses')return json({items:(await db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all()).results});
  if(view==='options'){
-  const [warehouses,brands,channels]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all()]);
-  return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results});
+  const [warehouses,brands,channels,suppliers]=await Promise.all([db().prepare('SELECT * FROM inventory_warehouses ORDER BY name').all(),db().prepare("SELECT DISTINCT brand FROM inventory_items WHERE brand!='' ORDER BY brand").all(),db().prepare('SELECT * FROM inventory_channels ORDER BY name').all(),db().prepare("SELECT DISTINCT supplier FROM inventory_items WHERE supplier!='' ORDER BY supplier").all()]);
+  return json({warehouses:warehouses.results,brands:brands.results,channels:channels.results,suppliers:suppliers.results});
  }
  if(view==='items'&&p.get('id')){
   const item=await requireRow(db(),'inventory_items',p.get('id')!);
@@ -43,6 +44,7 @@ export async function GET(req:Request){try{
   const args:unknown[]=[];let where='1=1';
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ?)';args.push(...Array(8).fill('%'+q+'%'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
+  if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
   const moveArgs:unknown[]=warehouse?[warehouse]:[];let cte='';
   if(view==='balance'){
    const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -55,6 +57,11 @@ export async function GET(req:Request){try{
   if(stock==='empty')where+=' AND COALESCE(t.stock,0)<=0';
   if(stock==='low')where+=' AND COALESCE(t.stock,0)<=it.min_stock';
   const extra=view==='balance'?',COALESCE(t.opening_qty,0) opening_qty,COALESCE(t.opening_cents,0) opening_cents,COALESCE(t.in_qty,0) in_qty,COALESCE(t.in_cents,0) in_cents,COALESCE(t.out_qty,0) out_qty,COALESCE(t.out_cents,0) out_cents':'';
+  if(group){
+   const flow=view==='balance'?',SUM(COALESCE(t.opening_qty,0)) opening_qty,SUM(COALESCE(t.opening_cents,0)) opening_cents,SUM(COALESCE(t.in_qty,0)) in_qty,SUM(COALESCE(t.in_cents,0)) in_cents,SUM(COALESCE(t.out_qty,0)) out_qty,SUM(COALESCE(t.out_cents,0)) out_cents':'';
+   const groups=await db().prepare(`${cte} SELECT it.${group} label,COUNT(*) item_count,SUM(COALESCE(t.stock,0)) stock,SUM(COALESCE(t.value_cents,0)) value_cents,MAX(COALESCE(t.cost_estimated,0)) cost_estimated${flow} FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} GROUP BY it.${group} ORDER BY it.${group} LIMIT 5001`).bind(...moveArgs,...args).all();
+   return json({items:[],groups:groups.results.slice(0,5000),count:groups.results.length,summary:{},truncated:groups.results.length>5000});
+  }
   const [rows,summary]=await Promise.all([
    db().prepare(`${cte} SELECT it.*,COALESCE(t.stock,0) stock,COALESCE(t.value_cents,0) value_cents,COALESCE(t.cost_estimated,0) cost_estimated${extra} FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} ORDER BY it.name,it.id LIMIT ? OFFSET ?`).bind(...moveArgs,...args,limit,limit===5000?0:(page-1)*50).all(),
    db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(t.stock),0) units,COALESCE(SUM(t.value_cents),0) value_cents,COALESCE(SUM(COALESCE(t.stock,0)<=it.min_stock),0) low_stock,COALESCE(MAX(t.cost_estimated),0) cost_estimated FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where}`).bind(...moveArgs,...args).first(),
@@ -66,10 +73,16 @@ export async function GET(req:Request){try{
   if(warehouse){where+=' AND t.warehouse_id=?';args.push(warehouse);}
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ?)';args.push('%'+q+'%','%'+q+'%');}
   if(view==='purchases'&&p.get('status')){where+=' AND t.status=?';args.push(p.get('status'));}
+  if(brand){where+=' AND it.brand=?';args.push(brand);}
+  if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
   // Шууд бэлэн борлуулалт: зарсан ажилтан бүртгэгдсэн мөрүүд. "__direct__" нь зарагч тодорхой бүхнийг заана.
   if(view==='sales'&&p.get('seller')){const seller=p.get('seller')!;if(seller==='__direct__')where+=" AND t.seller!=''";else{where+=' AND t.seller=?';args.push(seller);}}
   const date=view==='purchases'?'COALESCE(t.received_at,t.ordered_at,t.created_at)':view==='sales'?'COALESCE(t.sold_at,t.created_at)':'t.occurred_at';
   if(p.get('from')&&p.get('to')){const [from,to]=dayBounds(p.get('from')!,p.get('to')!);where+=` AND ${date}>=? AND ${date}<?`;args.push(from,to);}
+  if(view==='sales'&&group){
+   const groups=await db().prepare(`SELECT it.${group} label,COUNT(DISTINCT it.id) item_count,SUM(t.qty) stock,SUM(ROUND(t.total_price*100)) revenue_cents,SUM(t.cost_cents) value_cents,SUM(t.commission_cents) commission_cents,SUM(t.tax_cents) tax_cents,SUM(ROUND(t.total_price*100)-t.cost_cents-t.commission_cents-t.tax_cents) profit_cents,MAX(t.cost_estimated) cost_estimated FROM inventory_sales t JOIN inventory_items it ON it.id=t.item_id WHERE ${where} GROUP BY it.${group} ORDER BY it.${group} LIMIT 5001`).bind(...args).all();
+   return json({items:[],groups:groups.results.slice(0,5000),count:groups.results.length,summary:{},truncated:groups.results.length>5000});
+  }
   const rows=await db().prepare(`SELECT t.*,it.name item_name,it.code item_code,w.name warehouse_name${view==='sales'?',(SELECT name FROM members WHERE email=t.seller) seller_name':''} ${view==='sales'?',CAST(ROUND(t.total_price*100) AS INTEGER)-t.cost_cents-t.commission_cents-t.tax_cents profit_cents':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id JOIN inventory_warehouses w ON w.id=t.warehouse_id WHERE ${where} ORDER BY ${date} DESC,t.id DESC LIMIT ? OFFSET ?`).bind(...args,limit,limit===5000?0:(page-1)*50).all();
   const summary=await db().prepare(`SELECT COUNT(*) count ${view==='sales'?',COALESCE(SUM(ROUND(t.total_price*100)),0) revenue_cents,COALESCE(SUM(t.cost_cents),0) cost_cents,COALESCE(SUM(t.commission_cents),0) commission_cents,COALESCE(SUM(t.tax_cents),0) tax_cents,COALESCE(SUM(ROUND(t.total_price*100)-t.cost_cents-t.commission_cents-t.tax_cents),0) profit_cents,COALESCE(MAX(t.cost_estimated),0) cost_estimated':''} FROM ${table} t JOIN inventory_items it ON it.id=t.item_id WHERE ${where}`).bind(...args).first();
   return json({items:rows.results,count:summary?.count||0,summary,page,truncated:Number(summary?.count)>limit&&limit===5000});
