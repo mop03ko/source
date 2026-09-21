@@ -52,7 +52,7 @@ try{
   const response=await fetch(base+'/api/crm',{method:'POST',headers,body:JSON.stringify({action:'create',data:{name:'Bulk lead '+String(i).padStart(2,'0'),phone:String(99130000+i),product:'Phone',source:'Facebook',owner:'owner@example.test',status:'new',next_at:new Date().toISOString(),next_action:'Call'}})});
   assert.equal(response.status,200);
  }
- const navigate=async view=>{await cdp('Page.navigate',{url:base+'/?view='+view});await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===50&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");};
+ const navigate=async view=>{await cdp('Page.navigate',{url:base+'/?view='+view+(view==='inventory'?'&inv_items_stock=':'')});await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===50&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");};
  const count=()=>evaluate("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input:checked').length");
  const check=async selector=>{await wait(`!document.querySelector(${JSON.stringify(selector)}).disabled`);await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await pause(150);await wait("!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");};
  const selectedExport=async()=>{

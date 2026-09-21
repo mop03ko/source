@@ -42,7 +42,7 @@ try{
  const snap=async name=>{const metrics=await evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,name+'.png'),Buffer.from(shot.data,'base64'));evidence.screens.push({name,...metrics});assert.ok(metrics.scroll<=metrics.width,name+' overflows');};
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');await viewport(1440);
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
- await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("document.querySelectorAll('.inventory-item-link').length===3");
+ await cdp('Page.navigate',{url:base+'/?view=inventory&inv_items_stock='});await wait("document.querySelectorAll('.inventory-item-link').length===3");
  await click('Grouped phone2 дугаарын бүртгэл','.inventory-item-link');await wait("document.querySelectorAll('.inventory-unit-link').length===2");
  await snap('product-units-desktop');await viewport(390);await snap('product-units-mobile');await viewport(1440);
  await fill('input[aria-label="Барааны дотор дугаар хайх"]','222222');await wait("document.querySelectorAll('.inventory-unit-link').length===1");

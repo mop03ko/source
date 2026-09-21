@@ -47,7 +47,7 @@ try{
  const snap=async name=>{const metrics=await evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,name+'.png'),Buffer.from(shot.data,'base64'));evidence.screens.push({name,...metrics});assert.ok(metrics.scroll<=metrics.width,name+' overflows');};
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');await viewport(1440);
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
- await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("document.querySelectorAll('.inventory-item-link').length===3");
+ await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("document.querySelectorAll('.inventory-item-link').length===1");assert.equal(await evaluate("document.querySelector('select[aria-label=\"Үлдэгдлээр шүүх\"]').value"),'nonzero');evidence.defaultHidesZero=true;await fill('select[aria-label="Үлдэгдлээр шүүх"]','');await wait("document.querySelectorAll('.inventory-item-link').length===3");
 
  evidence.views=[];
 

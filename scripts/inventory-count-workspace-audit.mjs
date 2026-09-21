@@ -47,7 +47,7 @@ try{
  const snap=async name=>{const metrics=await evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})');const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(join(out,name+'.png'),Buffer.from(shot.data,'base64'));evidence.screens.push({name,...metrics});assert.ok(metrics.scroll<=metrics.width,name+' overflows');};
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');await viewport(1440);
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
- await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("document.querySelectorAll('.inventory-item-link').length===3");
+ await cdp('Page.navigate',{url:base+'/?view=inventory&inv_items_stock='});await wait("document.querySelectorAll('.inventory-item-link').length===3");
 
 
  for(let i=0;i<51;i++){const id=(await post('create_item',{code:'COUNT-'+i,name:'Count item '+String(i).padStart(2,'0'),sale_price:100})).id;await post('record_purchase',{item_id:id,warehouse_id:wh,qty:1,unit_cost:50,status:'received'});}
