@@ -65,6 +65,21 @@ try{
  evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(200);
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');
  await click('Үлдэгдлийн тайлан','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('04-balance');
+ await wait("!!document.querySelector('.balance-report .recharts-wrapper')");
+ assert.equal(await evaluate("document.querySelectorAll('.balance-kpis .ant-statistic').length"),4);
+ assert.ok(await evaluate("document.querySelector('.balance-category-list').textContent.includes('Таблет')"));
+ await evaluate("[...document.querySelectorAll('.balance-heading .ant-segmented-item')].find(e=>e.textContent==='График').click()");await pause(200);
+ assert.equal(await evaluate("!!document.querySelector('.inventory-item-link')"),false);
+ await evaluate("[...document.querySelectorAll('.balance-chart-toolbar .ant-segmented-item')].find(e=>e.textContent==='Тоо ширхэг').click()");await pause(200);
+ assert.ok(await evaluate("document.querySelector('.balance-flow-chart').getAttribute('aria-label').includes('Эцсийн үлдэгдэл: 4 ш')"));
+ await evaluate("document.querySelector('.balance-chart-toolbar').scrollIntoView({block:'start'})");await pause(200);await snap('balance-charts');await viewport(390);await evaluate("document.querySelector('.balance-chart-toolbar').scrollIntoView({block:'start'})");await pause(200);await snap('balance-charts-mobile');await viewport(1440);
+ await evaluate("[...document.querySelectorAll('.balance-heading .ant-segmented-item')].find(e=>e.textContent==='Жагсаалт').click()");await pause(200);
+ assert.equal(await evaluate("!!document.querySelector('.balance-flow-chart')"),false);assert.equal(await evaluate("!!document.querySelector('.inventory-item-link')"),true);
+ await fill('select[aria-label="Тайлан эрэмбэлэх"]','value_desc');await wait("!!document.querySelector('.inventory-item-link')");
+ await evaluate("[...document.querySelectorAll('.balance-heading .ant-segmented-item')].find(e=>e.textContent==='Нэгдсэн').click()");await pause(200);
+ await click('Үлдэгдэлгүй 0','.balance-health button');await wait("document.querySelector('.balance-report')?.textContent.includes('Сонгосон шүүлтүүрт бараа алга')");
+ await snap('balance-empty');await fill('select[aria-label="Үлдэгдлээр шүүх"]','');await wait("!!document.querySelector('.inventory-item-link')");evidence.checks.balanceDashboard=true;
+
  await viewport(390);await snap('05-balance-mobile');await click('Бараа, үлдэгдэл','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('06-stock-mobile');await viewport(1440);
  await fill('select[aria-label="Нийлүүлэгчээр шүүх"]','Шинэ нийлүүлэгч');
  await wait("!!document.querySelector('.inventory-item-link')");

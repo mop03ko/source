@@ -103,6 +103,25 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  assert.equal((await invPost('update_item',{code:'CATEGORY',name:'Test phone',brand:'Apple',supplier:'Mike',category:''},categorized[1].id))[0],200);
  assert.equal((await invGet('?view=items&id='+categorized[1].id))[1].item.category,'');
  console.log('PASS: separate supplier/brand filters; grouped stock, date balances and sales cents aggregate across all pages.');
+ // Balance dashboard must aggregate beyond one page and agree with grouped/list exports.
+ const balanceUrl='?view=balance&'+vendor+'&from=2026-09-21&to=2026-09-21';
+ [status,d]=await invGet(balanceUrl);assert.equal(status,200);assert.equal(d.items.length,50);
+ assert.equal(d.summary.count,51);assert.equal(d.summary.opening_qty,0);assert.equal(d.summary.in_qty,102);assert.equal(d.summary.out_qty,1);assert.equal(d.summary.units,101);
+ assert.equal(d.summary.opening_cents+d.summary.in_cents-d.summary.out_cents,d.summary.value_cents);
+ assert.equal(d.report.categories.reduce((n,c)=>n+c.stock,0),101);assert.equal(d.report.categories.reduce((n,c)=>n+c.value_cents,0),101000);
+ const dashboard=d.summary;
+ [status,d]=await invGet(balanceUrl+'&page=2');assert.equal(d.items.length,1);assert.deepEqual(d.summary,dashboard);
+ [status,d]=await invGet(balanceUrl+'&group=category');assert.deepEqual(d.summary,dashboard);assert.equal(d.groups.reduce((n,g)=>n+g.stock,0),101);
+ [status,d]=await invGet(balanceUrl+'&export=1');assert.equal(d.items.length,51);assert.equal(d.items.reduce((n,r)=>n+r.stock,0),dashboard.units);
+ [status,d]=await invGet(balanceUrl+phoneCategory);assert.equal(d.summary.count,26);assert.equal(d.report.categories.length,1);assert.equal(d.summary.units,51);
+ [status,d]=await invGet(balanceUrl+'&warehouse_id=missing');assert.equal(d.summary.units,0);assert.equal(d.summary.in_qty,0);assert.equal(d.summary.empty_stock,51);assert.equal(d.summary.reorder_stock,0);
+ [status,d]=await invGet(balanceUrl+'&sort=stock_asc');assert.equal(d.items[0].stock,1);
+ [status,d]=await invGet(balanceUrl+'&sort=value_desc');assert.equal(d.items[0].stock,2);
+ [status,d]=await invGet(balanceUrl+'&stock=empty');assert.equal(d.summary.count,0);assert.deepEqual(d.report.categories,[]);assert.equal(d.summary.in_qty,0);
+ [status,d]=await invGet('?view=balance&'+vendor+'&from=2026-09-22&to=2026-09-22');assert.equal(d.summary.opening_qty,101);assert.equal(d.summary.in_qty,0);assert.equal(d.summary.out_qty,0);
+ assert.equal((await invGet('?view=balance&from=2026-09-22&to=2026-09-21'))[0],400);
+ assert.equal((await invGet('?view=balance&from=2026-02-30&to=2026-09-21'))[0],400);
+ console.log('PASS: balance dashboard all-page totals, category chart reconciliation, group/list/export agreement, dates, warehouse and stock scope, sorting and empty results.');
  const priced=await invPost('create_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1000,cash_price:800});assert.equal(priced[0],200);
  assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,800);
  assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100},priced[1].id))[0],200);
