@@ -635,6 +635,7 @@ export async function POST(req: Request) {
       const seen = new Set<string>();
       const valid: typeof incoming = [];
       for (const d of incoming) {
+        if(d.status==='won')throw new Failure('Эхлээд хүсэлт бүртгээд, агуулахаас бараа сонгож худалдан авалтыг баталгаажуулна уу.');
         await validOwner(d.owner, m);
         if (
           !closed.includes(d.status) &&
@@ -816,7 +817,7 @@ export async function POST(req: Request) {
       if(old.version!==b.version)throw new Failure('Хүсэлт өөрчлөгдсөн байна. Жагсаалтыг шинэчилнэ үү.',409);
       const op=crypto.randomUUID();
       const result=await db().batch([
-        db().prepare("UPDATE leads SET deleted_at=NULL,status='review',next_at=NULL,next_action='Мэдээлэл шалгах',recycle_at=NULL,connected=0,updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND deleted_at IS NOT NULL").bind(now,op,b.id,b.version),
+        db().prepare("UPDATE leads SET deleted_at=NULL,status=CASE WHEN EXISTS(SELECT 1 FROM inventory_sales WHERE lead_id=leads.id) THEN 'won' ELSE 'review' END,next_at=NULL,next_action=CASE WHEN EXISTS(SELECT 1 FROM inventory_sales WHERE lead_id=leads.id) THEN 'Хаагдсан' ELSE 'Мэдээлэл шалгах' END,recycle_at=NULL,connected=0,updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND deleted_at IS NOT NULL").bind(now,op,b.id,b.version),
         db().prepare('INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,?,?,?,? FROM leads WHERE id=? AND op=?').bind(op,'restore',note+' · Өмнөх төлөв: '+old.status,m.email,now,b.id,op),
       ]);
       if(!result[0].meta.changes)throw new Failure('Хүсэлт өөрчлөгдсөн байна. Дахин ачаална уу.',409);
@@ -833,6 +834,8 @@ export async function POST(req: Request) {
       note = "";
     if (b.action === "update") {
       const v = leadSchema.parse(b.data);
+      if(v.status==='won'&&l.status!=='won')throw new Failure('Агуулахаас бараа сонгож худалдан авалтыг баталгаажуулна уу.',409);
+      if(v.status!=='won'&&await db().prepare('SELECT 1 FROM inventory_sales WHERE lead_id=?').bind(l.id).first())throw new Failure('Агуулахын борлуулалттай баталгаажсан хүсэлтийн төлөвийг өөрчлөх боломжгүй.',409);
       if (v.phone !== l.phone)
         throw new Failure(
           "Дугаарыг өөрчлөх боломжгүй. Буруу дугаар төлөвийг сонгоно уу.",

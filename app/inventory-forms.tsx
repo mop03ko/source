@@ -39,7 +39,7 @@ function ItemPicker({value,onChange,warehouse}:{value:Item|null;onChange:(item:I
  </div>;
 }
 
-export function MovementForm({kind,item,options,warehouse,busy,onSave}:{kind:'purchase'|'sale'|'transfer';item?:Item;options:Options;warehouse:string;busy:boolean;onSave:(data:unknown)=>Promise<void>}){
+export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,submitLabel}:{kind:'purchase'|'sale'|'transfer';item?:Item;options:Options;warehouse:string;busy:boolean;onSave:(data:unknown)=>Promise<void>;customer?:{name:string;phone:string};submitLabel?:string}){
  const [picked,setPicked]=useState<Item|null>(item||null),[source,setSource]=useState(warehouse),[channel,setChannel]=useState(''),[qty,setQty]=useState(1),[purchaseStatus,setPurchaseStatus]=useState('received');
  const [unit,setUnit]=useState(kind==='sale'?item?.sale_price||0:0),[extra,setExtra]=useState(0);
  const stock=useRemote<Detail>(picked?'/api/inventory?view=items&id='+encodeURIComponent(picked.id):null);
@@ -65,7 +65,7 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave}:{kind:'pu
   </>}
   {kind==='sale'&&<>
    <div className="form-grid"><Field label="Билл дугаар"><Input name="bill_number" maxLength={120}/></Field><Field label="Борлуулсан огноо"><Input name="sold_at" type="datetime-local"/></Field></div>
-   <div className="form-grid"><Field label="Харилцагч"><Input name="customer_name" maxLength={160}/></Field><Field label="Утас"><Input name="customer_phone" type="tel" maxLength={40}/></Field></div>
+   <div className="form-grid"><Field label="Харилцагч"><Input name="customer_name" maxLength={160} defaultValue={customer?.name} readOnly={!!customer}/></Field><Field label="Утас"><Input name="customer_phone" type="tel" maxLength={40} defaultValue={customer?.phone} readOnly={!!customer}/></Field></div>
    <Field label="Борлуулалтын платформ"><select name="platform" value={channel} onChange={e=>setChannel(e.target.value)}><option value="">Сонгох…</option>{options.channels.map(c=><option key={c.name}>{c.name}</option>)}</select></Field>
    <div className="form-grid" key={channel}><Field label="Шимтгэл (%)"><Input name="commission_rate" type="number" min={0} max={100} step="0.01" defaultValue={selectedChannel?.commission_rate||0}/></Field><Field label="Төлбөр орсон данс"><Input name="account" defaultValue={selectedChannel?.account||''} maxLength={80}/></Field></div>
    <div className="form-grid"><Field label="Татварын бүртгэх дүн (₮)"><Price name="tax_amount"/></Field><Field label="НӨАТ баримт"><span className="row inventory-checkbox"><input type="checkbox" name="vat_issued"/>Олгосон</span></Field></div>
@@ -74,7 +74,7 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave}:{kind:'pu
   </>}
   <Field label="Тайлбар"><textarea name="note" maxLength={2000} rows={2}/></Field>
   {blocked&&picked&&source&&!stock.loading&&<p className="error-box" role="alert">Сонгосон агуулахын үлдэгдэл хүрэлцэхгүй.</p>}
-  <Button disabled={busy||!picked||!source||blocked||stock.loading} type="submit">{busy?'Хадгалж байна…':kind==='transfer'?'Шилжүүлэх':'Бүртгэх'}</Button>
+  <Button disabled={busy||!picked||!source||blocked||stock.loading} type="submit">{busy?'Хадгалж байна…':submitLabel||(kind==='transfer'?'Шилжүүлэх':'Бүртгэх')}</Button>
  </GuardedForm>;
 }
 

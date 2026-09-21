@@ -45,12 +45,12 @@ const leadData=(phone,owner='owner@example.test',status='new')=>({name:'Test lea
  assert.equal((await crmPost('update',leadData('99011002',undefined,'lost'),leadWithRule,detail.lead.version))[0],200);
  [,detail]=await crmGet('?id='+leadWithRule);
  assert.ok(detail.activities.some(a=>a.actor==='AntMall SMS'),'lost дүрэм асаалттай үед SMS илгээхийг оролдоно');
- // "won" seed дүрэм хэвээр ажиллана.
+ // Won now requires the inventory confirmation flow; its SMS is covered in lead-purchases.test.cjs.
  [,d]=await crmPost('create',leadData('99011003'));const leadWon=d.id;
  [,detail]=await crmGet('?id='+leadWon);
- assert.equal((await crmPost('update',leadData('99011003',undefined,'won'),leadWon,detail.lead.version))[0],200);
+ assert.equal((await crmPost('update',leadData('99011003',undefined,'won'),leadWon,detail.lead.version))[0],409);
  [,detail]=await crmGet('?id='+leadWon);
- assert.ok(detail.activities.some(a=>a.actor==='AntMall SMS'),'won дүрэм анхнаасаа асаалттай тул SMS илгээхийг оролдоно');
+ assert.ok(!detail.activities.some(a=>a.actor==='AntMall SMS'),'Rejected status change must not send SMS');
  // Дүрэм устгах: цаашид тухайн статуст автомат SMS ажиллахгүй болно.
  assert.equal((await rulesPost({action:'delete',status:'lost'}))[0],200);
  [status,d]=await rulesGet();assert.equal(d.items.length,1);assert.equal(d.items[0].status,'won');
