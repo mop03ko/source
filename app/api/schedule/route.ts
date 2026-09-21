@@ -45,14 +45,22 @@ export async function GET(req:Request){try{
  const mon=url.searchParams.get('month')||new Date(Date.now()+8*3600000).toISOString().slice(0,7);
  month.parse(mon);
  const from=mon+'-01',to=mon+'-31';
+ const mine=await myNames(m);
+ // Хуваарь удирдах эрхтэй (Ахлах, Удирдлага, Админ) бүх хуваарийг хардаг; борлуулалтын ажилтан,
+ // хүргэгч зэрэг бусад нь зөвхөн өөрийнхөө мөрийг авна — шүүлт серверт хийгдэж, бусдын хуваарь
+ // клиент рүү огт дамжихгүй.
+ const all=canManageSchedule(m.role);
+ const marks=mine.map(()=>'?').join(',');
+ const scope=all?'':` AND (member_email=?${mine.length?` OR person_name IN (${marks})`:''})`;
+ const scopeArgs=all?[]:[m.email,...mine];
  const [shifts,requests,people]=await Promise.all([
-  db().prepare('SELECT * FROM work_shifts WHERE day>=? AND day<=? ORDER BY person_name,day').bind(from,to).all(),
-  db().prepare('SELECT * FROM shift_requests WHERE (from_day>=? AND from_day<=?) OR status=? ORDER BY (status=?) DESC,created_at DESC LIMIT 200').bind(from,to,'pending','pending').all(),
-  db().prepare('SELECT person_name,member_email,COUNT(*) days FROM work_shifts WHERE day>=? AND day<=? GROUP BY person_name ORDER BY person_name').bind(from,to).all(),
+  db().prepare(`SELECT * FROM work_shifts WHERE day>=? AND day<=?${scope} ORDER BY person_name,day`).bind(from,to,...scopeArgs).all(),
+  db().prepare(`SELECT * FROM shift_requests WHERE ((from_day>=? AND from_day<=?) OR status=?)${scope} ORDER BY (status=?) DESC,created_at DESC LIMIT 200`).bind(from,to,'pending',...scopeArgs,'pending').all(),
+  db().prepare(`SELECT person_name,member_email,COUNT(*) days FROM work_shifts WHERE day>=? AND day<=?${scope} GROUP BY person_name ORDER BY person_name`).bind(from,to,...scopeArgs).all(),
  ]);
  return Response.json({
   month:mon,shifts:shifts.results,requests:requests.results,people:people.results,
-  can_manage:canManageSchedule(m.role),me:{name:m.name,email:m.email,names:await myNames(m)},
+  can_manage:all,scoped:!all,me:{name:m.name,email:m.email,names:mine},
  },{headers:{'Cache-Control':'no-store'}});
 }catch(e){return err(e);}}
 // Томилгоог бичих/шинэчлэх: (өдөр, ажилтан) хос дээр нэг л бичлэг байна.

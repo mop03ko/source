@@ -52,14 +52,31 @@ const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,m
  // Ажилтан өөрийн нэрийг хуваарьт танина (хуваарьт "Б.Сэлэнгэ", CRM-д "Сэлэнгэ").
  user=AS;[status,d]=await get('?month=2026-09');
  assert.equal(status,200);assert.equal(d.can_manage,false);assert.deepEqual(d.me.names,['Б.Сэлэнгэ']);
+ // Борлуулалтын ажилтанд ЗӨВХӨН өөрийн хуваарь ирнэ — бусдын мөр клиент рүү огт дамжихгүй.
+ assert.equal(d.scoped,true);
+ assert.deepEqual([...new Set(d.shifts.map(x=>x.person_name))],['Б.Сэлэнгэ']);
+ assert.deepEqual(d.people.map(p=>p.person_name),['Б.Сэлэнгэ']);
+ assert.ok(d.shifts.length>0);
+ // Хүргэгч ч мөн адил зөвхөн өөрийнхөө мөрийг хардаг.
+ user={userId:'c',email:'courier@example.test',displayName:'Энх Учрал'};
+ [status,d]=await get('?month=2026-09');
+ assert.equal(d.scoped,true);
+ assert.deepEqual([...new Set(d.shifts.map(x=>x.person_name))],['О.Энх-Учрал']);
+ // Ахлах, Удирдлага, Админ бүгдийг хардаг.
+ user=MG;[status,d]=await get('?month=2026-09');
+ assert.equal(d.scoped,false);assert.equal(d.can_manage,true);
+ assert.ok([...new Set(d.shifts.map(x=>x.person_name))].length>1);
+ user=AS;[status,d]=await get('?month=2026-09');
  // Чөлөөний хүсэлт: зөвхөн өөрийнхөө талаар.
  assert.equal((await post('request',{kind:'leave',person_name:'О.Энх-Учрал',from_day:'2026-09-02'}))[0],403);
  assert.equal((await post('request',{kind:'leave',person_name:'Б.Сэлэнгэ',from_day:'2026-09-20'}))[0],404); // хуваарьгүй өдөр
  const leave=(await post('request',{kind:'leave',person_name:'Б.Сэлэнгэ',from_day:'2026-09-01',reason:'Эмчид'}))[1].id;
  assert.ok(leave);
  assert.equal((await post('request',{kind:'leave',person_name:'Б.Сэлэнгэ',from_day:'2026-09-01'}))[0],409); // давхар хүсэлт
- // Агент батлах эрхгүй.
+ // Агент өөрийн хүсэлтээ л хардаг.
  [status,d]=await get('?month=2026-09');
+ assert.ok(d.requests.every(r=>r.person_name==='Б.Сэлэнгэ'));
+ // Агент батлах эрхгүй.
  let req=d.requests.find(r=>r.id===leave);
  assert.equal((await post('decide',{approve:true},leave,req.version))[0],403);
  // Удирдлага (director) батлана → тэр өдөр Чөлөө болно.
@@ -106,5 +123,5 @@ const shift=(day,person,assignment,email)=>({day,person_name:person,assignment,m
  user=OW;assert.equal((await post('set_shift',shift('2026-09-04','О.Энх-Учрал','Олимпик','courier@example.test')))[0],200);
  user=MG;[st,res]=await delivPost('create',base({delivered_on:'2026-09-04'}));
  assert.match(res.warning,/Олимпик/); // өөр салбарт томилогдсон → сануулга
- console.log('PASS: work schedule role permissions (admin, director and manager all edit and decide; agents and couriers read-only), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, and delivery logging warnings when the courier is off or assigned elsewhere.');
+ console.log('PASS: work schedule role permissions (admin, director and manager all edit, decide and see everyone; agents and couriers are server-side scoped to their own rows and requests), one shift per person-day, assignment/month validation, self-only leave and move requests with duplicate and conflict guards, approval writing Чөлөө and moving the shift, decided-request immutability, requester-only cancellation, on-duty lookup, and delivery logging warnings when the courier is off or assigned elsewhere.');
 })().catch(e=>{console.error(e);process.exit(1)});

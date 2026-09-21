@@ -12,7 +12,7 @@ import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
 import {toast} from '@/components/ui/sonner';
 import {shiftAssignments,shiftOff,shiftIsWork,shiftRequestKinds,shiftRequestStatuses,requestDateLabel,type WorkShift,type ShiftRequest} from '@/lib/crm';
-type Data={month:string;shifts:WorkShift[];requests:ShiftRequest[];people:{person_name:string;member_email:string|null;days:number}[];can_manage:boolean;me:{name:string;email:string;names:string[]}};
+type Data={month:string;shifts:WorkShift[];requests:ShiftRequest[];people:{person_name:string;member_email:string|null;days:number}[];can_manage:boolean;scoped?:boolean;me:{name:string;email:string;names:string[]}};
 const WEEKDAYS=['Ня','Да','Мя','Лх','Пү','Ба','Бя'];
 // Нүдэнд багтахаар томилгоо бүрийг 2-4 тэмдэгтээр харуулна.
 const SHORT:Record<string,string>={'Хүргэлт':'Хүр','Олимпик':'Оли','Юнион':'Юни','Түмэнмолл':'Түм','Gotomarket':'Goto','ИЦА':'ИЦА','Тооллого':'Тоо','Амралт':'а','Чөлөө':'Ч'};
@@ -71,6 +71,7 @@ export default function SchedulePanel({month,onMonthChange,refresh=0}:{month:str
  </div>
  <div className="schedule-navigation"><div className="view-toggle" aria-label="Хуваарийн хэсэг"><Button variant={mode==='grid'?'default':'outline'} aria-pressed={mode==='grid'} onClick={()=>setMode('grid')}><CalendarDays size={16}/>Хуваарь</Button><Button variant={mode==='requests'?'default':'outline'} aria-pressed={mode==='requests'} onClick={()=>setMode('requests')}><Inbox size={16}/>Хүсэлт {pending.length>0&&<span className="schedule-count">{pending.length}</span>}</Button></div><p>{d?.can_manage?'Томилгоог засахын тулд ажилтны өдрийг сонгоно уу.':'Өөрийн ажлын өдрийг сонгож чөлөө, өдөр шилжүүлэх хүсэлт гаргана.'}</p></div>
  <AsyncStatus error={data.error} loading={data.loading} retry={data.retry}/>
+ {d?.scoped&&<p className="muted text-sm" style={{padding:'0 4px 8px'}}>Танд зөвхөн өөрийн хуваарь харагдана. Чөлөө авах, өдөр шилжүүлэх хүсэлтээ нүд дээрээ дарж гаргана уу.</p>}
  {d&&!data.error&&<>
  <div className="schedule-filters"><Input aria-label="Хуваарьт ажилтан хайх" placeholder="Ажилтны нэрээр хайх…" value={query} onChange={e=>setQuery(e.target.value)}/><Button variant={onlyMine?'default':'outline'} aria-pressed={onlyMine} onClick={()=>setOnlyMine(v=>!v)}><Users size={16}/>Миний хуваарь</Button>
  {mode==='grid'?<><SelectControl aria-label="Томилгоогоор шүүх" value={location} onChange={e=>setLocation(e.target.value)}><option value="">Бүх томилгоо</option>{shiftAssignments.map(a=><option key={a}>{a}</option>)}</SelectControl><div className="view-toggle schedule-layout"><Button variant={!daily?'default':'outline'} aria-pressed={!daily} onClick={()=>setLayout('month')}>Сараар</Button><Button variant={daily?'default':'outline'} aria-pressed={daily} onClick={()=>setLayout('day')}>Өдрөөр</Button></div></>:<SelectControl aria-label="Хүсэлтийн төлөв" value={requestStatus} onChange={e=>setRequestStatus(e.target.value)}><option value="">Бүх хүсэлт</option>{Object.entries(shiftRequestStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>}
