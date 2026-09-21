@@ -47,6 +47,7 @@ try{
 
  await cdp('Page.navigate',{url:base+'/?view=dashboard'});
  await wait("!!document.querySelector('.dashboard-report-tabs')");
+ assert.equal(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')||!!document.querySelector('.today-performance')"),false);
  await snap('admin-top-1440');await evaluate("document.querySelector('.dashboard-report').scrollIntoView()");await snap('admin-report-1440');
  for(const label of ['Маркетинг','IT']){await evaluate(`(()=>{[...document.querySelectorAll('.dashboard-report-tabs [role=tab]')].find(e=>e.textContent===${JSON.stringify(label)}).click()})()`);await pause(200);}
  await viewport(390);await snap('admin-report-390');await viewport(768);await snap('admin-report-768');await viewport(1440);
@@ -59,6 +60,8 @@ try{
   const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'test:'+role,email:role+'@example.test',name:role},maxAge:3600});
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
   await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.daily-shift')");
+  if(['manager','director'].includes(role))assert.equal(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')||!!document.querySelector('.today-performance')"),false);
+  if(role==='agent')assert.ok(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')"));
   if(['marketing','it'].includes(role)){await wait("!!document.querySelector('.daily-priority')");assert.ok(await evaluate("document.querySelector('.daily-task-list').textContent.includes('review')"));}
   if(['agent','marketing','it','delivery'].includes(role))assert.equal(await evaluate("!!document.querySelector('.dashboard-report')"),false);
   await viewport(390);await snap(role+'-390');await viewport(1440);await snap(role+'-1440');
