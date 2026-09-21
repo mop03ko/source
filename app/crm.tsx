@@ -166,7 +166,7 @@ export default function CRM({initialNow,initialQuery={}}:{initialNow:number;init
  {view==='duplicates'&&data.me.role!=='agent'&&<DuplicatesPanel members={data.directory} onOpen={openLead}/>}
  {view==='inventory'&&!isIsolatedRole(data.me.role)&&<InventoryPanel me={data.me} members={data.directory}/>}
  {view==='delivery'&&canSeeDeliveries(data.me.role)&&<DeliveriesPanel me={data.me} members={data.directory}/>}
- {view==='schedule'&&<SchedulePanel me={data.me}/>}
+ {view==='schedule'&&<SchedulePanel month={calMonth} onMonthChange={setCalMonth} refresh={refresh}/>}
  {view==='dashboard'&&isAdminLike(data.me.role)&&<DashboardPanel members={data.directory} salesStats={data.stats} salesDistribution={data.distribution} rfrom={reportFrom} rto={reportTo}/>}
  {view==='marketing'&&data.me.role!=='agent'&&data.me.role!=='it'&&<MarketingPanel me={data.me} members={data.directory}/>}
  {view==='it'&&data.me.role!=='agent'&&data.me.role!=='marketing'&&<ItPanel me={data.me} members={data.directory}/>}

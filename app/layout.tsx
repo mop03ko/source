@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import './antd.css';
+import './schedule.css';
 import {DraftGuard} from '@/components/draft-guard';
 import {AntdRegistry} from '@ant-design/nextjs-registry';
 import {AntProvider} from '@/components/ant-provider';
