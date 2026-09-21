@@ -211,6 +211,7 @@ export async function POST(req:Request){try{
    if(b.action==='receive_purchase'||b.action==='return_purchase'){
     if(!b.id)throw new Failure('Орлогын ID дутуу.');
     const purchase=await requireRow(d,'inventory_purchases',b.id),item=String(purchase.item_id),warehouse=String(purchase.warehouse_id);
+    if(purchase.created_by==='user-approved:excel-purchase-history')throw new Failure('Түүхэн импортын бүртгэлээс үлдэгдлийн хөдөлгөөн үүсгэхгүй.',409);
     if(b.action==='receive_purchase'){
      if(purchase.status!=='ordered')throw new Failure('Зөвхөн хүлээгдэж буй захиалгыг хүлээн авна.',409);
      await d.prepare("UPDATE inventory_purchases SET status='received',received_at=? WHERE id=?").bind(now,b.id).run();

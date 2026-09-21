@@ -88,6 +88,12 @@ const scenario=String.raw`
   }
  }
  const unknown=(await invGet('?view=balance&brand=__unregistered__'))[1];assert.ok(unknown.items.every(r=>r.brand===''));
+
+ const historical=sqlite.prepare('SELECT id FROM inventory_purchases LIMIT 1').get();
+ sqlite.prepare("UPDATE inventory_purchases SET created_by='user-approved:excel-purchase-history' WHERE id=?").run(historical.id);
+ const stockBefore=sqlite.prepare('SELECT * FROM inventory_stock_moves ORDER BY id').all();
+ for(const action of ['return_purchase','receive_purchase'])assert.equal((await invPost(action,{qty:1,note:'test'},historical.id))[0],409);
+ assert.deepEqual(sqlite.prepare('SELECT * FROM inventory_stock_moves ORDER BY id').all(),stockBefore);
  console.log('PASS: product identity, variant/condition separation, supplier/price preservation, barcode search, exact unit sale, historical links, stock safety and edit regrouping.');
 })().catch(e=>{console.error(e);process.exit(1)});`;
 eval(bootstrap+scenario);
