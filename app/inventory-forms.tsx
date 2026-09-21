@@ -31,10 +31,10 @@ export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(dat
  </GuardedForm>;
 }
 
-function ItemPicker({value,onChange,warehouse}:{value:Item|null;onChange:(item:Item|null)=>void;warehouse:string}){
+export function ItemPicker({value,onChange,warehouse,label='Бараа сонгох *'}:{value:Item|null;onChange:(item:Item|null)=>void;warehouse:string;label?:string}){
  const [q,setQ]=useState('');
  const search=useRemote<{items:Item[]}>(!value&&q.trim()?'/api/inventory?'+new URLSearchParams({view:'items',q,warehouse_id:warehouse}):null);
- return <div className="form-stack"><Field label="Бараа сонгох *">{value?<div className="inventory-selection"><span><strong>{value.name}</strong><small>{value.code} · {value.imei||[value.capacity,value.color].filter(Boolean).join(' / ')}</small></span><Button type="button" variant="outline" onClick={()=>onChange(null)}>Солих</Button></div>:<Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Код, IMEI эсвэл нэр бичнэ үү"/>}</Field>
+ return <div className="form-stack"><Field label={label}>{value?<div className="inventory-selection"><span><strong>{value.name}</strong><small>{value.code} · {value.imei||[value.capacity,value.color].filter(Boolean).join(' / ')}</small></span><Button type="button" variant="outline" onClick={()=>onChange(null)}>Солих</Button></div>:<Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Код, IMEI эсвэл нэр бичнэ үү"/>}</Field>
   {!value&&<><AsyncStatus error={search.error} loading={search.loading} retry={search.retry}/><div className="inventory-picker">{search.data?.items.map(item=><button type="button" key={item.id} onClick={()=>onChange(item)}><span><strong>{item.name}</strong><small>{item.code}</small></span><span>{item.stock} ш</span></button>)}</div>{search.data&&!search.data.items.length&&<p className="muted">Тохирох бараа олдсонгүй.</p>}</>}
  </div>;
 }

@@ -12,6 +12,7 @@ const bodySchema=z.object({action:z.enum(['create','update','set_status']),id:z.
 const deliverySchema=z.object({
  delivered_on:day,
  kind:z.string().trim().max(60).default(''),
+ item_id:z.string().trim().max(80).nullish(),
  item_info:z.string().trim().max(400).default(''),
  customer_phone:z.string().trim().max(120).default(''),
  address:z.string().trim().max(500).default(''),
@@ -34,6 +35,13 @@ async function resolveCourier(d:{courier_email?:string|null;courier_name:string}
  }
  if(!d.courier_name)throw new Failure('Хүргэлтийн ажилтныг сонгоно уу.');
  return {email:null,name:d.courier_name};
+}
+// Хүргэлтийг агуулахын бараатай холбоход тэр бараа бүртгэлд байгааг батална; холбоогүй ч байж болно
+// (гэрээ, баримт хүргэх эсвэл Excel-ээс импортолсон хуучин мөрүүд).
+async function resolveItem(id?:string|null){
+ if(!id)return null;
+ if(!await db().prepare('SELECT id FROM inventory_items WHERE id=?').bind(id).first())throw new Failure('Агуулахад тохирох бараа олдсонгүй.',404);
+ return id;
 }
 async function getDelivery(id:string){
  const row=await db().prepare('SELECT * FROM deliveries WHERE id=?').bind(id).first<Delivery>();
@@ -58,7 +66,8 @@ export async function GET(req:Request){try{
  const url=new URL(req.url);
  const id=url.searchParams.get('id');
  if(id){
-  const row=await getDelivery(id);
+  const row=await db().prepare('SELECT d.*,it.code item_code,it.name item_name,it.brand item_brand FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE d.id=?').bind(id).first<Delivery&{item_code:string|null;item_name:string|null}>();
+  if(!row)throw new Failure('Хүргэлт олдсонгүй.',404);
   if(isCourierOnly(m.role)&&!(row.courier_email===m.email||(!row.courier_email&&row.courier_name===m.name)))throw new Failure('Энэ хүргэлтийг харах эрхгүй.',403);
   return Response.json({delivery:row},{headers:{'Cache-Control':'no-store'}});
  }
@@ -69,15 +78,16 @@ export async function GET(req:Request){try{
   if(rto){day.parse(rto);where+=' AND delivered_on<=?';args.push(rto);}
   where=mineOnly(m,where,args);
   const done=deliveryDone.map(s=>`'${s}'`).join(',');
-  const [total,byCourier,byMonth,byChannel,byKind,byStatus]=await Promise.all([
+  const [total,byCourier,byMonth,byChannel,byKind,byStatus,byItem]=await Promise.all([
    db().prepare(`SELECT COUNT(*) n FROM deliveries WHERE ${where}`).bind(...args).first<{n:number}>(),
    db().prepare(`SELECT courier_name name,COUNT(*) total,COALESCE(SUM(status IN (${done})),0) done,COALESCE(SUM(status='failed'),0) failed,COALESCE(SUM(status='cancelled'),0) cancelled,COALESCE(SUM(status='pending'),0) pending,MAX(delivered_on) last_day,COUNT(DISTINCT delivered_on) active_days FROM deliveries WHERE ${where} GROUP BY courier_name ORDER BY total DESC`).bind(...args).all(),
    db().prepare(`SELECT substr(delivered_on,1,7) month,COUNT(*) total,COALESCE(SUM(status IN (${done})),0) done FROM deliveries WHERE ${where} GROUP BY month ORDER BY month`).bind(...args).all(),
    db().prepare(`SELECT CASE WHEN payment_channel='' THEN 'Тодорхойгүй' ELSE payment_channel END channel,COUNT(*) total FROM deliveries WHERE ${where} GROUP BY channel ORDER BY total DESC LIMIT 20`).bind(...args).all(),
    db().prepare(`SELECT CASE WHEN kind='' THEN 'Тодорхойгүй' ELSE kind END kind,COUNT(*) total FROM deliveries WHERE ${where} GROUP BY kind ORDER BY total DESC LIMIT 20`).bind(...args).all(),
    db().prepare(`SELECT status,COUNT(*) total FROM deliveries WHERE ${where} GROUP BY status`).bind(...args).all(),
+   db().prepare(`SELECT it.name,it.code,COUNT(*) total FROM deliveries d JOIN inventory_items it ON it.id=d.item_id WHERE ${where.replaceAll('courier_email','d.courier_email').replaceAll('courier_name','d.courier_name')} AND d.item_id IS NOT NULL GROUP BY d.item_id ORDER BY total DESC LIMIT 15`).bind(...args).all(),
   ]);
-  return Response.json({total:total?.n||0,byCourier:byCourier.results,byMonth:byMonth.results,byChannel:byChannel.results,byKind:byKind.results,byStatus:byStatus.results},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({total:total?.n||0,byCourier:byCourier.results,byMonth:byMonth.results,byChannel:byChannel.results,byKind:byKind.results,byStatus:byStatus.results,byItem:byItem.results},{headers:{'Cache-Control':'no-store'}});
  }
  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
  const q=(url.searchParams.get('q')||'').slice(0,100);
@@ -85,7 +95,7 @@ export async function GET(req:Request){try{
  const channel=(url.searchParams.get('channel')||'').slice(0,60),kind=(url.searchParams.get('kind')||'').slice(0,60);
  const from=url.searchParams.get('from')||'',to=url.searchParams.get('to')||'';
  let where='1=1';const args:unknown[]=[];
- if(q){where+=' AND (customer_phone LIKE ? OR address LIKE ? OR item_info LIKE ?)';args.push('%'+q+'%','%'+q+'%','%'+q+'%');}
+ if(q){where+=' AND (d.customer_phone LIKE ? OR d.address LIKE ? OR d.item_info LIKE ? OR it.code LIKE ? OR it.name LIKE ?)';args.push(...Array(5).fill('%'+q+'%'));}
  if(status&&Object.hasOwn(deliveryStatuses,status)){where+=' AND status=?';args.push(status);}
  if(courier){where+=' AND courier_name=?';args.push(courier);}
  if(channel){where+=' AND payment_channel=?';args.push(channel);}
@@ -95,9 +105,9 @@ export async function GET(req:Request){try{
  where=mineOnly(m,where,args);
  const done=deliveryDone.map(s=>`'${s}'`).join(',');
  const [rows,count,stats,couriers,channels]=await Promise.all([
-  db().prepare(`SELECT * FROM deliveries WHERE ${where} ORDER BY delivered_on DESC,created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
-  db().prepare(`SELECT COUNT(*) count FROM deliveries WHERE ${where}`).bind(...args).first<{count:number}>(),
-  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(status IN (${done})),0) done,COALESCE(SUM(status='pending'),0) pending,COALESCE(SUM(status='failed' OR status='cancelled'),0) failed FROM deliveries WHERE ${where}`).bind(...args).first(),
+  db().prepare(`SELECT d.*,it.code item_code,it.name item_name,it.brand item_brand FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where} ORDER BY d.delivered_on DESC,d.created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
+  db().prepare(`SELECT COUNT(*) count FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where}`).bind(...args).first<{count:number}>(),
+  db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(d.status IN (${done})),0) done,COALESCE(SUM(d.status='pending'),0) pending,COALESCE(SUM(d.status='failed' OR d.status='cancelled'),0) failed,COALESCE(SUM(d.item_id IS NOT NULL),0) linked FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where}`).bind(...args).first(),
   db().prepare('SELECT courier_name name,COUNT(*) total FROM deliveries GROUP BY courier_name ORDER BY total DESC LIMIT 100').all(),
   db().prepare("SELECT payment_channel name FROM deliveries WHERE payment_channel!='' GROUP BY payment_channel ORDER BY COUNT(*) DESC LIMIT 60").all(),
  ]);
@@ -115,8 +125,8 @@ export async function POST(req:Request){try{
   const d=deliverySchema.parse(b.data);
   const courier=await resolveCourier(d);
   const id=crypto.randomUUID();
-  await db().prepare('INSERT INTO deliveries(id,delivered_on,kind,item_info,customer_phone,address,payment_channel,contents,courier_email,courier_name,entered_by_email,entered_by_name,status,sale_id,lead_id,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-   .bind(id,d.delivered_on,d.kind,d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,m.email,m.name,d.status,d.sale_id||null,d.lead_id||null,d.note,m.email,now,now).run();
+  await db().prepare('INSERT INTO deliveries(id,delivered_on,kind,item_id,item_info,customer_phone,address,payment_channel,contents,courier_email,courier_name,entered_by_email,entered_by_name,status,sale_id,lead_id,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+   .bind(id,d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,m.email,m.name,d.status,d.sale_id||null,d.lead_id||null,d.note,m.email,now,now).run();
   return Response.json({ok:true,id});
  }
  if(!b.id||!b.version)throw new Failure('Хүргэлтийн хувилбар дутуу.');
@@ -134,8 +144,8 @@ export async function POST(req:Request){try{
   if(isCourierOnly(m.role))throw new Failure('Хүргэлтийн мэдээллийг засах эрхгүй.',403);
   const d=deliverySchema.parse(b.data);
   const courier=await resolveCourier(d);
-  const r=await db().prepare('UPDATE deliveries SET delivered_on=?,kind=?,item_info=?,customer_phone=?,address=?,payment_channel=?,contents=?,courier_email=?,courier_name=?,status=?,sale_id=?,lead_id=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?')
-   .bind(d.delivered_on,d.kind,d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,d.status,d.sale_id||null,d.lead_id||null,d.note,now,row.id,b.version).run();
+  const r=await db().prepare('UPDATE deliveries SET delivered_on=?,kind=?,item_id=?,item_info=?,customer_phone=?,address=?,payment_channel=?,contents=?,courier_email=?,courier_name=?,status=?,sale_id=?,lead_id=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?')
+   .bind(d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,d.status,d.sale_id||null,d.lead_id||null,d.note,now,row.id,b.version).run();
   if(!r.meta.changes)throw new Failure('Хүргэлт шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
   return Response.json({ok:true});
  }
