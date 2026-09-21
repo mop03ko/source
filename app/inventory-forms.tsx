@@ -1,4 +1,5 @@
 'use client';
+import {salePrice} from '@/lib/inventory-pricing';
 import {ChoiceInput} from '@/components/ui/choice-input';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useRef,useState} from 'react';
@@ -11,7 +12,7 @@ import {useRemote} from '@/hooks/use-remote';
 import {fromInput} from '@/lib/crm';
 import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 
-export type Item={id:string;code:string;brand:string;supplier:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
+export type Item={id:string;code:string;brand:string;supplier:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
 export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];channels:Channel[]};
@@ -22,7 +23,7 @@ export const cash=(value:number)=>new Intl.NumberFormat('mn-MN',{maximumFraction
 const Price=({name,value=0,required=false}:{name:string;value?:number;required?:boolean})=><Input name={name} type="number" min={0} max={1_000_000_000} step="0.01" defaultValue={value} required={required}/>;
 
 export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(data:unknown)=>Promise<void>}){
- return <GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);if(!String(f.get('name')||'').trim()||!String(f.get('code')||'').trim())throw new Error('Барааны нэр болон кодыг бөглөнө үү.');await onSave({...Object.fromEntries(f),sale_price:numeric(f,'sale_price'),min_stock:numeric(f,'min_stock')});return true;}}>
+ return <GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);if(!String(f.get('name')||'').trim()||!String(f.get('code')||'').trim())throw new Error('Барааны нэр болон кодыг бөглөнө үү.');await onSave({...Object.fromEntries(f),sale_price:numeric(f,'sale_price'),cash_price:String(f.get('cash_price')||'').trim()===''?null:numeric(f,'cash_price'),min_stock:numeric(f,'min_stock')});return true;}}>
   <p className="form-help">* тэмдэгтэй талбаруудыг заавал бөглөнө үү.</p>
   <h3>Үндсэн мэдээлэл</h3>
   <Field label="Барааны нэр *"><Input name="name" defaultValue={item?.name} required maxLength={300}/></Field>
@@ -32,7 +33,8 @@ export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(dat
   <div className="form-grid"><Field label="Багтаамж / хэмжээ"><Input name="capacity" defaultValue={item?.capacity} placeholder="256GB" maxLength={80}/></Field><Field label="Өнгө"><Input name="color" defaultValue={item?.color} maxLength={80}/></Field></div>
   <Field label="Бусад хувилбар"><Input name="variant" defaultValue={item?.variant} maxLength={120}/></Field>
   <h3>Үнэ ба үлдэгдлийн сануулга</h3>
-  <div className="form-grid"><Field label="Борлуулах нэгжийн үнэ (₮) *"><Price name="sale_price" value={item?.sale_price} required/></Field><Field label="Доод үлдэгдлийн сануулга (ш) *"><Input name="min_stock" type="number" min={0} max={1_000_000} step={1} required defaultValue={item?.min_stock||0}/></Field></div>
+  <div className="form-grid"><Field label="Үндсэн үнэ / зээл (₮) *"><Price name="sale_price" value={item?.sale_price} required/></Field><Field label="Доод үлдэгдлийн сануулга (ш) *"><Input name="min_stock" type="number" min={0} max={1_000_000} step={1} required defaultValue={item?.min_stock||0}/></Field></div>
+  <Field label="Бэлэн төлөлтийн хямдралтай үнэ (₮)"><Input name="cash_price" type="number" min={0} max={1_000_000_000} step="0.01" defaultValue={item?.cash_price??''} placeholder="Хоосон бол үндсэн үнийг ашиглана"/></Field>
   <p className="form-help">Үлдэгдэл, өртөг нь орлого, зарлага, тооллогын хөдөлгөөнөөс тооцогдоно. Борлуулах үнийн өөрчлөлт өмнөх борлуулалтын дүнг өөрчлөхгүй.</p>
   <Button disabled={busy} type="submit">{busy?'Хадгалж байна…':'Бараа хадгалах'}</Button>
  </GuardedForm>;
@@ -46,13 +48,13 @@ export function ItemPicker({value,onChange,warehouse,label='Бараа сонг�
  </div>;
 }
 
-export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,submitLabel}:{kind:'purchase'|'sale'|'transfer';item?:Item;options:Options;warehouse:string;busy:boolean;onSave:(data:unknown)=>Promise<void>;customer?:{name:string;phone:string};submitLabel?:string}){
+export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,submitLabel,creditOnly=false}:{creditOnly?:boolean;kind:'purchase'|'sale'|'transfer';item?:Item;options:Options;warehouse:string;busy:boolean;onSave:(data:unknown)=>Promise<void>;customer?:{name:string;phone:string};submitLabel?:string}){
  const [picked,setPicked]=useState<Item|null>(item||null),[source,setSource]=useState(warehouse),[channel,setChannel]=useState(''),[qty,setQty]=useState(1),[purchaseStatus,setPurchaseStatus]=useState('received');
- const [unit,setUnit]=useState(kind==='sale'?item?.sale_price||0:0),[extra,setExtra]=useState(0);
+ const [unit,setUnit]=useState(kind==='sale'?salePrice(item,creditOnly?'credit':'cash'):0),[extra,setExtra]=useState(0);
  const stock=useRemote<Detail>(picked?'/api/inventory?view=items&id='+encodeURIComponent(picked.id):null);
  const available=stock.data?.byWarehouse.find(w=>w.warehouse_id===source);
  const selectedChannel=options.channels.find(c=>c.name===channel);
- const chooseItem=(it:Item|null)=>{setPicked(it);if(kind==='sale')setUnit(it?.sale_price||0);};
+ const chooseItem=(it:Item|null)=>{setPicked(it);if(kind==='sale')setUnit(salePrice(it,creditOnly||channel?'credit':'cash'));};
  const blocked=kind!=='purchase'&&(!available||available.qty<qty);
  return <GuardedForm className="form-stack" onSubmit={async e=>{
   if(!picked||!source)throw new Error('Бараа болон агуулах сонгоно уу.');
@@ -71,9 +73,10 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
    <p className="inventory-stock-note">Нийт өртөг: <strong>{cash(unit*qty+extra)}</strong> · Нэгжид {cash(qty?(unit*qty+extra)/qty:0)}{purchaseStatus==='ordered'&&<small>Хүлээн авах хүртэл агуулахын үлдэгдэл нэмэгдэхгүй.</small>}</p>
   </>}
   {kind==='sale'&&<>
+   <p className="form-help">{creditOnly||channel?'Үндсэн үнэ сонгогдсон.':'Бэлэн төлөлтийн үнэ сонгогдсон; хямдралгүй бол үндсэн үнэ хэрэглэнэ.'} Төлбөрийн хэлбэр солиход нэгжийн үнэ шинэчлэгдэнэ.</p>
    <div className="form-grid"><Field label="Билл дугаар"><Input name="bill_number" maxLength={120}/></Field><Field label="Борлуулсан огноо"><Input name="sold_at" type="datetime-local"/></Field></div>
    <div className="form-grid"><Field label="Харилцагч"><Input name="customer_name" maxLength={160} defaultValue={customer?.name} readOnly={!!customer}/></Field><Field label="Утас"><Input name="customer_phone" type="tel" maxLength={40} defaultValue={customer?.phone} readOnly={!!customer}/></Field></div>
-   <Field label="Борлуулалтын платформ"><SelectControl name="platform" value={channel} onChange={e=>setChannel(e.target.value)}><option value="">Сонгох…</option>{options.channels.map(c=><option key={c.name}>{c.name}</option>)}</SelectControl></Field>
+   <Field label="Борлуулалтын платформ"><SelectControl name="platform" value={channel} onChange={e=>{setChannel(e.target.value);setUnit(salePrice(picked,creditOnly||e.target.value?'credit':'cash'));}}><option value="">{creditOnly?'Зээл / үндсэн үнэ':'Бэлэн төлөлт'}</option>{options.channels.map(c=><option key={c.name}>{c.name}</option>)}</SelectControl></Field>
    <div className="form-grid" key={channel}><Field label="Шимтгэл (%)"><Input name="commission_rate" type="number" min={0} max={100} step="0.01" defaultValue={selectedChannel?.commission_rate||0}/></Field><Field label="Төлбөр орсон данс"><Input name="account" defaultValue={selectedChannel?.account||''} maxLength={80}/></Field></div>
    <div className="form-grid"><Field label="Татварын бүртгэх дүн (₮)"><Price name="tax_amount"/></Field><div className="field"><span>НӨАТ баримт</span><span className="row inventory-checkbox"><ChoiceInput type="checkbox" name="vat_issued">Олгосон</ChoiceInput></span></div></div>
    <p className="muted">Татварын дүнг баримтаас оруулна. Борлуулалтын дүнгээс өртөг, шимтгэл, оруулсан татварыг хасаж ашиг тооцно.</p>

@@ -91,5 +91,13 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  [status,d]=await invGet('?view=items&group=supplier&'+vendor+'&warehouse_id=missing');assert.equal(d.groups[0].stock,0);
  [status,d]=await invGet('?view=options');assert.ok(d.suppliers.some(s=>s.supplier==='Report Vendor'));assert.ok(d.brands.some(b=>b.brand==='Brand A'));
  console.log('PASS: separate supplier/brand filters; grouped stock, date balances and sales cents aggregate across all pages.');
+ const priced=await invPost('create_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1000,cash_price:800});assert.equal(priced[0],200);
+ assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,800);
+ assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100},priced[1].id))[0],200);
+ assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,800,'Old clients must preserve cash price');
+ assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:700},priced[1].id))[0],400);
+ assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100,cash_price:1200},priced[1].id))[0],400);
+ assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100,cash_price:null},priced[1].id))[0],200);
+ assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,null);
  console.log('PASS: inventory role isolation, admin/manager-only item edits, denied-edit immutability, revoked-role request replay, item creation, purchases/sales and stock enforcement.');
 })().catch(e=>{console.error(e);process.exit(1)});

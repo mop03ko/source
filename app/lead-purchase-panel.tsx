@@ -23,7 +23,7 @@ export default function LeadPurchasePanel({lead,onConfirmed}:{lead:Lead;onConfir
     <p className="inventory-note">Баталгаажуулбал сонгосон агуулахаас тоо ширхэг хасагдаж, борлуулалт бүртгэгдэнэ. Хүсэлт “Худалдан авсан” төлөвт шилжинэ.</p>
     {lead.status==='won'&&<p className="inventory-note">Энэ хүсэлт өмнө нь “Худалдан авсан” төлөвтэй болсон ч агуулахын борлуулалттай холбогдоогүй байна. Энд баталгаажуулахад шинэ зарлага үүснэ. Өмнө нь агуулахаас зарлага бүртгэсэн бол давхар баталгаажуулахгүй.</p>}
     <AsyncStatus error={options.error} loading={options.loading} retry={options.retry}/>
-    {options.data&&<MovementForm kind="sale" options={options.data} warehouse="" busy={busy} customer={{name:lead.name,phone:lead.phone}} submitLabel="Худалдан авалтыг баталгаажуулах" onSave={async values=>{
+    {options.data&&<MovementForm kind="sale" creditOnly options={options.data} warehouse="" busy={busy} customer={{name:lead.name,phone:lead.phone}} submitLabel="Худалдан авалтыг баталгаажуулах" onSave={async values=>{
      if(inFlight.current)throw new Error('Өмнөх хүсэлт дуусахыг хүлээнэ үү.');
      const data={...(values as Record<string,unknown>),lead_id:lead.id,version:lead.version};
      const payload=JSON.stringify(data);

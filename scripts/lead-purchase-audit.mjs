@@ -23,7 +23,7 @@ try{
  const post=async(action,data,id)=>{const r=await fetch(base+'/api/inventory',{method:'POST',headers,body:JSON.stringify({action,data,id})});const value=await r.json();assert.equal(r.status,200,JSON.stringify(value));return value;};
  const wh=(await post('create_warehouse',{name:'Туршилтын агуулах'})).id;
  await post('create_warehouse',{name:'Туршилтын салбар'});
- const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',capacity:'256GB',color:'Silver',sale_price:2000000,min_stock:2})).id;
+ const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',capacity:'256GB',color:'Silver',sale_price:2000000,cash_price:1800000,min_stock:2})).id;
  await post('record_purchase',{item_id:item,warehouse_id:wh,qty:5,unit_cost:1000000.25,additional_cost:25000,status:'received'});
  const created=await fetch(base+'/api/crm',{method:'POST',headers,body:JSON.stringify({action:'create',data:{name:'Туршилтын зээлийн харилцагч',phone:'99050001',product:'Зээлээр утас авах',source:'Facebook',owner:'owner@example.test',status:'pending',next_at:new Date().toISOString(),next_action:'Шийдвэр хүлээж буй'}})});
  assert.equal(created.status,200);const lead=(await created.json()).id;
@@ -60,6 +60,7 @@ try{
  await wait("!!document.querySelector('input[name=sold_at]').value");
  assert.match(await evaluate("document.querySelector('input[name=sold_at]').value"),/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
  await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('5 ш')");
+ assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'2000000');evidence.checks.creditUsesBasePrice=true;
  await fill('input[name=qty]','6');
  assert.ok(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Худалдан авалтыг баталгаажуулах').disabled"));
  await fill('input[name=qty]','2');await fill('input[name=bill_number]','LOAN-UI-1');

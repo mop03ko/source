@@ -1,4 +1,5 @@
 'use client';
+import {salePrice} from '@/lib/inventory-pricing';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {useState} from 'react';
 import {Pagination} from 'antd';
@@ -72,11 +73,11 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
 }
 function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Member;sellers:Member[];canPickSeller:boolean;options?:Options;busy:boolean;onSubmit:(d:unknown)=>unknown}){
  const [item,setItem]=useState<Item|null>(null),[warehouse,setWarehouse]=useState('');
- const [qty,setQty]=useState(1),[price,setPrice]=useState(0);
+ const [qty,setQty]=useState(1),[price,setPrice]=useState(0),[platform,setPlatform]=useState('');
  const [units,setUnits]=useState<Unit[]>([]);
  const stock=useRemote<{byWarehouse:{warehouse_id:string;qty:number}[]}>(item?'/api/inventory?view=items&id='+encodeURIComponent(item.id):null);
  const available=stock.data?.byWarehouse.find(w=>w.warehouse_id===warehouse)?.qty??null;
- const choose=(it:Item|null)=>{setItem(it);setPrice(it?.sale_price||0);};
+ const choose=(it:Item|null)=>{setItem(it);setPrice(salePrice(it,platform?'credit':'cash'));};
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);
   if(!item||!warehouse){toast.error('Бараа болон агуулах сонгоно уу.');return;}
   onSubmit({item_id:item.id,warehouse_id:warehouse,qty,unit_price:price,seller:canPickSeller?f.get('seller'):me.email,
@@ -92,9 +93,10 @@ function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Member;se
   <Field label="Тоо ширхэг *"><Input type="number" min={1} max={available??undefined} required value={qty} onChange={e=>setQty(Math.max(1,Number(e.target.value)||1))}/></Field>
   <Field label="Нэгжийн үнэ *"><Input type="number" min={0} step="0.01" required value={price} onChange={e=>setPrice(Number(e.target.value)||0)}/></Field>
  </div>
+ <p className="form-help">{platform?'Үндсэн үнэ / зээл':'Бэлэн төлөлтийн үнэ'} · Төлбөрийн хэлбэр солиход нэгжийн үнэ шинэчлэгдэнэ.</p>
  <p className="form-help">Нийт: <strong>{cash(price*qty)}</strong></p>
  <div className="form-grid">
-  <Field label="Төлбөрийн хэлбэр"><SelectControl name="platform" defaultValue="">{[<option key="" value="">Бэлэн</option>,...(options?.channels||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)]}</SelectControl></Field>
+  <Field label="Төлбөрийн хэлбэр"><SelectControl name="platform" value={platform} onChange={e=>{setPlatform(e.target.value);setPrice(salePrice(item,e.target.value?'credit':'cash'));}}>{[<option key="" value="">Бэлэн</option>,...(options?.channels||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)]}</SelectControl></Field>
   <Field label="Билл / баримтын дугаар"><Input name="bill_number" maxLength={120}/></Field>
  </div>
  <div className="form-grid">

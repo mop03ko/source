@@ -23,7 +23,7 @@ try{
  const post=async(action,data,id)=>{const r=await fetch(base+'/api/inventory',{method:'POST',headers,body:JSON.stringify({action,data,id})});const value=await r.json();assert.equal(r.status,200,JSON.stringify(value));return value;};
  const wh=(await post('create_warehouse',{name:'Туршилтын агуулах'})).id;
  await post('create_warehouse',{name:'Туршилтын салбар'});
- const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',brand:'SearchBrand',supplier:'Туршилтын нийлүүлэгч',variant:'Тусгай хувилбар',capacity:'256GB',color:'Silver',sale_price:2000000,min_stock:2})).id;
+ const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',brand:'SearchBrand',supplier:'Туршилтын нийлүүлэгч',variant:'Тусгай хувилбар',capacity:'256GB',color:'Silver',sale_price:2000000,cash_price:1800000,min_stock:2})).id;
  for(const q of ['SearchBrand','256GB','Silver','Тусгай хувилбар']){
   const result=await (await fetch(base+'/api/inventory?view=items&q='+encodeURIComponent(q),{headers})).json();
   assert.equal(result.items[0]?.id,item,'Search field: '+q);
@@ -61,7 +61,7 @@ try{
  assert.equal(updated.item.sale_price,2100000);assert.equal(updated.item.stock,4);assert.equal(updated.item.supplier,'Шинэ нийлүүлэгч');
  evidence.checks.productEditPreservesStock=true;await snap('detail-edited');
  await viewport(390);await snap('product-detail-mobile');await viewport(1440);
- await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
+ await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');await fill('select[name=platform]','STOREPAY');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'2100000');await fill('select[name=platform]','');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');evidence.checks.cashCreditPrices=true;await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
  evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(200);
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');
  await click('Үлдэгдлийн тайлан','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('04-balance');
@@ -92,6 +92,13 @@ try{
   const data=await (await fetch(base+'/api/inventory?view=items',{headers})).json();
   assert.equal(data.count,3097);assert.equal(data.summary.units,1528);evidence.checks.workbook={imported:3096,excluded:19,units:1524};await snap('08-imported-stock');
  }
+ await cdp('Page.navigate',{url:base+'/?view=direct'});await wait("[...document.querySelectorAll('button')].some(b=>b.textContent==='Борлуулалт бүртгэх')");
+ await click('Борлуулалт бүртгэх');await wait("!!document.querySelector('input[placeholder=\"Код, IMEI эсвэл нэр бичнэ үү\"]')");
+ await fill('input[placeholder="Код, IMEI эсвэл нэр бичнэ үү"]','UI-TEST-256');await wait("!!document.querySelector('.inventory-picker button')");await evaluate("document.querySelector('.inventory-picker button').click()");await pause(300);
+ assert.equal(await evaluate("document.querySelector('input[aria-label=\"Нэгжийн үнэ *\"]').value"),'1800000');
+ await fill('select[name=platform]','STOREPAY');assert.equal(await evaluate("document.querySelector('input[aria-label=\"Нэгжийн үнэ *\"]').value"),'2100000');
+ await fill('select[name=platform]','');assert.equal(await evaluate("document.querySelector('input[aria-label=\"Нэгжийн үнэ *\"]').value"),'1800000');
+ evidence.checks.directCashCreditPrices=true;await snap('direct-sale-pricing');
  assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));
  evidence.checks.runtimeErrors=0;console.log('PASS: warehouse desktop/mobile, detail-sale workflow, profit/balance and optional XLSX import.');
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

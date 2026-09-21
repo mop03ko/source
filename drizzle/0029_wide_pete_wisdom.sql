@@ -1,0 +1,1 @@
+ALTER TABLE `inventory_items` ADD `cash_price` real;

@@ -113,9 +113,12 @@ export async function POST(req:Request){try{
     if(!id)throw new Failure('Барааны ID дутуу.');
     if(input.code&&await d.prepare('SELECT 1 FROM inventory_items WHERE code=? AND id!=?').bind(input.code,id).first())throw new Failure('Барааны код давхардсан.',409);
     if(input.imei&&await d.prepare('SELECT 1 FROM inventory_items WHERE imei=? AND id!=?').bind(input.imei,id).first())throw new Failure('IMEI / сериал давхардсан.',409);
-    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock];
-    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
-    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
+    const previous=b.action==='update_item'?await requireRow(d,'inventory_items',id):null;
+    const cashPrice=input.cash_price===undefined?(previous?.cash_price??null):input.cash_price;
+    if(cashPrice!==null&&Number(cashPrice)>input.sale_price)throw new Failure('Бэлэн төлөлтийн үнэ үндсэн үнээс их байж болохгүй.');
+    const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice];
+    if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
+    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
     return {ok:true,id};
    }
    if(b.action==='save_channel'){
