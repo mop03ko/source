@@ -2,7 +2,7 @@ export const productCategories=[
  'Гар утас','Чихэвч','Таблет','Зөөврийн компьютер','Суурин компьютер','Ухаалаг цаг',
  'Дрон','Камер','Микрофон','Гар утасны тогтворжуулагч','Чанга яригч','Тоглоомын төхөөрөмж',
  'Дэлгэц','Принтер','Компьютерийн эд анги','Сүлжээний төхөөрөмж','Хяналтын камер',
- 'Гэр, хамгаалалт','Цэнэглэгч, кабель','Дагалдах хэрэгсэл','Ширээ, тавилга',
+ 'Кэйс','Цэнэглэгч, кабель','Дагалдах хэрэгсэл','Ширээ, тавилга',
  'Тоос сорогч, цэвэрлэгээ','Агаар цэвэршүүлэгч','Чийгшүүлэгч, чийг хатаагч','Гал тогооны цахилгаан хэрэгсэл',
  'Үс арчилгааны төхөөрөмж','Массажны төхөөрөмж','Цахилгаан унаа','Сэнс',
 ] as const;
@@ -10,7 +10,7 @@ export const productCategories=[
 export function categoryFromName(name:string):string|null{
  const n=name.normalize('NFKC').toUpperCase().replace(/\s+/g,' ').trim();
  // Device compatibility words in accessories must never turn them into phones/tablets.
- if(/NAALT|НААЛТ|CASELOOP|HANDS 8|SILICON CASE|CASE-CN|PROMAXCASE|BEATS CASE|(?:IPHONE|IP \d|S25).*(?:CASE|COVER)|^CASE IP/.test(n))return 'Гэр, хамгаалалт';
+ if(/NAALT|НААЛТ|CASELOOP|HANDS 8|SILICON CASE|CASE-CN|PROMAXCASE|BEATS CASE|(?:IPHONE|IP \d|S25).*(?:CASE|COVER)|^CASE IP/.test(n))return 'Кэйс';
  if(/TRANSCEIVER|TEKDE[CK] MAT|CHARGING HANDLE|SELFIE STICK|\bFILTER\b|BATTERY|TABLETOP WITH|ANTI.THE|ГАР$|BANDLOOP|STRAP|BRACKET|SHELF|CABLE MANAGEMENT|FOOT.?REST|FOOT REST|^EYES\s*\d|^\[POUT\] EYES|^PENCIL |APPLE PENCIL|MAGIC (?:MOUSE|KEYBOARD)|IPAD.*KEYBOARD|\bSD (?:CARD|CART)\b|MOP 4EA|^CVC |\bAIRTAG\b/.test(n))return 'Дагалдах хэрэгсэл';
  if(/ADAPTER|ELECTROBOOST|MAGPOWER|MOPHIE|\bCABLE\b|^\[POUT\] HANDS|^HANDS\s*\d/.test(n))return 'Цэнэглэгч, кабель';
  if(/AIRPODS|AIPODS|EARPODS|\bBUDS\s*\d|WF-1000XM|\bEARS\s*2\b/.test(n))return 'Чихэвч';

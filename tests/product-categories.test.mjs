@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {categoryFromName,classification,productCategories} from '../scripts/assign-product-categories.mjs';
 for(const [name,expected] of [
  ['iPhone 17 Pro Max','Гар утас'],['Galaxy S25 Ultra','Гар утас'],['AirPods Pro 2','Чихэвч'],
- ['iPhone 17 Pro Max Case','Гэр, хамгаалалт'],['iPad Magic Keyboard','Дагалдах хэрэгсэл'],
+ ['iPhone 17 Pro Max Case','Кэйс'],['iPad Magic Keyboard','Дагалдах хэрэгсэл'],
  ['[POUT] HANDS 7 for Apple','Цэнэглэгч, кабель'],['Dyson V15 Filter','Дагалдах хэрэгсэл'],
  ['Galaxy Watch 7','Ухаалаг цаг'],['Galaxy Tab S10','Таблет'],['MacBook Air','Зөөврийн компьютер'],
  ['DJI Osmo Mobile 7','Гар утасны тогтворжуулагч'],['DJI Osmo Pocket 3','Камер'],
