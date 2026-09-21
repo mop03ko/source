@@ -1,19 +1,10 @@
+"use client"
+import {Empty as AntEmpty} from "antd"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-function Empty({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="empty"
-      className={cn(
-        "flex min-w-0 flex-1 flex-col items-center justify-center gap-6 rounded-lg border-dashed p-6 text-center text-balance md:p-12",
-        className
-      )}
-      {...props}
-    />
-  )
-}
+function Empty({className,children,...props}:React.ComponentProps<"div">){return <div {...props} data-slot="empty" className={className}><AntEmpty image={AntEmpty.PRESENTED_IMAGE_SIMPLE} description={children}/></div>;}
 
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (

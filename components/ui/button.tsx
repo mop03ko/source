@@ -1,6 +1,8 @@
+"use client"
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
+import {Button as AntButton} from "antd"
 
 import { cn } from "@/lib/utils"
 
@@ -48,17 +50,10 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  const Comp = asChild ? Slot.Root : "button"
+  if(asChild)return <Slot.Root className={cn(buttonVariants({variant,size,className}))} {...props}/>;
+  const {type,ref,...rest}=props;
+  return <AntButton data-slot="button" {...rest} color={undefined} ref={ref} htmlType={type??"submit"} type={variant==="default"||variant==="destructive"?"primary":variant==="ghost"?"text":variant==="link"?"link":"default"} danger={variant==="destructive"} size={size==="sm"||size==="xs"||size==="icon-sm"||size==="icon-xs"?"small":size==="lg"||size==="icon-lg"?"large":"middle"} data-variant={variant} data-size={size} className={cn("crm-ant-button",size?.startsWith("icon")&&"crm-icon-button",className)}/>;
 
-  return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
 }
 
 export { Button, buttonVariants }

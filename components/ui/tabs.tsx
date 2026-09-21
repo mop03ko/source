@@ -1,97 +1,22 @@
-"use client"
+'use client';
+import * as React from 'react';
+import {Tabs as AntTabs} from 'antd';
+import {cva} from 'class-variance-authority';
 import {useDraftGuard} from '@/components/draft-guard';
-
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { Tabs as TabsPrimitive } from "radix-ui"
-
-import { cn } from "@/lib/utils"
-
-function Tabs({
-  className,
-  orientation = "horizontal",
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
-  const allow=useDraftGuard();
-  const [localValue,setLocalValue]=React.useState(props.defaultValue??'');
-  return (
-    <TabsPrimitive.Root
-      data-slot="tabs"
-      data-orientation={orientation}
-      orientation={orientation}
-      activationMode="manual"
-      className={cn(
-        "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
-        className
-      )}
-      {...props}
-      value={props.value??localValue}
-      onValueChange={value=>{if(allow()){setLocalValue(value);props.onValueChange?.(value);}}}
-    />
-  )
+const Context=React.createContext({value:'',change:(_value:string)=>{},id:''});
+export function Tabs({value,defaultValue='',onValueChange,orientation='horizontal',children,...props}:React.ComponentProps<'div'>&{value?:string;defaultValue?:string;onValueChange?:(value:string)=>void;orientation?:'horizontal'|'vertical'}){
+ const [local,setLocal]=React.useState(defaultValue),allow=useDraftGuard(),id=React.useId();
+ return <Context.Provider value={{value:value??local,id,change:next=>{if(next!==(value??local)&&allow()){setLocal(next);onValueChange?.(next);}}}}><div {...props} data-slot="tabs" data-orientation={orientation}>{children}</div></Context.Provider>;
 }
-
-const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
-  {
-    variants: {
-      variant: {
-        default: "bg-muted",
-        line: "gap-1 bg-transparent",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
-function TabsList({
-  className,
-  variant = "default",
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants>) {
-  return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
-      {...props}
-    />
-  )
+export const tabsListVariants=cva('',{variants:{variant:{default:'',line:''}}});
+type TriggerProps=React.ComponentProps<'button'>&{value:string};
+export function TabsTrigger({children}:TriggerProps){return <>{children}</>;}
+export function TabsList({children,className,...props}:React.ComponentProps<'div'>&{variant?:'default'|'line'}){
+ const ctx=React.useContext(Context);
+ const items=React.Children.toArray(children).filter((child):child is React.ReactElement<TriggerProps>=>React.isValidElement(child)&&child.type===TabsTrigger).map(child=>({key:child.props.value,label:<span data-slot="tabs-trigger" data-state={ctx.value===child.props.value?'active':'inactive'}>{child.props.children}</span>,disabled:child.props.disabled}));
+ return <AntTabs id={ctx.id} className={className} data-slot="tabs-list" aria-label={props['aria-label']} activeKey={ctx.value} onChange={ctx.change} items={items}/>;
 }
-
-function TabsTrigger({
-  className,
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
-  return (
-    <TabsPrimitive.Trigger
-      data-slot="tabs-trigger"
-      className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
-        className
-      )}
-      {...props}
-    />
-  )
+export function TabsContent({value,children,...props}:React.ComponentProps<'div'>&{value:string}){
+ const ctx=React.useContext(Context);if(ctx.value!==value)return null;
+ return <div {...props} data-slot="tabs-content" role="tabpanel" id={`${ctx.id}-panel-${value}`} aria-labelledby={`${ctx.id}-tab-${value}`}>{children}</div>;
 }
-
-function TabsContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Content>) {
-  return (
-    <TabsPrimitive.Content
-      data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
-      {...props}
-    />
-  )
-}
-
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }

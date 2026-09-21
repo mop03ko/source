@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button';
 import {Popover,PopoverContent,PopoverTrigger} from '@/components/ui/popover';
 import {dateLabel} from '@/lib/crm';
 import {playNotificationSound} from '@/lib/sound';
-import {toast} from 'sonner';
+import {toast} from '@/components/ui/sonner';
 type Notice={id:string;lead_id:string;kind:string;created_at:string;read_at:string|null;name:string;product:string;next_action:string};
 type Feed={items:Notice[];total:number;unread:number;page:number};
 async function request(body?:unknown,query=''){const r=await fetch('/api/notifications'+query,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'});const d=await r.json() as {error?:string};if(!r.ok)throw new Error(d.error||'Мэдэгдэл ачаалахад алдаа гарлаа.');return d;}

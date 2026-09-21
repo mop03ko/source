@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 const dir=await mkdtemp(join(tmpdir(),'antmall-inventory-')),out=resolve('artifacts/inventory-audit');
 await mkdir(out,{recursive:true});
 const base='http://127.0.0.1:34673',secret=randomBytes(32).toString('base64');
-const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true',AUTH_GOOGLE_ID:'test',AUTH_GOOGLE_SECRET:'test',CRM_OWNER_EMAIL:'owner@example.test',TURSO_DATABASE_URL:'file:'+join(dir,'test.db'),TURSO_AUTH_TOKEN:'',NEXT_TELEMETRY_DISABLED:'1'};delete env.VERCEL;
+const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true',AUTH_GOOGLE_ID:'test',AUTH_GOOGLE_SECRET:'test',CRM_OWNER_EMAIL:'owner@example.test',TURSO_DATABASE_URL:'file:'+join(dir,'test.db'),TURSO_AUTH_TOKEN:'',ANTMALL_SMS_API_KEY:'',CRM_GOOGLE_SERVICE_ACCOUNT_JSON:'',NEXT_TELEMETRY_DISABLED:'1'};delete env.VERCEL;
 execFileSync(process.execPath,['scripts/migrate.mjs'],{env,stdio:'pipe'});
 const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','34673'],{env,stdio:'ignore',windowsHide:true});
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -44,7 +44,7 @@ try{
  await cdp('Page.navigate',{url:base});await wait("!!document.querySelector('.nav-button')");await pause(1200);await click('Агуулах','.nav-button');await wait("!!document.querySelector('.inventory-item-link')");
  await snap('01-stock-desktop');await click('Туршилтын утасUI-TEST-256','.inventory-item-link');await wait("!!document.querySelector('.detail-body .sync-summary')");
  await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
- evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(200);await evaluate("document.querySelector('[data-slot=sheet-content] > button').click()");await pause(200);
+ evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(200);
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');
  await click('Үлдэгдлийн тайлан','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('04-balance');
  await viewport(390);await snap('05-balance-mobile');await click('Бараа, үлдэгдэл','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('06-stock-mobile');await viewport(1440);

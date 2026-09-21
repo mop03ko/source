@@ -1,4 +1,5 @@
 'use client';
+import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useState} from 'react';
 import {Truck,Search,Plus,List,ChartNoAxesCombined,CheckCircle2,Clock,CircleX,ArrowUpRight,Loader2,Package,Link2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -11,7 +12,7 @@ import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard'
 import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
 import {ItemPicker,type Item} from './inventory-forms';
-import {toast} from 'sonner';
+import {toast} from '@/components/ui/sonner';
 import {deliveryStatuses,deliveryDone,deliveryKinds,isCourierOnly,requestDateLabel,type Member,type Delivery} from '@/lib/crm';
 type Stats={total:number;done:number;pending:number;failed:number;linked:number};
 type CourierRow={name:string;total:number;done:number;failed:number;cancelled:number;pending:number;last_day:string;active_days:number};
@@ -29,14 +30,14 @@ function DeliveryForm({row,members,legacy,busy,onSubmit}:{row?:Linked;members:Me
  const [item,setItem]=useState<Item|null>(row?.item_id?{id:row.item_id,code:row.item_code||'',name:row.item_name||'',brand:row.item_brand||''} as Item:null);
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const c=String(f.get('courier')||'');
   onSubmit({delivered_on:f.get('delivered_on'),kind:f.get('kind'),item_id:item?.id||null,item_info:f.get('item_info'),customer_phone:f.get('customer_phone'),address:f.get('address'),payment_channel:f.get('payment_channel'),contents:f.get('contents'),courier_email:c.startsWith('name:')?null:c,courier_name:c.startsWith('name:')?c.slice(5):'',status:f.get('status'),note:f.get('note')});}}>
- <div className="form-grid"><Field label="Огноо (УБ) *"><Input name="delivered_on" type="date" required defaultValue={row?.delivered_on||todayUB()}/></Field><Field label="Төрөл"><select name="kind" defaultValue={row?.kind||'24 цаг'}>{[...new Set([...deliveryKinds,...(row?.kind?[row.kind]:[])])].map(k=><option key={k}>{k}</option>)}</select></Field></div>
+ <div className="form-grid"><Field label="Огноо (УБ) *"><Input name="delivered_on" type="date" required defaultValue={row?.delivered_on||todayUB()}/></Field><Field label="Төрөл"><SelectControl name="kind" defaultValue={row?.kind||'24 цаг'}>{[...new Set([...deliveryKinds,...(row?.kind?[row.kind]:[])])].map(k=><option key={k}>{k}</option>)}</SelectControl></Field></div>
  <ItemPicker value={item} onChange={setItem} warehouse="" label="Агуулахын бараа (сонголттой)"/>
  <Field label="Барааны нэмэлт тайлбар"><Input name="item_info" maxLength={400} defaultValue={row?.item_info} placeholder="Агуулахын бүртгэлд байхгүй бол гараар бичнэ"/></Field>
  <div className="form-grid"><Field label="Харилцагчийн утас"><Input name="customer_phone" maxLength={120} defaultValue={row?.customer_phone} placeholder="99112233"/></Field><Field label="Төлбөрийн суваг"><Input name="payment_channel" maxLength={60} defaultValue={row?.payment_channel} placeholder="Зөгий, Гэгээн, Storepay…"/></Field></div>
- <Field label="Хаягийн мэдээлэл"><textarea name="address" rows={2} maxLength={500} defaultValue={row?.address} placeholder="Дүүрэг, хороо, байр, орц, тоот…"/></Field>
- <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><select name="courier" required defaultValue={courierValue(row)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</select></Field><Field label="Төлөв"><select name="status" defaultValue={row?.status||'pending'}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field></div>
+ <Field label="Хаягийн мэдээлэл"><TextareaControl name="address" rows={2} maxLength={500} defaultValue={row?.address} placeholder="Дүүрэг, хороо, байр, орц, тоот…"/></Field>
+ <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><SelectControl name="courier" required defaultValue={courierValue(row)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</SelectControl></Field><Field label="Төлөв"><SelectControl name="status" defaultValue={row?.status||'pending'}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl></Field></div>
  <Field label="Хамт хүргэх зүйлс"><Input name="contents" maxLength={200} defaultValue={row?.contents} placeholder="Бараа, гэрээ, баталгааны хуудас"/></Field>
- <Field label="Нэмэлт тайлбар"><textarea name="note" rows={2} maxLength={2000} defaultValue={row?.note}/></Field>
+ <Field label="Нэмэлт тайлбар"><TextareaControl name="note" rows={2} maxLength={2000} defaultValue={row?.note}/></Field>
  <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Хадгалах</Button>
  </GuardedForm>;
 }
@@ -75,10 +76,10 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  {mode==='list'?<>
  {stats&&<div className="metrics"><div className="metric"><div><span>Нийт хүргэлт</span><Truck size={19}/></div><strong>{stats.total.toLocaleString()}</strong><small>Шүүлтүүрт тохирсон</small></div><div className="metric"><div><span>Хүргэсэн</span><CheckCircle2 size={19}/></div><strong>{stats.done.toLocaleString()}</strong><small>{pct(stats.done,stats.total)}% гүйцэтгэл</small></div><div className="metric metric-focus"><div><span>Хүлээгдэж буй</span><Clock size={19}/></div><strong>{stats.pending.toLocaleString()}</strong><small>Хүргэгдэх шаардлагатай</small></div><div className={'metric'+(stats.failed?' metric-alert':'')}><div><span>Хүргэгдээгүй</span><CircleX size={19}/></div><strong>{stats.failed.toLocaleString()}</strong><small>Цуцалсан, бүтээгүй</small></div><div className="metric"><div><span>Бараатай холбогдсон</span><Link2 size={19}/></div><strong>{stats.linked.toLocaleString()}</strong><small>{pct(stats.linked,stats.total)}% агуулахын бүртгэлтэй</small></div></div>}
  <div className="filters"><div className="search"><Search size={17}/><Input aria-label="Хүргэлт хайх" placeholder="Утас, хаяг, бараагаар хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
- <select aria-label="Төлөвөөр шүүх" value={status} onChange={e=>setFilter(setStatus,e.target.value)}><option value="">Бүх төлөв</option>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
- {!courierOnly&&<select aria-label="Хүргэгчээр шүүх" value={courier} onChange={e=>setFilter(setCourier,e.target.value)}><option value="">Бүх хүргэгч</option>{(list.data?.couriers||[]).map(c=><option key={c.name} value={c.name}>{c.name} ({c.total})</option>)}</select>}
- <select aria-label="Сувгаар шүүх" value={channel} onChange={e=>setFilter(setChannel,e.target.value)}><option value="">Бүх суваг</option>{(list.data?.channels||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select>
- <select aria-label="Төрлөөр шүүх" value={kind} onChange={e=>setFilter(setKind,e.target.value)}><option value="">Бүх төрөл</option>{deliveryKinds.map(k=><option key={k} value={k}>{k}</option>)}</select>
+ <SelectControl aria-label="Төлөвөөр шүүх" value={status} onChange={e=>setFilter(setStatus,e.target.value)}><option value="">Бүх төлөв</option>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>
+ {!courierOnly&&<SelectControl aria-label="Хүргэгчээр шүүх" value={courier} onChange={e=>setFilter(setCourier,e.target.value)}><option value="">Бүх хүргэгч</option>{(list.data?.couriers||[]).map(c=><option key={c.name} value={c.name}>{c.name} ({c.total})</option>)}</SelectControl>}
+ <SelectControl aria-label="Сувгаар шүүх" value={channel} onChange={e=>setFilter(setChannel,e.target.value)}><option value="">Бүх суваг</option>{(list.data?.channels||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</SelectControl>
+ <SelectControl aria-label="Төрлөөр шүүх" value={kind} onChange={e=>setFilter(setKind,e.target.value)}><option value="">Бүх төрөл</option>{deliveryKinds.map(k=><option key={k} value={k}>{k}</option>)}</SelectControl>
  <Input aria-label="Огноо: эхлэх" type="date" value={from} max={to||undefined} onChange={e=>setFilter(setFrom,e.target.value)}/><span className="muted">—</span><Input aria-label="Огноо: дуусах" type="date" value={to} min={from||undefined} onChange={e=>setFilter(setTo,e.target.value)}/>
  {(q||status||courier||channel||kind||from||to)&&<Button variant="ghost" size="sm" onClick={()=>{setQ('');setStatus('');setCourier('');setChannel('');setKind('');setFrom('');setTo('');setPage(1);}}>Шүүлтүүр цэвэрлэх</Button>}</div>
  <AsyncStatus error={list.error} loading={list.loading} retry={list.retry}/>

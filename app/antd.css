@@ -1,0 +1,61 @@
+/* Ant Design owns controls; these rules retain the CRM's layout and branding. */
+.crm-ant-layout{min-height:100dvh;flex-direction:row}
+.crm-ant-sider{position:sticky!important;top:0;height:100dvh;overflow:hidden;background:#28153d!important}
+.crm-ant-sidebar-inner{height:100%;display:flex;flex-direction:column;background:#28153d;color:#e5ddef}
+.crm-ant-sidebar-inner .brand,.crm-ant-sidebar-inner .sidebar-user{display:flex;flex-shrink:0}
+.crm-ant-sidebar-content{flex:1;overflow:auto;min-height:0}
+.crm-ant-menu.ant-menu{background:transparent;border:0;padding:0 10px;color:#d3c7df}
+.crm-ant-menu .ant-menu-item{width:calc(100% - 8px);margin:4px;height:46px;line-height:46px}
+.crm-ant-menu .ant-menu-item-selected{background:#473159!important;box-shadow:inset 3px 0 #f58b32;color:#fff!important}
+.crm-ant-menu .ant-menu-item:hover{background:#39234d!important}
+.crm-ant-menu-label{display:flex;align-items:center;gap:12px}
+.crm-ant-menu-label svg{flex:none}
+.crm-ant-menu-label .nav-count{line-height:20px}
+.crm-ant-button{gap:8px}
+.crm-ant-button svg{flex-shrink:0;width:16px;height:16px}
+.crm-icon-button{padding:0!important;width:36px;min-width:36px}
+.crm-ant-input{width:100%;min-width:0}
+.crm-select-control{display:inline-block;position:relative;min-width:0;max-width:100%;vertical-align:middle}
+.crm-native-select{position:absolute!important;width:1px!important;min-width:0!important;height:1px!important;min-height:0!important;padding:0!important;border:0!important;opacity:0;pointer-events:none;left:0;bottom:0}
+.crm-date-control{position:relative;display:inline-block;width:100%;min-width:0}
+.crm-date-control .ant-picker{width:100%;min-width:0}
+.crm-date-control .ant-picker input{height:auto!important;min-height:0!important;padding:0!important}
+.filters>.crm-date-control{width:170px}
+.ant-checkbox-wrapper,.ant-radio-wrapper{margin:0}
+.field>.crm-select-control,.form-stack>.crm-select-control{width:100%}
+.filters>.crm-select-control{width:210px;font-size:12px}
+.assign-inline .crm-select-control{width:150px}
+.crm-select-control .ant-select{max-width:100%}
+.crm-select-control .ant-select-input{min-height:0!important}
+.crm-ant-table{width:100%;min-width:0;overflow:hidden}
+.crm-ant-table .ant-table-content{overflow-x:auto!important}
+.crm-ant-table .ant-table-cell{white-space:nowrap}
+.crm-ant-table .ant-table-placeholder{display:none}
+.crm-overlay-title{margin:0;font-size:20px;font-weight:600;line-height:1.4;padding-right:16px}
+.crm-overlay-description{margin:6px 0 0;font-size:13px;font-weight:400;color:#6a5877}
+.crm-overlay-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.ant-modal .form-dialog{max-width:none!important;max-height:calc(90dvh - 120px);overflow-y:auto;padding:2px}
+.ant-modal .ant-modal-body{max-height:calc(90dvh - 120px);overflow-y:auto}
+.ant-drawer .detail-sheet{width:100%!important;max-width:100%!important;overflow:visible!important}
+.ant-drawer .ant-drawer-body{min-width:0}
+.ant-tabs.detail-tabs{height:auto;width:100%}
+.ant-tabs .ant-tabs-tab-btn{font-size:13px}
+.ant-tabs .ant-tabs-nav{min-height:40px}
+.ant-popover-inner .notification-panel{max-width:min(380px,calc(100vw - 48px))}
+.ant-pagination.page-controls{width:auto;justify-content:flex-end}
+.ant-empty-description [data-slot=empty-header]{margin:auto}
+.ant-empty-description [data-slot=empty-icon]{display:none}
+@media(max-width:767px){
+ .filters>.crm-select-control{width:100%;flex:1 1 160px}
+ .ant-modal{max-width:calc(100vw - 24px);margin:12px auto}
+ .ant-modal .ant-modal-container{padding:20px 16px}
+ .ant-drawer .ant-drawer-header{padding:16px}
+ .crm-overlay-title{font-size:18px}
+ .ant-select,.ant-input,.ant-picker{font-size:16px}
+ .crm-ant-button{white-space:normal}
+ .ant-tabs .ant-tabs-nav-wrap{max-width:100%}
+ .lead-list-table .ant-table-content>table{width:100%!important;min-width:0!important;table-layout:fixed!important}
+ .lead-list-table colgroup{display:none}
+ .lead-list-table .lead-link{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+ .lead-list-table .lead-link>span:last-child{min-width:0}
+}

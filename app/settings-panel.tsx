@@ -1,7 +1,9 @@
 'use client';
+import {ChoiceInput} from '@/components/ui/choice-input';
+import {TextareaControl} from '@/components/ui/form-controls';
 import {useUnsavedChanges} from '@/components/draft-guard';
 import AvatarImage from 'next/image';
-import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';import {toast} from 'sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';import SmsRulesPanel from './sms-rules-panel';
+import {useState,type FormEvent} from 'react';import {Volume2,Save,PlayCircle,Send,Loader2,Trash2} from 'lucide-react';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';import {toast} from '@/components/ui/sonner';import {soundPresets,playNotificationSound} from '@/lib/sound';import {isAdminLike} from '@/lib/crm';import type {Member} from '@/lib/crm';import SheetsPanel from './sheets-panel';import SmsRulesPanel from './sms-rules-panel';
 type Settings={notification_sound:string};
 type Profile={phone?:string|null;avatar?:string|null};
 // Зурган аватарыг 192x192 квадрат болгож шахна: DB-д base64 маягаар хадгалахад хэт том болохоос сэргийлнэ.
@@ -56,14 +58,14 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  </section></TabsContent>
  {admin&&<TabsContent value="system"><section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
- <div className="sound-options">{Object.entries(soundPresets).map(([k,v])=><label key={k} className={'sound-option'+(sound===k?' active':'')}><input type="radio" name="sound" value={k} checked={sound===k} onChange={()=>setSound(k)}/><Volume2 size={16}/><span>{v}</span><Button type="button" variant="ghost" size="icon" aria-label={v+' сонсох'} disabled={k==='none'} onClick={()=>playNotificationSound(k)}><PlayCircle size={17}/></Button></label>)}</div>
+ <div className="sound-options">{Object.entries(soundPresets).map(([k,v])=><label key={k} className={'sound-option'+(sound===k?' active':'')}><ChoiceInput type="radio" name="sound" value={k} checked={sound===k} onChange={()=>setSound(k)}/><Volume2 size={16}/><span>{v}</span><Button type="button" variant="ghost" size="icon" aria-label={v+' сонсох'} disabled={k==='none'} onClick={()=>playNotificationSound(k)}><PlayCircle size={17}/></Button></label>)}</div>
  <div className="row"><Button className="primary" disabled={busy||!dirty} onClick={save}><Save size={16}/>Хадгалах</Button>{dirty&&<Button variant="ghost" onClick={()=>setSound(initial.notification_sound)}>Цуцлах</Button>}</div>
  </section></TabsContent>}
  {admin&&<TabsContent value="sms">
  <SmsRulesPanel/>
  <section className="panel"><div className="eyebrow">ГАРААР SMS ИЛГЭЭХ</div><h2>Дурын дугаарт мессеж илгээх</h2><p className="muted">Утасны дугаар, мессежийг гараар оруулж шууд илгээнэ.</p>
  {sendError&&<div role="alert" className="error-box">{sendError}</div>}
- <form className="form-stack" onSubmit={sendManual}><label className="field"><span>Утасны дугаар</span><Input required value={to} onChange={e=>setTo(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label><label className="field"><span>Мессеж</span><textarea required rows={4} maxLength={600} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Илгээх мессежээ бичнэ үү…"/></label><Button className="primary" type="submit" disabled={sendBusy}>{sendBusy?<Loader2 className="spin" size={16}/>:<Send size={16}/>}Илгээх</Button></form>
+ <form className="form-stack" onSubmit={sendManual}><label className="field"><span>Утасны дугаар</span><Input required value={to} onChange={e=>setTo(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label><label className="field"><span>Мессеж</span><TextareaControl required rows={4} maxLength={600} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Илгээх мессежээ бичнэ үү…"/></label><Button className="primary" type="submit" disabled={sendBusy}>{sendBusy?<Loader2 className="spin" size={16}/>:<Send size={16}/>}Илгээх</Button></form>
  </section>
  </TabsContent>}
  {admin&&<TabsContent value="sheets"><SheetsPanel members={members}/></TabsContent>}</Tabs>

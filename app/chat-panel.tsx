@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceInput} from '@/components/ui/choice-input';
 import {useUnsavedChanges} from '@/components/draft-guard';
 import AvatarImage from 'next/image';
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
@@ -145,7 +146,7 @@ export default function ChatPanel({me,members,onRead}:{me:Member;members:Member[
  <Dialog open={groupOpen} onOpenChange={setGroupOpen}><DialogContent><DialogHeader><DialogTitle>Шинэ групп чат</DialogTitle><DialogDescription>Нэр өгөөд, оруулах гишүүдээ сонгоно уу.</DialogDescription></DialogHeader><form className="form-stack" onSubmit={createGroup}>
  {groupError&&<div role="alert" className="error-box">{groupError}</div>}
  <label className="field"><span>Чатын нэр *</span><Input required maxLength={80} value={groupName} onChange={e=>setGroupName(e.target.value)} placeholder="Жишээ: Борлуулалтын төслийн баг"/></label>
- <label className="field"><span>Гишүүд *</span><div className="group-member-list">{members.filter(p=>p.email!==me.email&&p.active).map(p=><label key={p.email} className="group-member-row"><input type="checkbox" checked={groupMembers.includes(p.email)} onChange={e=>setGroupMembers(g=>e.target.checked?[...g,p.email]:g.filter(x=>x!==p.email))}/><span>{p.name}</span><small>{p.email}</small></label>)}</div></label>
+ <label className="field"><span>Гишүүд *</span><div className="group-member-list">{members.filter(p=>p.email!==me.email&&p.active).map(p=><label key={p.email} className="group-member-row"><ChoiceInput type="checkbox" checked={groupMembers.includes(p.email)} onChange={e=>setGroupMembers(g=>e.target.checked?[...g,p.email]:g.filter(x=>x!==p.email))}/><span>{p.name}</span><small>{p.email}</small></label>)}</div></label>
  <Button type="submit" className="primary full" disabled={groupBusy||!groupName.trim()||!groupMembers.length}>{groupBusy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Үүсгэх</Button>
  </form></DialogContent></Dialog>
  </div>;

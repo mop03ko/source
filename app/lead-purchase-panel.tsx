@@ -6,7 +6,7 @@ import {useDraftGuard} from '@/components/draft-guard';
 import {useRemote} from '@/hooks/use-remote';
 import {dateLabel,type Lead} from '@/lib/crm';
 import {MovementForm,cash,type Options} from './inventory-forms';
-import {toast} from 'sonner';
+import {toast} from '@/components/ui/sonner';
 
 type Purchase={id:string;item_name:string;item_code:string;imei:string|null;warehouse_name:string;qty:number;total_price:number;sold_at:string;bill_number:string};
 export default function LeadPurchasePanel({lead,onConfirmed}:{lead:Lead;onConfirmed:()=>Promise<void>}){

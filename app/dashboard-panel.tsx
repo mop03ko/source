@@ -1,4 +1,5 @@
 'use client';
+import {TextareaControl} from '@/components/ui/form-controls';
 import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard';
 import {AsyncStatus} from '@/components/async-status';
 import {useCallback,useEffect,useState} from 'react';
@@ -6,7 +7,7 @@ import {BadgeCheck,Loader2,Wallet,ShieldAlert} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Table,TableHeader,TableHead,TableBody,TableRow,TableCell} from '@/components/ui/table';
-import {toast} from 'sonner';
+import {toast} from '@/components/ui/sonner';
 import {dateLabel,stages,marketingStages,itStages,type Member} from '@/lib/crm';
 type ModuleStats={total:number;active:number;overdue:number;done:number};
 type SalesStats={total:number;won:number;due:number;recycled:number;recycle_overdue:number;unassigned:number};
@@ -75,6 +76,6 @@ export default function DashboardPanel({members,salesStats,salesDistribution,rfr
  {pending.length?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>ГАРЧИГ</TableHead><TableHead>СУВАГ</TableHead><TableHead>ХАРИУЦАГЧ</TableHead><TableHead>ТӨСӨВ</TableHead><TableHead>ДУУСАХ ХУГАЦАА</TableHead><TableHead/></TableRow></TableHeader><TableBody>{pending.map(t=><TableRow key={t.id}><TableCell><strong>{t.title}</strong></TableCell><TableCell>{t.channel}</TableCell><TableCell><span className="owner-label">{ownerName(t.owner)}</span></TableCell><TableCell>{t.budget.toLocaleString()}₮</TableCell><TableCell>{t.due_at?dateLabel(t.due_at):'Товгүй'}</TableCell><TableCell><Button size="sm" className="primary" disabled={busyId===t.id} onClick={()=>{setApproveTarget(t);setApproveNote('');}}>{busyId===t.id?<Loader2 className="spin" size={14}/>:<BadgeCheck size={14}/>}Батлах</Button></TableCell></TableRow>)}</TableBody></Table></div>:<p className="muted">Батлах хүлээгдэж буй төсөв алга.</p>}
  </section>
  </div>
- <Dialog open={!!approveTarget} onOpenChange={o=>{if(!o){setApproveTarget(null);setApproveNote('');}}}><DialogContent><DialogHeader><DialogTitle>Төсөв батлах</DialogTitle><DialogDescription>{approveTarget?.title} · {approveTarget?.budget.toLocaleString()}₮</DialogDescription></DialogHeader><GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();approve();}}><label className="field"><span>Батлах шалтгаан *</span><textarea required maxLength={2000} rows={3} value={approveNote} onChange={e=>setApproveNote(e.target.value)} placeholder="Батлах шалтгаан, тохиролцоог тэмдэглэнэ үү…"/></label><Button type="submit" className="primary full" disabled={!approveTarget||busyId===approveTarget.id||!approveNote.trim()}>{approveTarget&&busyId===approveTarget.id?<Loader2 className="spin" size={16}/>:<BadgeCheck size={16}/>}Батлах</Button></GuardedForm></DialogContent></Dialog>
+ <Dialog open={!!approveTarget} onOpenChange={o=>{if(!o){setApproveTarget(null);setApproveNote('');}}}><DialogContent><DialogHeader><DialogTitle>Төсөв батлах</DialogTitle><DialogDescription>{approveTarget?.title} · {approveTarget?.budget.toLocaleString()}₮</DialogDescription></DialogHeader><GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();approve();}}><label className="field"><span>Батлах шалтгаан *</span><TextareaControl required maxLength={2000} rows={3} value={approveNote} onChange={e=>setApproveNote(e.target.value)} placeholder="Батлах шалтгаан, тохиролцоог тэмдэглэнэ үү…"/></label><Button type="submit" className="primary full" disabled={!approveTarget||busyId===approveTarget.id||!approveNote.trim()}>{approveTarget&&busyId===approveTarget.id?<Loader2 className="spin" size={16}/>:<BadgeCheck size={16}/>}Батлах</Button></GuardedForm></DialogContent></Dialog>
  </>;
 }

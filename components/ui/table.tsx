@@ -1,29 +1,30 @@
 "use client"
 
 import * as React from "react"
+import {Table as AntTable} from "antd"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
-  return (
-    <div
-      data-slot="table-container"
-      className="relative w-full overflow-x-auto"
-    >
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      />
-    </div>
-  )
+const TableContext=React.createContext<{header:React.ReactNode;body:React.ReactNode}>({header:null,body:null});
+function HeaderWrapper(){return <>{React.useContext(TableContext).header}</>;}
+function BodyWrapper(){return <>{React.useContext(TableContext).body}</>;}
+const tableComponents={header:{wrapper:HeaderWrapper},body:{wrapper:BodyWrapper}};
+function Table({className,children,...props}:React.ComponentProps<"table">){
+ const parts=React.Children.toArray(children);
+ const header=parts.find(child=>React.isValidElement(child)&&child.type===TableHeader);
+ const body=parts.filter(child=>child!==header&&!(React.isValidElement(child)&&child.type===TableCaption));
+ const caption=parts.find(child=>React.isValidElement(child)&&child.type===TableCaption) as React.ReactElement<{children?:React.ReactNode}>|undefined;
+ const headerElement=header as React.ReactElement<{children?:React.ReactNode}>|undefined;
+ const row=React.Children.toArray(headerElement?.props.children).find(child=>React.isValidElement(child)) as React.ReactElement<{children?:React.ReactNode}>|undefined;
+ const count=Math.max(1,React.Children.count(row?.props.children));
+ return <TableContext.Provider value={{header,body}}><div data-slot="table-container" className="crm-ant-table" style={props.style} aria-label={props['aria-label']}><AntTable className={className} data-slot="table" size="middle" pagination={false} tableLayout="auto" components={tableComponents} columns={Array.from({length:count},(_,i)=>({key:String(i)}))} dataSource={[{key:'content'}]} scroll={{x:'max-content'}}/>{caption&&<div className="crm-table-caption">{caption.props.children}</div>}</div></TableContext.Provider>;
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("ant-table-thead", className)}
       {...props}
     />
   )
@@ -33,7 +34,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={cn("ant-table-tbody", className)}
       {...props}
     />
   )
@@ -57,7 +58,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+        "ant-table-row border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
         className
       )}
       {...props}
@@ -70,7 +71,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "ant-table-cell h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}
@@ -83,7 +84,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "ant-table-cell p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}

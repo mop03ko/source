@@ -48,7 +48,17 @@ try{
  await fill('input[placeholder="Код, IMEI эсвэл нэр бичнэ үү"]','UI-TEST-256');
  await wait("!!document.querySelector('.inventory-picker button')");
  await snap('01-item-picker-desktop');
- await evaluate("document.querySelector('.inventory-picker button').click()");await fill('select[name=warehouse_id]',wh);
+ await evaluate("document.querySelector('.inventory-picker button').click()");
+ const pointer=async expression=>{const pos=await evaluate(`(()=>{const e=${expression};if(!e)throw new Error('Missing Ant control');e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};})()`);for(const type of ['mousePressed','mouseReleased'])await cdp('Input.dispatchMouseEvent',{type,button:'left',clickCount:1,...pos});await pause(250);};
+ await pointer("document.querySelector('select[name=warehouse_id]').parentElement.querySelector('.ant-select')");
+ await wait("!!document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')");
+ await pointer("[...document.querySelectorAll('.ant-select-item-option')].find(e=>e.textContent==='Туршилтын агуулах')");
+ assert.equal(await evaluate("document.querySelector('select[name=warehouse_id]').value"),wh);
+ await pointer("document.querySelector('input[name=sold_at]').parentElement.querySelector('.ant-picker')");
+ await wait("!!document.querySelector('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')");
+ await pointer("document.querySelector('.ant-picker-now-btn')");
+ await wait("!!document.querySelector('input[name=sold_at]').value");
+ assert.match(await evaluate("document.querySelector('input[name=sold_at]').value"),/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
  await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('5 ш')");
  await fill('input[name=qty]','6');
  assert.ok(await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Худалдан авалтыг баталгаажуулах').disabled"));
