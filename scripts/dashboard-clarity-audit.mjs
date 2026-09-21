@@ -27,6 +27,8 @@ try{
  for(const role of ['operator','agent','manager','director','marketing','it','delivery'])fixture.prepare('INSERT INTO members(email,name,role,active) VALUES(?,?,?,1)').run(role+'@example.test',role,role);
  fixture.prepare('INSERT INTO marketing_tasks(id,title,channel,budget,owner,status,due_at,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run('task-marketing','Campaign review','Social',120000,'marketing@example.test','planned',past,'owner@example.test',stamp,stamp);
  fixture.prepare('INSERT INTO it_tasks(id,title,system_area,owner,status,due_at,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run('task-it','Service review','Web','it@example.test','planned',past,'owner@example.test',stamp,stamp);
+ const leadFixture=fixture.prepare("INSERT INTO leads(id,name,phone,product,source,owner,status,next_action,created_at,updated_at,op) VALUES(?,?,?,?,?,?,'review','',?,?,?)");
+ for(let i=0;i<1001;i++)leadFixture.run('nav-'+i,'Sidebar test',String(90000000+i),'Item','Test','agent@example.test',stamp,stamp,'nav-'+i);
  fixture.close();
  chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9347','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
  let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9347/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
@@ -48,6 +50,22 @@ try{
  await cdp('Page.navigate',{url:base+'/?view=dashboard'});
  await wait("!!document.querySelector('.dashboard-report-tabs')");
  assert.equal(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')||!!document.querySelector('.today-performance')"),false);
+ // Sidebar badges keep their exact accessible count without overflowing the menu.
+ assert.equal(await evaluate("document.querySelector('.crm-ant-menu [aria-current=page]')?.textContent.trim()"),'Хяналтын самбар');
+ assert.equal(await evaluate("document.querySelector('.crm-ant-menu [aria-current=page] .nav-count')"),null);
+ assert.equal(await evaluate("document.querySelector('.crm-ant-menu .nav-count')?.textContent"),'999+');
+ assert.ok(await evaluate("document.querySelector('.crm-ant-menu .nav-count')?.getAttribute('aria-label').includes('1,001')"));
+ await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:700,deviceScaleFactor:1,mobile:false});await pause(300);
+ assert.ok(await evaluate("(()=>{const e=document.querySelector('.crm-ant-sidebar-content');return e.scrollHeight<=e.clientHeight})()"),'desktop navigation should fit at 700px height');
+ await snap('sidebar-700');
+ await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");await pause(400);
+ assert.ok(await evaluate("document.querySelector('[data-slot=sidebar-inner]').inert"));
+ await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");await pause(400);
+ await viewport(390);await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");
+ await wait("!!document.querySelector('.ant-drawer-open .crm-ant-menu')");await snap('sidebar-mobile-open');
+ await evaluate("[...document.querySelectorAll('.ant-drawer-open .ant-menu-item')].find(e=>e.textContent.includes('Борлуулалт')).click()");
+ await wait("!document.querySelector('.ant-drawer-open')&&!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')");
+ await viewport(1440);await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.dashboard-report-tabs')");
  await snap('admin-top-1440');await evaluate("document.querySelector('.dashboard-report').scrollIntoView()");await snap('admin-report-1440');
  for(const label of ['Маркетинг','IT']){await evaluate(`(()=>{[...document.querySelectorAll('.dashboard-report-tabs [role=tab]')].find(e=>e.textContent===${JSON.stringify(label)}).click()})()`);await pause(200);}
  await viewport(390);await snap('admin-report-390');await viewport(768);await snap('admin-report-768');await viewport(1440);

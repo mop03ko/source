@@ -13,7 +13,7 @@ export function SidebarProvider({children,...props}:React.ComponentProps<'div'>)
 }
 export function Sidebar({children,className,...props}:React.ComponentProps<'div'>){
  const ctx=React.useContext(Context);
- const content=<div {...props} data-slot="sidebar-inner" className={`crm-ant-sidebar-inner ${className??''}`}>{children}</div>;
+ const content=<div {...props} data-slot="sidebar-inner" inert={!ctx.mobile&&!ctx.open} className={`crm-ant-sidebar-inner ${className??''}`}>{children}</div>;
  if(ctx.mobile)return <Drawer open={ctx.mobileOpen} placement="left" onClose={()=>ctx.setMobileOpen(false)} size={288} title="Ажлын цэс" styles={{body:{padding:0}}}>{content}</Drawer>;
  return <Layout.Sider aria-label="Ажлын цэс" width={248} collapsedWidth={0} collapsed={!ctx.open} theme="light" className="crm-ant-sider">{content}</Layout.Sider>;
 }
@@ -30,8 +30,8 @@ export function SidebarMenu({children}:React.ComponentProps<'ul'>){
   if(!React.isValidElement<{children?:React.ReactNode}>(child))return [];
   const button=React.Children.toArray(child.props.children).find(node=>React.isValidElement(node)&&node.type===SidebarMenuButton) as React.ReactElement<MenuButtonProps>|undefined;
   if(!button)return [];const key=String(child.key??index);if(button.props.isActive)selected.push(key);
-  return [{key,label:<span className="crm-ant-menu-label">{button.props.children}</span>,className:button.props.className,disabled:button.props.disabled,onClick:({domEvent}:{domEvent:React.MouseEvent<HTMLElement>|React.KeyboardEvent<HTMLElement>})=>{button.props.onClick?.(domEvent as React.MouseEvent<HTMLButtonElement>);ctx.setMobileOpen(false);}}];
+  return [{key,'aria-current':button.props.isActive?'page' as const:undefined,'aria-label':button.props['aria-label'],label:<span className="crm-ant-menu-label">{button.props.children}</span>,className:button.props.className,disabled:button.props.disabled,onClick:({domEvent}:{domEvent:React.MouseEvent<HTMLElement>|React.KeyboardEvent<HTMLElement>})=>{button.props.onClick?.(domEvent as React.MouseEvent<HTMLButtonElement>);ctx.setMobileOpen(false);}}];
  });
- return <Menu mode="inline" selectedKeys={selected} items={items} className="crm-ant-menu"/>;
+ return <Menu aria-label="Үндсэн цэс" mode="inline" selectedKeys={selected} items={items} className="crm-ant-menu"/>;
 }
 export function SidebarTrigger(props:React.ComponentProps<typeof Button>){const ctx=React.useContext(Context);return <Button type="button" variant="ghost" size="icon" {...props} data-slot="sidebar-trigger" aria-label="Цэс нээх, хаах" aria-expanded={ctx.mobile?ctx.mobileOpen:ctx.open} onClick={ctx.toggle}><PanelLeft size={18}/></Button>;}
