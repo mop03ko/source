@@ -41,6 +41,17 @@ export const deliveryStatuses:Record<string,string>={pending:'Хүлээгдэж
 export const deliveryDone=['delivered','self_pickup'];
 export const deliveryClosed=['delivered','self_pickup','failed','cancelled'];
 export const deliveryKinds=['24 цаг','Яаралтай','Гэрээ','Таталт','Засвар','Бусад'];
+// Ажлын хуваарийн томилгоо: Excel дэх салбар/ажлын төрлүүд, "а" нь Амралт, Чөлөө нь зөвшөөрөлтэй чөлөө.
+export const shiftAssignments=['Хүргэлт','Олимпик','Юнион','Түмэнмолл','Gotomarket','ИЦА','Тооллого','Амралт','Чөлөө'];
+export const shiftOff=['Амралт','Чөлөө'];
+export const shiftIsWork=(a:string)=>!shiftOff.includes(a);
+// Хуваарийг Ахлах, Удирдлага, Админ засна; чөлөө/шилжүүлэх хүсэлтийг ч тэд шийдвэрлэнэ.
+// Хуваарь ба хүргэлтийн бүртгэлд ажилтны нэр өөр хэлбэртэй байдаг (овгийн эхний үсэг, зураас, зай)
+// тул хоёр модулийг холбохдоо нормчилсон түлхүүрээр тулгана.
+export const personKey=(v:string)=>String(v||'').toLowerCase().replace(/^[а-яёөү]\.\s*/u,'').replace(/[\s-]/g,'');
+export const canManageSchedule=(role:string)=>role==='admin'||role==='director'||role==='manager';
+export const shiftRequestKinds:Record<string,string>={leave:'Чөлөө авах',move:'Өдөр шилжүүлэх'};
+export const shiftRequestStatuses:Record<string,string>={pending:'Хүлээгдэж буй',approved:'Батлагдсан',rejected:'Татгалзсан'};
 export const kinds:Record<string,string>={sheet_update:'Sheet мэдээлэл шинэчлэгдсэн',sheet_import:'Google Sheets импорт',sheet_assignment:'Sheet хуваарилалт шинэчлэгдсэн',connected:'Холбогдсон дуудлага',no_answer:'Дуудлагад хариулаагүй',message:'SMS / Messenger бүртгэх',note:'Тэмдэглэл',update:'Мэдээлэл шинэчилсэн',recycle:'Дахин холбогдох эхлүүлсэн',optout:'Дахин холбогдохгүй',assign:'Гараар хуваарилсан',delete:'Устгасан',restore:'Сэргээсэн'};
 export type Member={email:string;user_id:string|null;name:string;role:string;active:number;last_seen?:string|null;phone?:string|null;avatar?:string|null};
 export type Lead={id:string;name:string;phone:string;registration?:string;registration_manual?:number;product:string;source:string;owner:string;status:string;next_at:string|null;next_action:string;recycle_at:string|null;connected:number;created_at:string;updated_at:string;version:number;blocked?:number;attempts?:number;deleted_at?:string|null};
@@ -57,6 +68,8 @@ export type InventoryItem={id:string;code:string;brand:string;name:string;varian
 export type InventoryPurchase={id:string;item_id:string;warehouse_id:string;qty:number;unit_cost:number;total_cost:number;ordered_at:string|null;received_at:string|null;payment_status:string;note:string;created_by:string;created_at:string};
 export type InventorySale={id:string;item_id:string;warehouse_id:string;qty:number;unit_price:number;total_price:number;customer_name:string;customer_phone:string;platform:string;sold_at:string|null;note:string;created_by:string;created_at:string};
 export type Delivery={id:string;delivered_on:string;kind:string;item_id:string|null;item_info:string;customer_phone:string;address:string;payment_channel:string;contents:string;courier_email:string|null;courier_name:string;entered_by_email:string|null;entered_by_name:string;status:string;sale_id:string|null;lead_id:string|null;note:string;created_by:string;created_at:string;updated_at:string;version:number};
+export type WorkShift={id:string;day:string;member_email:string|null;person_name:string;assignment:string;note:string;created_by:string;created_at:string;updated_at:string;version:number};
+export type ShiftRequest={id:string;kind:string;person_name:string;member_email:string|null;from_day:string;to_day:string|null;assignment:string;reason:string;status:string;requested_by:string;decided_by:string|null;decided_at:string|null;decision_note:string;created_at:string;updated_at:string;version:number};
 export const closed=['won','lost','invalid'];
 export function normalizePhone(v:string){let p=v.replace(/[\s()+-]/g,'');if(p.startsWith('976')&&p.length===11)p=p.slice(3);if(!/^\d{8}$/.test(p))throw new Error('Монголын 8 оронтой утасны дугаар оруулна уу.');return p;}
 export function dateLabel(v:string|null){if(!v)return 'Товгүй';const d=new Date(v);return Number.isNaN(d.getTime())?'Огноо шалгах':new Date(d.getTime()+8*3600000).toISOString().slice(0,16).replace('T',' ')+' · УБ';}

@@ -1,7 +1,7 @@
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
-import {deliveryStatuses,deliveryDone,canSeeDeliveries,isCourierOnly,type Member,type Delivery} from '@/lib/crm';
+import {deliveryStatuses,deliveryDone,canSeeDeliveries,isCourierOnly,shiftOff,personKey,type Member,type Delivery} from '@/lib/crm';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 // Маркетинг, IT хоёул хүргэлтэд хамааралгүй тул хаана. Хүргэгч (delivery) зөвхөн өөрийн хүргэлтээ
@@ -42,6 +42,16 @@ async function resolveItem(id?:string|null){
  if(!id)return null;
  if(!await db().prepare('SELECT id FROM inventory_items WHERE id=?').bind(id).first())throw new Failure('Агуулахад тохирох бараа олдсонгүй.',404);
  return id;
+}
+// Ажлын хуваарьтай тулгана: амралттай эсвэл өөр салбарт томилогдсон хүн дээр бүртгэвэл сануулна.
+// Хориглохгүй — нэмэлт ажил хийх тохиолдол бодитоор байдаг, зөвхөн анхааруулна.
+async function scheduleWarning(day:string,courier:string){
+ const rows=await db().prepare('SELECT person_name,assignment FROM work_shifts WHERE day=?').bind(day).all<{person_name:string;assignment:string}>();
+ const hit=rows.results.find(r=>personKey(r.person_name)===personKey(courier));
+ if(!hit)return '';
+ if(shiftOff.includes(hit.assignment))return `Анхаар: ${courier} ${day}-нд хуваарьт ${hit.assignment} байна.`;
+ if(hit.assignment!=='Хүргэлт')return `Анхаар: ${courier} ${day}-нд хуваарьт "${hit.assignment}"-д томилогдсон байна.`;
+ return '';
 }
 async function getDelivery(id:string){
  const row=await db().prepare('SELECT * FROM deliveries WHERE id=?').bind(id).first<Delivery>();
@@ -127,7 +137,7 @@ export async function POST(req:Request){try{
   const id=crypto.randomUUID();
   await db().prepare('INSERT INTO deliveries(id,delivered_on,kind,item_id,item_info,customer_phone,address,payment_channel,contents,courier_email,courier_name,entered_by_email,entered_by_name,status,sale_id,lead_id,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
    .bind(id,d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,m.email,m.name,d.status,d.sale_id||null,d.lead_id||null,d.note,m.email,now,now).run();
-  return Response.json({ok:true,id});
+  return Response.json({ok:true,id,warning:await scheduleWarning(d.delivered_on,courier.name)});
  }
  if(!b.id||!b.version)throw new Failure('Хүргэлтийн хувилбар дутуу.');
  const row=await getDelivery(b.id);
@@ -147,7 +157,7 @@ export async function POST(req:Request){try{
   const r=await db().prepare('UPDATE deliveries SET delivered_on=?,kind=?,item_id=?,item_info=?,customer_phone=?,address=?,payment_channel=?,contents=?,courier_email=?,courier_name=?,status=?,sale_id=?,lead_id=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?')
    .bind(d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,d.status,d.sale_id||null,d.lead_id||null,d.note,now,row.id,b.version).run();
   if(!r.meta.changes)throw new Failure('Хүргэлт шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
-  return Response.json({ok:true});
+  return Response.json({ok:true,warning:await scheduleWarning(d.delivered_on,courier.name)});
  }
  throw new Failure('Тодорхойгүй үйлдэл.');
 }catch(e){return err(e);}}

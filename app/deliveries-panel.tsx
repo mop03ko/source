@@ -13,7 +13,7 @@ import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
 import {ItemPicker,type Item} from './inventory-forms';
 import {toast} from '@/components/ui/sonner';
-import {deliveryStatuses,deliveryDone,deliveryKinds,isCourierOnly,requestDateLabel,type Member,type Delivery} from '@/lib/crm';
+import {deliveryStatuses,deliveryDone,deliveryKinds,isCourierOnly,personKey,requestDateLabel,type Member,type Delivery} from '@/lib/crm';
 type Stats={total:number;done:number;pending:number;failed:number;linked:number};
 type CourierRow={name:string;total:number;done:number;failed:number;cancelled:number;pending:number;last_day:string;active_days:number};
 type Report={total:number;byCourier:CourierRow[];byMonth:{month:string;total:number;done:number}[];byChannel:{channel:string;total:number}[];byKind:{kind:string;total:number}[];byStatus:{status:string;total:number}[];byItem:{name:string;code:string;total:number}[]};
@@ -27,15 +27,26 @@ const statusClass=(s:string)=>deliveryDone.includes(s)?'stage-won':s==='pending'
 const courierValue=(d?:Delivery)=>!d?'':d.courier_email||'name:'+d.courier_name;
 function DeliveryForm({row,members,legacy,busy,onSubmit}:{row?:Linked;members:Member[];legacy:string[];busy:boolean;onSubmit:(d:unknown)=>unknown}){
  // Хүргэж буй барааг агуулахын бүртгэлтэй холбоно. Гэрээ, баримт хүргэх мөрүүд бий тул сонголттой.
+ const [day,setDay]=useState(row?.delivered_on||todayUB());
+ const [courier,setCourier]=useState(courierValue(row));
+ // Тэр өдөр хуваарьт "Хүргэлт"-д томилогдсон ажилтнуудыг харуулж, хуваарьт бусыг сонговол сануулна.
+ const onDuty=useRemote<{items:{person_name:string;member_email:string|null}[]}>('/api/schedule?'+new URLSearchParams({day,assignment:'Хүргэлт'}));
+ const duty=onDuty.data?.items||[];
+ const dutyNames=duty.map(x=>x.person_name).join(', ');
+ const chosen=members.find(m=>m.email===courier)?.name||(courier.startsWith('name:')?courier.slice(5):'');
+ const offDuty=!!chosen&&!!duty.length&&!duty.some(x=>personKey(x.person_name)===personKey(chosen));
  const [item,setItem]=useState<Item|null>(row?.item_id?{id:row.item_id,code:row.item_code||'',name:row.item_name||'',brand:row.item_brand||''} as Item:null);
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const c=String(f.get('courier')||'');
   onSubmit({delivered_on:f.get('delivered_on'),kind:f.get('kind'),item_id:item?.id||null,item_info:f.get('item_info'),customer_phone:f.get('customer_phone'),address:f.get('address'),payment_channel:f.get('payment_channel'),contents:f.get('contents'),courier_email:c.startsWith('name:')?null:c,courier_name:c.startsWith('name:')?c.slice(5):'',status:f.get('status'),note:f.get('note')});}}>
- <div className="form-grid"><Field label="Огноо (УБ) *"><Input name="delivered_on" type="date" required defaultValue={row?.delivered_on||todayUB()}/></Field><Field label="Төрөл"><SelectControl name="kind" defaultValue={row?.kind||'24 цаг'}>{[...new Set([...deliveryKinds,...(row?.kind?[row.kind]:[])])].map(k=><option key={k}>{k}</option>)}</SelectControl></Field></div>
+ <div className="form-grid"><Field label="Огноо (УБ) *"><Input name="delivered_on" type="date" required value={day} onChange={e=>setDay(e.target.value)}/></Field><Field label="Төрөл"><SelectControl name="kind" defaultValue={row?.kind||'24 цаг'}>{[...new Set([...deliveryKinds,...(row?.kind?[row.kind]:[])])].map(k=><option key={k}>{k}</option>)}</SelectControl></Field></div>
  <ItemPicker value={item} onChange={setItem} warehouse="" label="Агуулахын бараа (сонголттой)"/>
  <Field label="Барааны нэмэлт тайлбар"><Input name="item_info" maxLength={400} defaultValue={row?.item_info} placeholder="Агуулахын бүртгэлд байхгүй бол гараар бичнэ"/></Field>
  <div className="form-grid"><Field label="Харилцагчийн утас"><Input name="customer_phone" maxLength={120} defaultValue={row?.customer_phone} placeholder="99112233"/></Field><Field label="Төлбөрийн суваг"><Input name="payment_channel" maxLength={60} defaultValue={row?.payment_channel} placeholder="Зөгий, Гэгээн, Storepay…"/></Field></div>
  <Field label="Хаягийн мэдээлэл"><TextareaControl name="address" rows={2} maxLength={500} defaultValue={row?.address} placeholder="Дүүрэг, хороо, байр, орц, тоот…"/></Field>
- <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><SelectControl name="courier" required defaultValue={courierValue(row)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</SelectControl></Field><Field label="Төлөв"><SelectControl name="status" defaultValue={row?.status||'pending'}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl></Field></div>
+ <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><SelectControl name="courier" required value={courier} onChange={e=>setCourier(e.target.value)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</SelectControl></Field><Field label="Төлөв"><SelectControl name="status" defaultValue={row?.status||'pending'}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl></Field></div>
+ {!!dutyNames&&<p className="form-help">{day}-нд хуваарьт хүргэлтэд: <strong>{dutyNames}</strong></p>}
+ {!duty.length&&!onDuty.loading&&<p className="form-help">{day}-нд хуваарьт хүргэлтийн ажилтан бүртгэгдээгүй.</p>}
+ {offDuty&&<p className="form-help" style={{color:'#b54708'}}>Анхаар: {chosen} тэр өдөр хуваарьт хүргэлтэд томилогдоогүй байна.</p>}
  <Field label="Хамт хүргэх зүйлс"><Input name="contents" maxLength={200} defaultValue={row?.contents} placeholder="Бараа, гэрээ, баталгааны хуудас"/></Field>
  <Field label="Нэмэлт тайлбар"><TextareaControl name="note" rows={2} maxLength={2000} defaultValue={row?.note}/></Field>
  <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Хадгалах</Button>
@@ -60,10 +71,10 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
   setBusy(true);
   try{
    const r=await fetch('/api/deliveries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})});
-   const d=await r.json() as {error?:string;fieldErrors?:Record<string,string>};
+   const d=await r.json() as {error?:string;fieldErrors?:Record<string,string>;warning?:string};
    const form=document.activeElement?.closest('form')||null;
    if(!r.ok){markFormError(form,d.error||'Хүсэлт амжилтгүй.',d.fieldErrors);throw new Error(d.error||'Хүсэлт амжилтгүй.');}
-   markFormSaved(form);setRevision(v=>v+1);toast.success('Амжилттай хадгаллаа.');return d;
+   markFormSaved(form);setRevision(v=>v+1);toast.success('Амжилттай хадгаллаа.');if(d.warning)toast.warning(d.warning);return d;
   }catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}
  };
  const setFilter=(fn:(v:string)=>void,v:string)=>{fn(v);setPage(1);};
