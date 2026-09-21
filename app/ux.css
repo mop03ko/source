@@ -283,3 +283,14 @@
 @media(max-width:767px){.inventory-product-card{display:grid;gap:10px}.inventory-expanded{padding:8px}.inventory-expanded>.row input{max-width:none}.inventory-product-identity{gap:8px}.inventory-catalog-toolbar{align-items:flex-start}}
 
 .inventory-bulk-modal .ant-table-cell small{display:block;color:var(--muted-foreground)}
+
+/* Balance reports share one reading order across groups and individual items. */
+.balance-kpi-hint{display:block;margin-top:8px;color:var(--muted-foreground);font-size:12px}
+.balance-method{padding:12px 14px;margin:16px 0;border:1px solid var(--border);border-radius:8px;font-size:13px}
+.balance-method summary{cursor:pointer;font-weight:600}.balance-method p{line-height:1.7;margin-bottom:0}
+.balance-detail-table{padding:16px 20px}.balance-detail-table small{display:block;color:var(--muted-foreground);font-size:12px}
+.balance-table-value{display:grid;gap:6px;font-variant-numeric:tabular-nums;white-space:nowrap}.balance-table-value strong{font-size:15px}.balance-table-value strong small{display:inline;font-weight:400}.balance-table-value>span{color:var(--muted-foreground);font-size:12px}
+.balance-closing-cell{background:#f0f7ff!important}.balance-detail-table .ant-table-summary{background:var(--muted)}
+.balance-mobile-list{display:grid;gap:12px}.balance-mobile-card{padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+.balance-mobile-stages{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.balance-mobile-stages>div{padding:10px;background:var(--muted);border-radius:6px}.balance-mobile-stages>div:last-child{background:#f0f7ff}.balance-mobile-stages>div>span{display:block;font-size:12px;margin-bottom:8px}.balance-total{margin-top:14px;border-color:#91b6ed}
+@media(max-width:767px){.balance-detail-table{padding:14px}.balance-list-heading{gap:12px}.balance-mobile-card .inventory-item-link{white-space:normal;text-align:left}.balance-mobile-card .ant-tag{margin-top:8px}}

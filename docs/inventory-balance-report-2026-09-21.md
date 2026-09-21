@@ -17,3 +17,12 @@
 Автомат тестээр 51 барааны хуудаслалт, графикийн нийлбэр, CSV/жагсаалт/бүлэглэл ижил дүнтэй эсэх, хугацаа, агуулах, ангилал, хоосон үр дүн, эрэмбэлэлтийг шалгав. Browser audit нь гурван харагдац, хэмжүүр солих, хоосон үлдэгдлийн шүүлтүүр, desktop/mobile хэмжээ болон графикийг шалгана. Зургийн нотолгоо `artifacts/inventory-audit/balance-charts*.png`.
 
 Бараа, үнэ, үлдэгдлийн өгөгдөлд бичилт хийгээгүй; migration шаардлагагүй. Графикийн код тайланг нээхэд ачаалагдана.
+
+
+## Clarity update
+- Unified Ant Design table for individual records and category/brand/supplier groups; same opening, incoming, outgoing, closing order and all-page totals.
+- Separate quantity and warehouse-cost typography; closing balance highlighted, negative stock and estimated cost labels, per-record zero-quantity cost adjustments exposed.
+- Mobile cards use a two-column breakdown with totals, avoiding a wide financial table on phones.
+- KPI cards explain opening and closing timestamps. Expandable reading guide explains valuation, transfers, returns, adjustments and current metadata grouping. Category bars explicitly represent comparison with the largest category, not percentage shares.
+- Summary is hidden during refresh/errors to avoid showing stale figures under changed filters. Grouping controls are expanded in the balance report.
+- Validation: production build, scoped ESLint, existing inventory API balance reconciliation tests; isolated Chrome audit across 390/768/1440px with totals, supplier grouping and chart/list switching.
