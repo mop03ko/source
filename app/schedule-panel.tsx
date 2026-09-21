@@ -179,7 +179,7 @@ function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;on
    onDone(value.written||0,value.skipped||0);
   }catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
  };
- return <Dialog open={open} onOpenChange={o=>{if(!o)onClose();}}><DialogContent className="form-dialog schedule-planner">
+ return <Dialog open={open} onOpenChange={o=>{if(!o)onClose();}}><DialogContent className="schedule-planner" width="min(1500px, 96vw)" style={{maxHeight:'90dvh',overflowY:'auto',background:'#fff'}}>
   <DialogHeader><DialogTitle>Шинэ сарын хуваарь төлөвлөх</DialogTitle><DialogDescription>Амрах өдрийг нүдэн дээр дарж сонгоно — саарал нь амралт, цэнхэр нь ажлын өдөр. Баганын толгойг дарвал тэр өдөр бүх ажилтанд нэгэн зэрэг солигдоно. Аль хэдийн томилгоотой нүдийг хөндөхгүй.</DialogDescription></DialogHeader>
   <div className="form-stack">
    <div className="form-grid">
@@ -187,17 +187,17 @@ function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;on
     <Field label="Сонгосон ажилтан"><Input value={chosen.length+' / '+rows.length} disabled/></Field>
    </div>
    {!rows.length&&<p className="muted">Одоогийн сард хуваарьтай ажилтан байхгүй тул төлөвлөх хүн алга. "Томилгоо нэмэх"-ээр ажилтан бүртгэнэ үү.</p>}
-   {!!rows.length&&<div className="table-scroll" style={{overflowX:'auto'}}>
+   {!!rows.length&&<div style={{overflowX:'auto'}}>
     <table style={{borderCollapse:'collapse',fontSize:12,whiteSpace:'nowrap'}}>
      <thead><tr>
-      <th style={{position:'sticky',left:0,background:'var(--background,#fff)',textAlign:'left',padding:'6px 8px',minWidth:150,zIndex:1}}>Ажилтан</th>
-      <th style={{textAlign:'left',padding:'6px 8px',minWidth:130}}>Томилгоо</th>
-      <th style={{padding:'6px 8px'}}>Түргэн</th>
-      {days.map(day=><th key={day} style={{padding:'2px 1px',minWidth:26,textAlign:'center'}}>
+      <th style={{position:'sticky',left:0,top:0,background:'var(--background,#fff)',textAlign:'left',padding:'6px 8px',minWidth:150,zIndex:3}}>Ажилтан</th>
+      <th style={{position:'sticky',top:0,background:'var(--background,#fff)',textAlign:'left',padding:'6px 8px',minWidth:130,zIndex:2}}>Томилгоо</th>
+      <th style={{position:'sticky',top:0,background:'var(--background,#fff)',padding:'6px 8px',zIndex:2}}>Түргэн</th>
+      {days.map(day=><th key={day} style={{position:'sticky',top:0,background:'var(--background,#fff)',padding:'2px 1px',minWidth:26,textAlign:'center',zIndex:2}}>
        <button type="button" onClick={()=>toggleColumn(day)} title={day+' — бүх ажилтанд солих'} style={{border:0,background:'transparent',font:'inherit',cursor:'pointer',padding:2,lineHeight:1.15,opacity:isWeekend(day)?0.6:1}}>
         <div>{PLAN_WEEKDAYS[weekday(day)]}</div><div>{Number(day.slice(8))}</div>
        </button></th>)}
-      <th style={{padding:'6px 8px'}}>Ажил/Амр</th>
+      <th style={{position:'sticky',top:0,background:'var(--background,#fff)',padding:'6px 8px',zIndex:2}}>Ажил/Амр</th>
      </tr></thead>
      <tbody>{rows.map(r=>{
       const work=days.length-r.rest.length;
