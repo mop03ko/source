@@ -79,6 +79,24 @@ try{
  await evaluate("(()=>{const e=document.querySelector('.ant-modal textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Approved in disposable audit');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
  await wait("!document.querySelector('.ant-modal button[type=submit]').disabled");await evaluate("document.querySelector('.ant-modal button[type=submit]').click()");await wait("!document.querySelector('.ant-modal')&&!document.querySelector('.dashboard-approval-card')");
  const verification=new DatabaseSync(join(dir,'test.db'));assert.ok(verification.prepare("SELECT approved_at FROM marketing_tasks WHERE id='task-marketing'").get().approved_at);verification.close();
+ // Grant a categorized role through the real member form, then verify persistence and filtering.
+ await cdp('Page.navigate',{url:base+'/?view=team'});await wait("document.body.innerText.includes('Гишүүн нэмэх')");
+ await click('Гишүүн нэмэх');await wait("!!document.querySelector('.member-role-field')");
+ await fill('.ant-modal input[name=name]','Audit Operator');await fill('.ant-modal input[name=email]','new-operator@example.test');
+ const rolePoint=await evaluate("(()=>{const r=document.querySelector('.member-role-field .ant-select').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
+ await cdp('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...rolePoint});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...rolePoint});
+ await wait("!!document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')");
+ assert.ok(await evaluate("[...document.querySelectorAll('.ant-select-item-group')].some(e=>e.textContent==='Удирдах эрх')"));
+ await evaluate("[...document.querySelectorAll('.ant-select-item-option')].find(e=>e.getAttribute('title')==='Оператор').click()");
+ await wait("document.querySelector('.member-role-summary')?.textContent.includes('Өөрт нь хүсэлт оноохгүй')");
+ await viewport(390);await snap('member-role-operator-390');await viewport(1440);
+ await evaluate("document.querySelector('.ant-modal form').requestSubmit()");await wait("!document.querySelector('.ant-modal')");
+ const memberCheck=new DatabaseSync(join(dir,'test.db'));assert.equal(memberCheck.prepare('SELECT role FROM members WHERE email=?').get('new-operator@example.test').role,'operator');memberCheck.close();
+ await fill('.team-role-filter select','operator');await wait("document.querySelector('.team-role-filter')?.textContent.includes('2 гишүүн')");
+ assert.equal(await evaluate("document.querySelectorAll('.team-workspace-tabs tbody tr').length"),2);
+ await evaluate("[...document.querySelectorAll('.team-workspace-tabs tbody tr')].find(e=>e.textContent.includes('Audit Operator')).querySelector('button').click()");
+ await wait("document.querySelector('.member-role-field input[name=role]')?.value==='operator'");
+ await pause(450);await snap('member-role-edit');await evaluate("document.querySelector('.ant-modal-close').click()");await wait("!document.querySelector('.ant-modal')");
  for(const role of ['operator','agent','manager','director','marketing','it','delivery']){
   const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'test:'+role,email:role+'@example.test',name:role},maxAge:3600});
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});

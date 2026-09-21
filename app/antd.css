@@ -85,3 +85,5 @@
 .crm-ant-sidebar-inner .sidebar-user a{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:8px;color:#d3c7df}
 .crm-ant-sidebar-inner .sidebar-user a:hover{background:#442d5b;color:#fff}
 @media(max-height:760px){.crm-ant-sidebar-inner .sidebar-tip{display:none}.crm-ant-sidebar-inner .brand{padding-block:18px!important}}
+
+.member-role-field{display:grid;gap:12px}.member-role-summary{padding:14px;border:1px solid #e5dcea;border-radius:8px;background:#faf8fc}.member-role-summary .row{flex-wrap:wrap;gap:6px}.member-role-summary p{margin:8px 0 12px;color:#65566f;font-size:13px}.team-role-filter{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px}.team-role-filter .crm-select-control{width:240px;max-width:100%}
