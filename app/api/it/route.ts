@@ -6,7 +6,7 @@ export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 // Борлуулалтын ажилтан, Маркетингийн ажилтан хоёул энэ модульд хамааралгүй тул бүрмөсөн хаана; IT
 // эрхтэй хүн харин борлуулалтын хүсэлт (/api/crm) рүү огт хандахгүй (тэнд тусад нь хориглосон).
-function assertAccess(m:Member){if(m.role==='agent'||m.role==='marketing')throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
+function assertAccess(m:Member){if(m.role==='operator'||m.role==='agent'||m.role==='marketing')throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
 async function getTask(id:string){
  const t=await db().prepare('SELECT * FROM it_tasks WHERE id=?').bind(id).first<ItTask>();
  if(!t)throw new Failure('Ажил олдсонгүй.',404);

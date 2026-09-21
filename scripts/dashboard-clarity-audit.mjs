@@ -24,7 +24,7 @@ try{
 
  const fixture=new DatabaseSync(join(dir,'test.db'));
  const stamp=new Date().toISOString(),past=new Date(Date.now()-86400000*2).toISOString();
- for(const role of ['agent','manager','director','marketing','it','delivery'])fixture.prepare('INSERT INTO members(email,name,role,active) VALUES(?,?,?,1)').run(role+'@example.test',role,role);
+ for(const role of ['operator','agent','manager','director','marketing','it','delivery'])fixture.prepare('INSERT INTO members(email,name,role,active) VALUES(?,?,?,1)').run(role+'@example.test',role,role);
  fixture.prepare('INSERT INTO marketing_tasks(id,title,channel,budget,owner,status,due_at,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run('task-marketing','Campaign review','Social',120000,'marketing@example.test','planned',past,'owner@example.test',stamp,stamp);
  fixture.prepare('INSERT INTO it_tasks(id,title,system_area,owner,status,due_at,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run('task-it','Service review','Web','it@example.test','planned',past,'owner@example.test',stamp,stamp);
  fixture.close();
@@ -60,7 +60,7 @@ try{
  await evaluate("(()=>{const e=document.querySelector('.ant-modal textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Approved in disposable audit');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
  await wait("!document.querySelector('.ant-modal button[type=submit]').disabled");await evaluate("document.querySelector('.ant-modal button[type=submit]').click()");await wait("!document.querySelector('.ant-modal')&&!document.querySelector('.dashboard-approval-card')");
  const verification=new DatabaseSync(join(dir,'test.db'));assert.ok(verification.prepare("SELECT approved_at FROM marketing_tasks WHERE id='task-marketing'").get().approved_at);verification.close();
- for(const role of ['agent','manager','director','marketing','it','delivery']){
+ for(const role of ['operator','agent','manager','director','marketing','it','delivery']){
   const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'test:'+role,email:role+'@example.test',name:role},maxAge:3600});
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
   await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.daily-shift,.daily-staffing')");
@@ -68,9 +68,9 @@ try{
   if(['manager','director'].includes(role))assert.equal(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')||!!document.querySelector('.today-performance')"),false);
   if(role==='agent')assert.ok(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')"));
   if(['marketing','it'].includes(role)){await wait("!!document.querySelector('.daily-priority')");assert.ok(await evaluate("document.querySelector('.daily-task-list').textContent.includes('review')"));}
-  if(['agent','marketing','it','delivery'].includes(role))assert.equal(await evaluate("!!document.querySelector('.dashboard-report')"),false);
+  if(['operator','agent','marketing','it','delivery'].includes(role))assert.equal(await evaluate("!!document.querySelector('.dashboard-report')"),false);
   await viewport(390);await snap(role+'-390');await viewport(1440);await snap(role+'-1440');
  }
- assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));evidence.checks={roles:7,reports:true,approvalReview:true,mobile:true};console.log('PASS: seven dashboard roles, report tabs, approval review, desktop/tablet/mobile and runtime errors.');
+ assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));evidence.checks={roles:8,reports:true,approvalReview:true,mobile:true};console.log('PASS: eight dashboard roles, report tabs, approval review, desktop/tablet/mobile and runtime errors.');
 
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

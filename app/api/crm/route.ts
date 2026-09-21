@@ -9,6 +9,7 @@ import {
   closed,
   isAdminLike,
   isIsolatedRole,
+  canOwnLead,
   canManageSchedule,
   type Member,
   type Lead,
@@ -129,7 +130,7 @@ async function validOwner(email: string, m: Member) {
     .prepare("SELECT role FROM members WHERE email=? AND active=1")
     .bind(email)
     .first<{ role: string }>();
-  if (!target || isIsolatedRole(target.role) || target.role === "director")
+  if (!target || !canOwnLead(target.role))
     throw new Failure("Идэвхтэй хариуцагч сонгоно уу.");
 }
 export async function GET(req: Request) {
@@ -630,7 +631,7 @@ export async function POST(req: Request) {
             .email()
             .transform((v) => v.toLowerCase()),
           name: z.string().trim().min(1).max(100),
-          role: z.enum(["admin", "director", "manager", "agent", "marketing", "it", "delivery"]),
+          role: z.enum(["admin", "director", "manager", "agent", "operator", "marketing", "it", "delivery"]),
           active: z.boolean(),
         })
         .parse(b.data);
@@ -643,6 +644,8 @@ export async function POST(req: Request) {
         .first<{ user_id: string }>();
       if (target?.user_id === owner?.owner && (!d.active || d.role !== "admin"))
         throw new Failure("Үндсэн эзэмшигчийн эрхийг бууруулах боломжгүй.");
+      if (d.role === "operator" && await db().prepare("SELECT 1 FROM leads WHERE owner=? AND deleted_at IS NULL AND status NOT IN ('won','lost','invalid') LIMIT 1").bind(d.email).first())
+        throw new Failure("Энэ ажилтны идэвхтэй зээлийн хүсэлтүүдийг шилжүүлсний дараа Оператор эрх олгоно уу.",409);
       await db()
         .prepare(
           "INSERT INTO members(email,name,role,active) VALUES(?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,role=excluded.role,active=excluded.active",
@@ -806,7 +809,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, assigned, byOwner, roster: roster.length });
     }
     if (b.action === "bulk_recycle") {
-      if (m.role === "agent")
+      if (!canManageSchedule(m.role))
         throw new Failure(
           "Зөвхөн удирдлага, админ багцаар Recycle эхлүүлнэ.",
           403,

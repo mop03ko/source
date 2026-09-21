@@ -1,9 +1,11 @@
 export const stages: Record<string,string> = {review:'Мэдээлэл шалгах',new:'Шинэ хүсэлт',contacted:'Холбогдсон',materials:'Материал бүрдүүлж буй',pending:'Шийдвэр хүлээж буй',appointment:'Уулзалт товлосон',unreachable:'Холбогдоогүй',won:'Худалдан авсан',lost:'Татгалзсан',invalid:'Буруу дугаар'};
 export const sources=['Facebook','Instagram','Утас','Вэбсайт','Дэлгүүр','Байгууллага','Бусад'];
-export const roles:Record<string,string>={admin:'Админ',director:'Удирдлага',manager:'Ахлах',agent:'Борлуулалтын ажилтан',marketing:'Маркетинг',it:'IT',delivery:'Хүргэлтийн ажилтан'};
+export const roles:Record<string,string>={admin:'Админ',director:'Удирдлага',manager:'Ахлах',agent:'Борлуулалтын ажилтан',operator:'Оператор',marketing:'Маркетинг',it:'IT',delivery:'Хүргэлтийн ажилтан'};
 // "Удирдлага" (director) нь админтай адил эрхтэй (гишүүн удирдах, тайлан, төсөв батлах г.м); зөвхөн жинхэнэ
 // эзэмшигчийн бүртгэлийг хамгаалах логик (owner protection) л 'admin'-ийг өөрөө шаарддаг тул үүнд хамаарахгүй.
 export const isAdminLike=(role:string)=>role==='admin'||role==='director';
+// Operators can edit leads but cannot be assigned as their owner.
+export const canOwnLead=(role:string)=>['admin','manager','agent'].includes(role);
 // Барааны мэдээллийг зөвхөн Админ, Ахлах засна.
 export const canEditInventoryItem=(role:string)=>role==='admin'||role==='manager';
 // Маркетинг, IT, Хүргэлт гурвуулаа борлуулалтын хүсэлт (leads)-тэй огт харьцдаггүй, тусад нь модультай эрхүүд.
@@ -18,7 +20,7 @@ export function channelsForRole(role:string):string[]{
  const list:string[]=[];
  if(role!=='director')list.push('all');
  if(role==='marketing'||role==='admin'||role==='director')list.push('marketing');
- if(role==='agent'||role==='manager'||role==='admin'||role==='director')list.push('sales');
+ if(role==='operator'||role==='agent'||role==='manager'||role==='admin'||role==='director')list.push('sales');
  return list;
 }
 // Удирдлага (director) хувийн чат (DM)-аар зөвхөн Ахлах, Админтай харилцана; энгийн ажилтан

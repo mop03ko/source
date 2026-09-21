@@ -9,7 +9,7 @@ const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
 deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/crm']=common;deps['./crm']=common;const assign=load('lib/assign.ts');deps['@/lib/assign']=assign;deps['./assign']=assign;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const sms=load('lib/sms.ts');deps['@/lib/sms']=sms;const model=load('lib/sheet-model.ts');deps['./sheet-model']=model;const sheets=load('lib/sheets.ts');const crmRoute=load('app/api/crm/route.ts');
 async function crmGet(q=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+q));return [r.status,await r.json()];}
-async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
+async function crmPost(action,data,id,version){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})}));return [r.status,await r.json()];}
 const today=assign.ubDay();
 const shiftRow=(email,person,a)=>sqlite.prepare('INSERT INTO work_shifts(id,day,member_email,person_name,assignment,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
  .run(crypto.randomUUID(),today,email,person,a,'','test',new Date().toISOString(),new Date().toISOString());
@@ -22,11 +22,14 @@ const waitingLead=(createdAt)=>{const id='sheet-w'+(++seq);sqlite.prepare("INSER
 const ownerOf=(id)=>sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(id).owner;
 (async()=>{
  await crmGet(); // owner → admin
- for(const m of [{email:'m1@example.test',name:'Manager',role:'manager'},{email:'a1@example.test',name:'Агент Нэг',role:'agent'},{email:'a2@example.test',name:'Агент Хоёр',role:'agent'},{email:'a3@example.test',name:'Агент Гурав',role:'agent'},{email:'c1@example.test',name:'Хүргэгч',role:'delivery'}])
+ for(const m of [{email:'op@example.test',name:'Operator',role:'operator'},{email:'m1@example.test',name:'Manager',role:'manager'},{email:'a1@example.test',name:'Агент Нэг',role:'agent'},{email:'a2@example.test',name:'Агент Хоёр',role:'agent'},{email:'a3@example.test',name:'Агент Гурав',role:'agent'},{email:'c1@example.test',name:'Хүргэгч',role:'delivery'}])
   assert.equal((await crmPost('member',{...m,active:true}))[0],200);
 
  // Хуваарьт хэн ч байхгүй үед хуваарилахгүй — хүсэлт хүлээсэн хэвээр.
+ shiftRow('op@example.test','Operator','Олимпик');
  const first=waitingLead(new Date().toISOString());
+ assert.equal((await crmPost('assign',{owner:'op@example.test'},first,1))[0],400);
+ assert.equal(ownerOf(first),'__sheet_unassigned__');
  let [status,d]=await crmPost('auto_assign',{});
  assert.equal(status,400);assert.match(d.error,/хуваарьт байгаа борлуулалтын ажилтан байхгүй/);
  assert.equal(ownerOf(first),'__sheet_unassigned__');
@@ -115,5 +118,13 @@ const ownerOf=(id)=>sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(id)
  // 4. Дараа нь нэр танихгүй болбол хуучин зан төлөвөөр хуваарилалт цуцлагдана.
  await sheets.applyRows([row('Тодорхойгүй хүн','')],[],'L',1);
  assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(synced.id).owner,'__sheet_unassigned__');
+ // Explicit Sheets mappings to an operator must also be rejected at sync time.
+ await sheets.applyRows([row('Operator','op@example.test')],[],'L',1);
+ assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(synced.id).owner,'__sheet_unassigned__');
+ user={userId:'op',email:'op@example.test',displayName:'Operator'};
+ assert.equal((await crmGet('?id='+first))[0],200);
+ assert.equal((await crmPost('auto_assign',{}))[0],403);
+ assert.equal((await crmPost('bulk_recycle',{}))[0],403);
+ assert.equal((await crmPost('member',{email:'op@example.test',name:'Operator',role:'admin',active:true}))[0],403);
  console.log('PASS: smart lead assignment — duty roster limited to active sales agents scheduled to work that day (days off, couriers and managers excluded), even round-robin weighted by leads already received today, manager/director/admin-only trigger, assigned leads becoming actionable with an auto_assign audit trail, sheet_links kept in step so a later sync cannot revert the owner, the recent-only window protecting the historical backlog, suppressed numbers skipped, and a sync round-trip that keeps an auto-assigned owner while still unassigning a lead whose named sheet owner stops matching an employee.');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -22,6 +22,18 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal((await post('create',leadData()))[0],409);
  assert.equal((await get('?view=today'))[1].count,1);assert.deepEqual((await get('?view=dashboard'))[1].leads,(await get('?view=today'))[1].leads);assert.ok(!(await get('?id='+id))[1].activities.some(a=>a.note.includes('АБ99112233')));
  assert.equal((await post('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
+ assert.equal((await post('member',{email:'operator@example.test',name:'Operator',role:'operator',active:true}))[0],200);
+ assert.equal((await post('create',leadData('88118811','operator@example.test')))[0],400);
+ assert.equal((await post('import',[leadData('88118812','operator@example.test')]))[0],400);
+ assert.equal((await post('update',leadData('99112233','operator@example.test'),id,1))[0],400);
+ user={userId:'operator',email:'operator@example.test',displayName:'Operator'};
+ assert.equal((await get('?view=all'))[1].count,1);
+ assert.equal((await get('?id='+id))[0],200);
+ assert.equal((await post('update',{...leadData(),product:'Operator updated'},id,1))[0],200);
+ assert.equal((await get('?id='+id))[1].lead.product,'Operator updated');
+ // Restore fixture version so the existing optimistic-locking checks remain independent.
+ sqlite.prepare('UPDATE leads SET version=1 WHERE id=?').run(id);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  user={userId:'stranger',email:'stranger@example.test',displayName:'Stranger'};assert.equal((await get())[0],403);
  user={userId:'agent',email:'agent@example.test',displayName:'Agent'};assert.equal((await get())[1].stats.total,0);assert.equal((await get('?id='+id))[0],404);assert.equal((await post('member',{email:'third@example.test',name:'Third',role:'admin',active:true}))[0],403);assert.equal((await post('create',leadData('88112233')))[0],403);
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
