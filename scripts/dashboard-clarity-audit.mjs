@@ -51,6 +51,10 @@ try{
  await snap('admin-top-1440');await evaluate("document.querySelector('.dashboard-report').scrollIntoView()");await snap('admin-report-1440');
  for(const label of ['Маркетинг','IT']){await evaluate(`(()=>{[...document.querySelectorAll('.dashboard-report-tabs [role=tab]')].find(e=>e.textContent===${JSON.stringify(label)}).click()})()`);await pause(200);}
  await viewport(390);await snap('admin-report-390');await viewport(768);await snap('admin-report-768');await viewport(1440);
+
+ await evaluate("document.querySelector('.dashboard-task-link').click()");await wait("document.querySelector('.detail-body')?.textContent.includes('120,000')");
+ assert.ok(await evaluate("document.querySelector('.ant-drawer').textContent.includes('Campaign review')"));await snap('pending-task-detail');
+ await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.dashboard-approval-card')");
  await evaluate("[...document.querySelectorAll('.dashboard-approval-card button')].find(e=>e.textContent==='Хянаж батлах').click()");await wait("!!document.querySelector('.ant-modal textarea')");
  assert.equal(await evaluate("document.querySelector('.ant-modal button[type=submit]').disabled"),true);
  await evaluate("(()=>{const e=document.querySelector('.ant-modal textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Approved in disposable audit');e.dispatchEvent(new Event('input',{bubbles:true}));})()");

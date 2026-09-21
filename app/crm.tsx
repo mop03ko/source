@@ -194,7 +194,7 @@ export default function CRM({initialNow,initialQuery={}}:{initialNow:number;init
  {view==='inventory'&&!isIsolatedRole(data.me.role)&&<InventoryPanel me={data.me} members={data.directory}/>}
  {view==='delivery'&&canSeeDeliveries(data.me.role)&&<DeliveriesPanel me={data.me} members={data.directory} initialTaskId={moduleTarget?.module==='delivery'?moduleTarget.id:undefined}/>}
 
- {view==='dashboard'&&isAdminLike(data.me.role)&&<DashboardPanel members={data.directory} salesStats={data.stats} salesDistribution={data.distribution} rfrom={reportFrom} rto={reportTo} onRange={(from,to)=>{setReportFrom(from);setReportTo(to);}}/>}
+ {view==='dashboard'&&isAdminLike(data.me.role)&&<DashboardPanel members={data.directory} salesStats={data.stats} salesDistribution={data.distribution} onOpenTask={id=>{if(!allow())return;navigate('marketing');setModuleTarget({module:'marketing',id});}} rfrom={reportFrom} rto={reportTo} onRange={(from,to)=>{setReportFrom(from);setReportTo(to);}}/>}
  {view==='marketing'&&data.me.role!=='agent'&&data.me.role!=='it'&&<MarketingPanel me={data.me} members={data.directory} initialTaskId={moduleTarget?.module==='marketing'?moduleTarget.id:undefined}/>}
  {view==='it'&&data.me.role!=='agent'&&data.me.role!=='marketing'&&<ItPanel me={data.me} members={data.directory} initialTaskId={moduleTarget?.module==='it'?moduleTarget.id:undefined}/>}
  {view==='settings'&&<SettingsPanel me={data.me} members={data.members} initial={data.settings} onSaved={s=>setData(d=>d?{...d,settings:{...d.settings,...s}}:d)} onProfileSaved={p=>setData(d=>d?{...d,me:{...d.me,...p}}:d)}/>}
