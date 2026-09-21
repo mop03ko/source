@@ -1,4 +1,5 @@
 'use client';
+import {ListPagination} from '@/components/list-pagination';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useRef,useState} from 'react';
@@ -41,7 +42,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  if(mode!=='items'){params.set('from',from);params.set('to',to);}
  const url='/api/inventory?'+params,list=useRemote<List>(mode==='counts'?null:url);
  const detail=useRemote<Detail>(detailId?'/api/inventory?view=items&id='+encodeURIComponent(detailId)+'&revision='+revision:null);
- const summary=list.data?.summary,rows=list.data?.items||[],total=list.data?.count||0,totalPages=Math.max(1,Math.ceil(total/50));
+ const summary=list.data?.summary,rows=list.data?.items||[],total=list.data?.count||0;
  const canManage=['admin','director','manager'].includes(me.role);
  const canEditItem=canEditInventoryItem(me.role);
  const post:Post=async(action,data,id)=>{
@@ -108,7 +109,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
     {mode==='sales'&&<><TableCell>{dateLabel(r.sold_at||r.created_at)}<small>{r.bill_number}</small></TableCell><TableCell><button className="inventory-item-link" onClick={()=>setDetailId(r.item_id)}>{r.item_name}<small>{r.item_code} · {r.warehouse_name}</small></button></TableCell><TableCell>{r.qty} ш</TableCell><TableCell>{cash(r.total_price)}<small>Өртөг {cash(r.cost_cents/100)}</small></TableCell><TableCell>{cash(r.commission_cents/100)}<small>Татвар {cash(r.tax_cents/100)}</small></TableCell><TableCell className={r.profit_cents<0?'inventory-negative':''}>{cash(r.profit_cents/100)}</TableCell><TableCell>{r.platform||'—'}<small>{r.account}{r.vat_issued?' · Баримт олгосон':''}</small></TableCell><TableCell>{r.customer_name||'—'}<small>{r.customer_phone}</small></TableCell></>}
     {mode==='moves'&&<><TableCell>{dateLabel(r.occurred_at||r.created_at)}</TableCell><TableCell>{r.item_name}<small>{r.item_code}</small></TableCell><TableCell>{r.warehouse_name}</TableCell><TableCell>{kinds[r.kind]||r.kind}</TableCell><TableCell className={r.qty_delta<0?'inventory-negative':''}>{r.qty_delta>0?'+':''}{r.qty_delta}</TableCell><TableCell>{cash(r.value_cents/100)}</TableCell><TableCell>{r.note||'—'}</TableCell></>}
    </TableRow>)}</TableBody></Table></div>}
-   {totalPages>1&&<div className="table-footer"><span>{total} бүртгэл</span><div className="row"><Button variant="outline" disabled={page<=1||list.loading} onClick={()=>setPage(p=>p-1)}>Өмнөх</Button><span>{page} / {totalPages}</span><Button variant="outline" disabled={page>=totalPages||list.loading} onClick={()=>setPage(p=>p+1)}>Дараах</Button></div></div>}
+   <ListPagination page={page} total={total} loading={list.loading} onChange={setPage} pageSize={50} label="бүртгэл"/>
   </>}
   <Sheet open={!!detailId} onOpenChange={o=>{if(!o)setDetailId('');}}><SheetContent className="detail-sheet"><SheetHeader><SheetTitle>{detail.data?.item.name||'Барааны дэлгэрэнгүй'}</SheetTitle><SheetDescription>Агуулах тус бүрийн үлдэгдэл, өртөг, сүүлийн 100 хөдөлгөөн</SheetDescription></SheetHeader><div className="detail-body"><AsyncStatus error={detail.error} loading={detail.loading} retry={detail.retry}/>{detail.data&&<>
    <p className="muted">{detail.data.item.code} · {detail.data.item.brand} · {[detail.data.item.capacity,detail.data.item.color,detail.data.item.imei].filter(Boolean).join(' / ')}</p>

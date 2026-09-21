@@ -78,7 +78,15 @@ try{
   await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));
  }
  const load=async view=>{await cdp('Page.navigate',{url:base+'/?view='+view});await pause(1200);for(let i=0;i<30;i++){if(await evaluate("!!document.querySelector('.nav-button')&&!document.querySelector('.loading')"))break;await pause(150);}};
- await viewport(390);await load('reports');
+ await viewport(390);await load('all');
+ const collapseHeader='.work-summary .ant-collapse-header';
+ assert.equal(await evaluate(`document.querySelector('${collapseHeader}').getAttribute('aria-expanded')`),'false');
+ await evaluate(`document.querySelector('${collapseHeader}').focus()`);
+ await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+ await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await pause(400);
+ assert.equal(await evaluate(`document.querySelector('${collapseHeader}').getAttribute('aria-expanded')`),'true');
+ await inspect('antd-collapse-open');evidence.checks.antCollapseKeyboard=true;
+ await load('reports');
  evidence.checks.activeTab=await evaluate("(()=>{const e=document.querySelector('.sales-navigation [aria-current=page]'),r=e.getBoundingClientRect();return{text:e.textContent,left:r.left,right:r.right,viewport:innerWidth,visible:r.left>=0&&r.right<=innerWidth};})()");assert.equal(evidence.checks.activeTab.visible,true);await inspect('active-report-tab-mobile');
  await load('direct');
  assert.equal(await evaluate("(()=>{const r=document.querySelector('.sales-navigation [aria-current=page]').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})()"),true);

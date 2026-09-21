@@ -109,10 +109,10 @@ try{
  await click('Хяналтын самбар','.nav-button');await snap('05-dashboard-desktop');
  await click('Маркетинг','.nav-button');await snap('06-marketing-desktop');
  await cdp('Network.setBlockedURLs',{urls:['*api/marketing?report*']});await click('Тайлан','.view-toggle button');
- assert.ok(await evaluate("!!document.querySelector('.error-box')"));assert.equal(await evaluate("document.querySelectorAll('.bar-row').length"),0);await snap('06b-marketing-report-error');
+ assert.ok(await evaluate("!!document.querySelector('[role=alert]')"));assert.equal(await evaluate("document.querySelectorAll('.bar-row').length"),0);await snap('06b-marketing-report-error');
  await cdp('Network.setBlockedURLs',{urls:[]});await click('Дахин оролдох');assert.ok(await evaluate("document.querySelectorAll('.bar-row').length>0"));
  await click('IT','.nav-button');await snap('07-it-desktop');
- await cdp('Network.setBlockedURLs',{urls:['*api/it?report*']});await click('Тайлан','.view-toggle button');assert.ok(await evaluate("!!document.querySelector('.error-box')"));
+ await cdp('Network.setBlockedURLs',{urls:['*api/it?report*']});await click('Тайлан','.view-toggle button');assert.ok(await evaluate("!!document.querySelector('[role=alert]')"));
  await cdp('Network.setBlockedURLs',{urls:[]});await click('Дахин оролдох');assert.ok(await evaluate("document.querySelectorAll('.bar-row').length>0"));
  await click('Тохиргоо','.nav-button');await snap('08-settings-desktop');
  await evaluate("document.querySelector('[role=tab][aria-selected=true]').focus()");

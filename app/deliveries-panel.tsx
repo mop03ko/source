@@ -1,4 +1,5 @@
 'use client';
+import {ListPagination} from '@/components/list-pagination';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 import {useState} from 'react';
@@ -97,7 +98,7 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  const list=useRemote<List>(mode==='list'?listUrl:null);
  const report=useRemote<Report>(mode==='report'?'/api/deliveries?'+new URLSearchParams({report:'1',rfrom,rto,revision:String(revision)}):null);
  const detail=useRemote<{delivery:Linked;units:Unit[]}>(detailId?'/api/deliveries?id='+encodeURIComponent(detailId)+'&revision='+revision:null);
- const rows=list.data?.items||[],total=list.data?.count||0,stats=list.data?.stats,totalPages=Math.max(1,Math.ceil(total/50));
+ const rows=list.data?.items||[],total=list.data?.count||0,stats=list.data?.stats;
  const activeMembers=members.filter(m=>m.active);
  const legacy=(list.data?.couriers||[]).map(c=>c.name).filter(n=>!activeMembers.some(m=>m.name===n));
  const post=async(action:string,data:unknown,id?:string,version?:number)=>{
@@ -128,7 +129,7 @@ export default function DeliveriesPanel({me,members}:{me:Member;members:Member[]
  {(q||status||courier||channel||kind||from||to)&&<Button variant="ghost" size="sm" onClick={()=>{setQ('');setStatus('');setCourier('');setChannel('');setKind('');setFrom('');setTo('');setPage(1);}}>Шүүлтүүр цэвэрлэх</Button>}</ResponsiveFilters>
  <AsyncStatus error={list.error} loading={list.loading} retry={list.retry}/>
  {!list.error&&(rows.length?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>ОГНОО</TableHead><TableHead>ТӨРӨЛ</TableHead><TableHead>БАРАА</TableHead><TableHead>УТАС</TableHead><TableHead>ХАЯГ</TableHead><TableHead>СУВАГ</TableHead><TableHead>ХҮРГЭГЧ</TableHead><TableHead>ТӨЛӨВ</TableHead><TableHead><span className="sr-only">Үйлдэл</span></TableHead></TableRow></TableHeader><TableBody>{rows.map(r=><TableRow key={r.id} className="lead-row"><TableCell><button className="lead-link" onClick={()=>setDetailId(r.id)}><span className="lead-avatar"><Truck size={16}/></span><strong>{r.delivered_on}</strong></button></TableCell><TableCell>{r.kind||'—'}</TableCell><TableCell>{r.item_name?<span className="owner-label" title={r.item_code||''}><Link2 size={12}/> {r.item_name}</span>:r.item_info||'—'}</TableCell><TableCell>{r.customer_phone||'—'}</TableCell><TableCell><span title={r.address}>{r.address.slice(0,40)||'—'}{r.address.length>40?'…':''}</span></TableCell><TableCell>{r.payment_channel||'—'}</TableCell><TableCell><span className="owner-label">{r.courier_name}</span></TableCell><TableCell><span className={'stage '+statusClass(r.status)}>{deliveryStatuses[r.status]||r.status}</span></TableCell><TableCell><Button variant="ghost" size="icon" aria-label="Хүргэлт нээх" onClick={()=>setDetailId(r.id)}><ArrowUpRight size={18}/></Button></TableCell></TableRow>)}</TableBody></Table></div>:!list.loading&&<p className="muted chat-empty-list">Тохирох хүргэлт олдсонгүй.</p>)}
- {totalPages>1&&<div className="table-footer"><span>{total.toLocaleString()} хүргэлт</span><div className="row"><Button size="sm" variant="outline" disabled={page<=1||list.loading} onClick={()=>setPage(p=>p-1)}>Өмнөх</Button><span className="muted">{page} / {totalPages}</span><Button size="sm" variant="outline" disabled={page>=totalPages||list.loading} onClick={()=>setPage(p=>p+1)}>Дараах</Button></div></div>}
+ <ListPagination page={page} total={total} loading={list.loading} onChange={setPage} pageSize={50} label="хүргэлт"/>
  </>:<>
  <div className="report-range panel"><Field label="Хугацааны эхлэл"><Input type="date" value={rfrom} max={rto||undefined} onChange={e=>setRfrom(e.target.value)}/></Field><Field label="Хугацааны төгсгөл"><Input type="date" value={rto} min={rfrom||undefined} onChange={e=>setRto(e.target.value)}/></Field><Button variant="ghost" size="sm" onClick={()=>{setRfrom('');setRto('');}}>Бүх хугацаа</Button><p className="muted text-sm">{rfrom||rto?`${rfrom||'…'} — ${rto||'өнөөдөр'} хооронд хүргэсэн ${(report.data?.total||0).toLocaleString()} хүргэлтэд үндэслэв.`:'Бүх хугацааны хүргэлт харагдаж байна.'}</p></div>
  <AsyncStatus error={report.error} loading={report.loading} retry={report.retry}/>

@@ -122,5 +122,15 @@ try{
  evidence.checks.selectSearchDraft.selectionMarksDirty=true;
  dialogAnswer=true;await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);
  for(const [view,label] of [['direct','Борлуулалт бүртгэх'],['inventory','Бараа нэмэх']]){try{await load(view);await click(label);await inspect(view+'-form-desktop');await viewport(390);await inspect(view+'-form-mobile');await viewport(1440);}catch(error){evidence.scanFailures.push({view,error:String(error)});}}
+ for(let i=0;i<50;i++)await post('/api/inventory','create_item',{code:'PAGE-'+i,name:'Pagination fixture '+i});
+ await viewport(1440);await load('inventory');
+ assert.equal(await evaluate("document.querySelectorAll('.ant-table-tbody tr').length"),50);
+ await click('2','.ant-pagination-item');
+ assert.equal(await evaluate("document.querySelectorAll('.ant-table-tbody tr').length"),1);
+ await evaluate("(()=>{const e=document.querySelector('.search input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'UX-FULL-256');e.dispatchEvent(new Event('input',{bubbles:true}));})()");await pause(600);
+ assert.equal(await evaluate("document.querySelector('.ant-pagination-item-active')?.textContent"),'1');
+ assert.equal(await evaluate("document.querySelectorAll('.ant-table-tbody tr').length"),1);
+ evidence.checks.inventoryPagination={total:51,pages:[50,1],filterResetsPage:true};
+ await inspect('antd-inventory-pagination');
  console.log('Probe evidence',JSON.stringify(evidence.checks));
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();db?.close();}

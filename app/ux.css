@@ -1,4 +1,15 @@
 /* Higher specificity keeps these workspace rules above the legacy surface styles. */
+:root .crm-disclosure.work-summary{padding:0}
+:root .crm-disclosure .ant-collapse-header{min-height:44px;align-items:center;color:#522a70}
+:root .crm-disclosure .ant-collapse-body{min-width:0}
+:root .schedule-legend-collapse{margin:12px 24px}
+:root .schedule-legend-items{display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12px}
+:root .schedule-legend-items span{display:flex;align-items:center;gap:6px}
+:root .schedule-legend-items b{border-radius:4px;padding:4px 6px;color:#372944}
+:root .crm-list-pagination .ant-pagination{flex-wrap:wrap;row-gap:10px}
+:root .crm-loading-status{display:flex;align-items:center;gap:10px;padding:12px 20px;color:#65566f}
+:root .crm-async-alert{margin:12px;overflow-wrap:anywhere}
+@media(max-width:767px){:root .crm-async-alert{flex-wrap:wrap;gap:10px}:root .crm-async-alert .ant-alert-actions{margin-inline-start:0}:root .schedule-legend-collapse{margin-inline:12px}}
 :root .perf-stats span,:root .capacity-result span,:root .candidate-group span,:root .table-toolbar h2>span,:root .guide-grid p,:root .cadence p{color:#65506f}
 :root .schedule-grid th button small{color:#65506f;font-size:11px}
 :root .auth-kicker,:root .auth-card>small{color:#65566f}
