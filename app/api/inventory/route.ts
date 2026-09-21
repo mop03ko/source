@@ -36,12 +36,12 @@ export async function GET(req:Request){try{
   const [byWarehouse,moves,stock]=await Promise.all([
    db().prepare('SELECT w.id warehouse_id,w.name warehouse_name,COALESCE(SUM(m.qty_delta),0) qty,COALESCE(SUM(m.value_cents),0) value_cents,COALESCE(MAX(m.cost_estimated),0) cost_estimated FROM inventory_warehouses w LEFT JOIN inventory_stock_moves m ON m.warehouse_id=w.id AND m.item_id=? GROUP BY w.id ORDER BY w.name').bind(item.id).all(),
    db().prepare('SELECT m.*,w.name warehouse_name FROM inventory_stock_moves m JOIN inventory_warehouses w ON w.id=m.warehouse_id WHERE m.item_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 100').bind(item.id).all(),
-   db().prepare('SELECT COALESCE(SUM(qty_delta),0) stock,COALESCE(SUM(value_cents),0) value_cents FROM inventory_stock_moves WHERE item_id=?').bind(item.id).first(),
+   db().prepare('SELECT COALESCE(SUM(qty_delta),0) stock,COALESCE(SUM(value_cents),0) value_cents,COALESCE(MAX(cost_estimated),0) cost_estimated FROM inventory_stock_moves WHERE item_id=?').bind(item.id).first(),
   ]);return json({item:{...item,...stock},byWarehouse:byWarehouse.results,moves:moves.results});
  }
  if(view==='items'||view==='balance'){
   const args:unknown[]=[];let where='1=1';
-  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ?)';args.push(...Array(4).fill('%'+q+'%'));}
+  if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ?)';args.push(...Array(8).fill('%'+q+'%'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   const moveArgs:unknown[]=warehouse?[warehouse]:[];let cte='';
   if(view==='balance'){

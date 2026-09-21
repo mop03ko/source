@@ -23,7 +23,12 @@ try{
  const post=async(action,data,id)=>{const r=await fetch(base+'/api/inventory',{method:'POST',headers,body:JSON.stringify({action,data,id})});const value=await r.json();assert.equal(r.status,200,JSON.stringify(value));return value;};
  const wh=(await post('create_warehouse',{name:'Туршилтын агуулах'})).id;
  await post('create_warehouse',{name:'Туршилтын салбар'});
- const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',capacity:'256GB',color:'Silver',sale_price:2000000,min_stock:2})).id;
+ const item=(await post('create_item',{code:'UI-TEST-256',name:'Туршилтын утас',brand:'SearchBrand',supplier:'Туршилтын нийлүүлэгч',variant:'Тусгай хувилбар',capacity:'256GB',color:'Silver',sale_price:2000000,min_stock:2})).id;
+ for(const q of ['SearchBrand','256GB','Silver','Тусгай хувилбар']){
+  const result=await (await fetch(base+'/api/inventory?view=items&q='+encodeURIComponent(q),{headers})).json();
+  assert.equal(result.items[0]?.id,item,'Search field: '+q);
+ }
+ evidence.checks.productSearch=true;
  await post('record_purchase',{item_id:item,warehouse_id:wh,qty:5,unit_cost:1000000.25,additional_cost:25000,status:'received'});
  await post('record_sale',{item_id:item,warehouse_id:wh,qty:1,unit_price:2000000,platform:'STOREPAY',bill_number:'TEST-BILL'});
  chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9334','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
@@ -43,6 +48,19 @@ try{
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
  await cdp('Page.navigate',{url:base});await wait("!!document.querySelector('.nav-button')");await pause(1200);await click('Агуулах','.nav-button');await wait("!!document.querySelector('.inventory-item-link')");
  await snap('01-stock-desktop');await click('Туршилтын утасUI-TEST-256','.inventory-item-link');await wait("!!document.querySelector('.detail-body .sync-summary')");
+ assert.ok(await evaluate("document.querySelector('.detail-body').textContent.includes('Туршилтын нийлүүлэгч')"));
+ assert.ok(await evaluate("document.querySelector('.detail-body').textContent.includes('Тусгай хувилбар')"));
+ await click('Мэдээлэл засах');await wait("!!document.querySelector('input[name=sale_price]')");
+ await viewport(390);await snap('product-form-mobile');await viewport(1440);
+ await fill('input[name=sale_price]','');
+ assert.equal(await evaluate("document.querySelector('input[name=sale_price]').checkValidity()"),false);
+ await fill('input[name=sale_price]','2100000');await fill('input[name=supplier]','Шинэ нийлүүлэгч');
+ await click('Бараа хадгалах');await wait("!document.querySelector('input[name=sale_price]')");
+ await wait("document.querySelector('.detail-body')?.textContent.includes('Шинэ нийлүүлэгч')");
+ const updated=await (await fetch(base+'/api/inventory?view=items&id='+item,{headers})).json();
+ assert.equal(updated.item.sale_price,2100000);assert.equal(updated.item.stock,4);assert.equal(updated.item.supplier,'Шинэ нийлүүлэгч');
+ evidence.checks.productEditPreservesStock=true;await snap('detail-edited');
+ await viewport(390);await snap('product-detail-mobile');await viewport(1440);
  await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
  evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(200);
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');

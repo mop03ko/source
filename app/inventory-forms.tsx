@@ -22,13 +22,18 @@ export const cash=(value:number)=>new Intl.NumberFormat('mn-MN',{maximumFraction
 const Price=({name,value=0,required=false}:{name:string;value?:number;required?:boolean})=><Input name={name} type="number" min={0} max={1_000_000_000} step="0.01" defaultValue={value} required={required}/>;
 
 export function ItemForm({item,busy,onSave}:{item?:Item;busy:boolean;onSave:(data:unknown)=>Promise<void>}){
- return <GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);await onSave({...Object.fromEntries(f),sale_price:numeric(f,'sale_price'),min_stock:numeric(f,'min_stock')});return true;}}>
+ return <GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);if(!String(f.get('name')||'').trim()||!String(f.get('code')||'').trim())throw new Error('Барааны нэр болон кодыг бөглөнө үү.');await onSave({...Object.fromEntries(f),sale_price:numeric(f,'sale_price'),min_stock:numeric(f,'min_stock')});return true;}}>
+  <p className="form-help">* тэмдэгтэй талбаруудыг заавал бөглөнө үү.</p>
+  <h3>Үндсэн мэдээлэл</h3>
   <Field label="Барааны нэр *"><Input name="name" defaultValue={item?.name} required maxLength={300}/></Field>
   <div className="form-grid"><Field label="Код / SKU *"><Input name="code" defaultValue={item?.code} required maxLength={200}/></Field><Field label="IMEI / сериал"><Input name="imei" defaultValue={item?.imei||''} maxLength={80}/></Field></div>
   <div className="form-grid"><Field label="Брэнд"><Input name="brand" defaultValue={item?.brand} maxLength={120}/></Field><Field label="Нийлүүлэгч"><Input name="supplier" defaultValue={item?.supplier} maxLength={120}/></Field></div>
+  <h3>Барааны шинж чанар</h3>
   <div className="form-grid"><Field label="Багтаамж / хэмжээ"><Input name="capacity" defaultValue={item?.capacity} placeholder="256GB" maxLength={80}/></Field><Field label="Өнгө"><Input name="color" defaultValue={item?.color} maxLength={80}/></Field></div>
   <Field label="Бусад хувилбар"><Input name="variant" defaultValue={item?.variant} maxLength={120}/></Field>
-  <div className="form-grid"><Field label="Борлуулах нэгжийн үнэ"><Price name="sale_price" value={item?.sale_price}/></Field><Field label="Доод үлдэгдлийн сануулга"><Input name="min_stock" type="number" min={0} max={1_000_000} step={1} defaultValue={item?.min_stock||0}/></Field></div>
+  <h3>Үнэ ба үлдэгдлийн сануулга</h3>
+  <div className="form-grid"><Field label="Борлуулах нэгжийн үнэ (₮) *"><Price name="sale_price" value={item?.sale_price} required/></Field><Field label="Доод үлдэгдлийн сануулга (ш) *"><Input name="min_stock" type="number" min={0} max={1_000_000} step={1} required defaultValue={item?.min_stock||0}/></Field></div>
+  <p className="form-help">Үлдэгдэл, өртөг нь орлого, зарлага, тооллогын хөдөлгөөнөөс тооцогдоно. Борлуулах үнийн өөрчлөлт өмнөх борлуулалтын дүнг өөрчлөхгүй.</p>
   <Button disabled={busy} type="submit">{busy?'Хадгалж байна…':'Бараа хадгалах'}</Button>
  </GuardedForm>;
 }
