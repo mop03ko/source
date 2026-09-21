@@ -63,7 +63,8 @@ try{
  for(const role of ['agent','manager','director','marketing','it','delivery']){
   const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'test:'+role,email:role+'@example.test',name:role},maxAge:3600});
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
-  await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.daily-shift')");
+  await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.daily-shift,.daily-staffing')");
+  if(['manager','director'].includes(role)){assert.ok(await evaluate("!!document.querySelector('.daily-staffing')"));assert.equal(await evaluate("document.querySelector('.daily-work').textContent.includes('Хүсэлт хуваарилах')||document.querySelector('.daily-work').textContent.includes('Хүргэлт хянах')||document.body.innerText.includes('Өнөөдрийн үзүүлэлт · Улаанбаатарын цаг')"),false);}
   if(['manager','director'].includes(role))assert.equal(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')||!!document.querySelector('.today-performance')"),false);
   if(role==='agent')assert.ok(await evaluate("!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')"));
   if(['marketing','it'].includes(role)){await wait("!!document.querySelector('.daily-priority')");assert.ok(await evaluate("document.querySelector('.daily-task-list').textContent.includes('review')"));}

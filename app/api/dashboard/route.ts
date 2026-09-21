@@ -1,6 +1,6 @@
 import {env} from '@/lib/runtime';
 import {member,Failure} from '@/lib/access';
-import {personKey} from '@/lib/crm';
+import {personKey,shiftIsWork,canManageSchedule} from '@/lib/crm';
 export const dynamic='force-dynamic';
 export async function GET(req:Request){try{
  const me=await member(),db=env.DB;
@@ -10,7 +10,9 @@ export async function GET(req:Request){try{
  const page=Math.max(1,Math.min(10000,Math.floor(Number(new URL(req.url).searchParams.get('page')))||1));
  const shifts=await db.prepare('SELECT person_name,member_email,assignment,note FROM work_shifts WHERE day=?').bind(day).all<{person_name:string;member_email:string|null;assignment:string;note:string}>();
  const shift=shifts.results.filter(s=>s.member_email?s.member_email.toLowerCase()===me.email.toLowerCase():personKey(s.person_name)===personKey(me.name)).map(s=>({assignment:s.assignment,note:s.note}));
- if(!['marketing','it','delivery'].includes(me.role))return Response.json({day,shift,items:[],count:0,summary:null},{headers:{'Cache-Control':'no-store'}});
+ const emailByName=new Map(shifts.results.filter(s=>s.member_email).map(s=>[personKey(s.person_name),s.member_email!.toLowerCase()]));
+ const working=new Set(shifts.results.filter(s=>s.assignment.trim()&&shiftIsWork(s.assignment.trim())).map(s=>s.member_email?.toLowerCase()||emailByName.get(personKey(s.person_name))||personKey(s.person_name))).size;
+ if(!['marketing','it','delivery'].includes(me.role))return Response.json({day,shift,items:[],count:0,summary:null,...(canManageSchedule(me.role)?{staffing:{working}}:{})},{headers:{'Cache-Control':'no-store'}});
  const delivery=me.role==='delivery',table=delivery?'deliveries':me.role==='it'?'it_tasks':'marketing_tasks';
  const due=delivery?'delivered_on':'due_at';
  const scope=delivery?'(courier_email=? OR (courier_email IS NULL AND courier_name=?))':'owner=?';

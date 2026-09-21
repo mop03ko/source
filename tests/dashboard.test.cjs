@@ -25,6 +25,8 @@ function task(role,id,owner,due,status='planned'){const table=role==='it'?'it_ta
  const insert=sqlite.prepare('INSERT INTO deliveries(id,delivered_on,courier_email,courier_name,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
  for(const [id,email,name,status,date] of [['mine',courier,'Courier','pending',day],['legacy',null,'Courier','pending',day],['other','other@test.mn','Other','pending',day],['closed',courier,'Courier','delivered',day],['future',courier,'Courier','pending',tomorrow.slice(0,10)==day?new Date(Date.parse(tomorrow)+8*3600000).toISOString().slice(0,10):tomorrow.slice(0,10)]])insert.run(id,date,email,name,status,'admin',start,start);
  const d=(await get())[1];assert.equal(d.count,2);assert.deepEqual(d.items.map(t=>t.id).sort(),['legacy','mine']);assert.equal(d.shift.length,0);
- for(const role of ['agent','manager','admin','director']){current={email:role+'@test.mn',name:role,role};const d=(await get())[1];assert.deepEqual(d.items,[]);assert.equal(d.summary,null);}
+
+ for(const [id,name,email,assignment] of [['off','Off','off@test.mn','Амралт'],['leave','Leave','leave@test.mn','Чөлөө'],['blank','Blank',null,''],['duplicate','IT alias','it@test.mn','Олимпик']])sqlite.prepare('INSERT INTO work_shifts(id,day,member_email,person_name,assignment,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(id,day,email,name,assignment,'admin',start,start);
+ for(const role of ['agent','manager','admin','director']){current={email:role+'@test.mn',name:role,role};const d=(await get())[1];assert.deepEqual(d.items,[]);assert.equal(d.summary,null);if(role==='agent')assert.equal(d.staffing,undefined);else assert.equal(d.staffing.working,2);}
  console.log('PASS: dashboard authentication, own-task and courier isolation, ignored role/owner spoofing, UB day boundaries, overdue/open work, unscheduled count, pagination and shift privacy.');
 })().catch(e=>{console.error(e);process.exit(1);});
