@@ -29,6 +29,16 @@ const scenario=String.raw`
  [status,d]=await invGet(productUrl);assert.equal(d.count,1);assert.equal(d.items[0].id,second);assert.equal(d.product.stock,0);
  [status,d]=await invGet('?view=items&id='+first);assert.equal(d.item.stock,1);assert.notEqual(d.item.product_key,product.id,'Editing variant regroups without moving ledger');
  assert.equal((await invGet('?view=products&id=missing'))[0],404);
+ const blank=(await invPost('create_item',{code:'UNCATEGORIZED',name:'No category',sale_price:100}))[1].id;
+ for(const view of ['products','items','balance']){[status,d]=await invGet('?view='+view+'&category=__uncategorized__');assert.equal(status,200);assert.equal(d.count,1);if(view==='items')assert.equal(d.items[0].id,blank);}
+ [status,d]=await invGet('?view=products');assert.equal(d.summary.reorder_stock,0);assert.ok(d.summary.empty_stock>0,'Empty stock is distinct from positive reorder stock');
+ [status,d]=await invGet('?view=moves&kind=sale');assert.equal(status,200);assert.equal(d.count,1);assert.ok(d.items.every(m=>m.kind==='sale'));assert.equal(d.items[0].item_id,second);
+ [status,d]=await invGet('?view=moves&kind=missing');assert.equal(d.count,0);
+ const otherWarehouse=(await invPost('create_warehouse',{name:'Other warehouse'}))[1].id;
+ const transfer=(await invPost('transfer',{item_id:first,warehouse_id:warehouse,to_warehouse_id:otherWarehouse,qty:1}));assert.equal(transfer[0],200);
+ [status,d]=await invGet('?view=moves&ref_id='+transfer[1].id);assert.equal(d.count,2);assert.equal(d.items.reduce((n,m)=>n+m.qty_delta,0),0);assert.equal(new Set(d.items.map(m=>m.warehouse_id)).size,2);
+ [status,d]=await invGet('?view=products&sort=stock_asc');assert.ok(d.items.every((item,i)=>i===0||d.items[i-1].stock<=item.stock));
+ [status,d]=await invGet('?view=products&sort=value_desc');assert.ok(d.items.every((item,i)=>i===0||d.items[i-1].value_cents>=item.value_cents));
  const pk=deps['@/lib/inventory'].productKey;assert.equal(await pk(input),await pk({...input,name:' IPHONE 17 PRO '}));assert.notEqual(await pk(input),await pk({...input,code:'DISPLAY'}));assert.notEqual(await pk(input),await pk({...input,color:''}));assert.notEqual(await pk({...input,color:'',code:'A'}),await pk({...input,color:'',code:'B'}));
  console.log('PASS: product identity, variant/condition separation, supplier/price preservation, barcode search, exact unit sale, historical links, stock safety and edit regrouping.');
 })().catch(e=>{console.error(e);process.exit(1)});`;

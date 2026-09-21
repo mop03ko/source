@@ -6,10 +6,10 @@ import {Bar,BarChart,CartesianGrid,Cell,ResponsiveContainer,Tooltip,XAxis,YAxis}
 export type BalanceCategory={label:string;item_count:number;stock:number;value_cents:number};
 export type BalanceView='all'|'charts'|'list';
 const number=(n:number)=>n.toLocaleString('en-US',{maximumFractionDigits:2});
-const compact=(n:number)=>new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(n);
+const compact=(n:number)=>Math.abs(n)>=1e6?number(n/1e6)+' сая':Math.abs(n)>=1e3?number(n/1e3)+' мян':number(n);
 const colors=['#64748b','#059669','#d97706','#2563eb'];
 
-export default function InventoryBalanceReport({summary,categories,from,to,warehouse,view,onView,onStock}:{summary:Record<string,number>;categories:BalanceCategory[];from:string;to:string;warehouse:string;view:BalanceView;onView:(view:BalanceView)=>void;onStock:(stock:string)=>void}){
+export default function InventoryBalanceReport({summary,categories,from,to,warehouse,view,onView,onStock,onCategory}:{summary:Record<string,number>;categories:BalanceCategory[];from:string;to:string;warehouse:string;view:BalanceView;onView:(view:BalanceView)=>void;onStock:(stock:string)=>void;onCategory:(category:string)=>void}){
  const [measure,setMeasure]=useState<'qty'|'value'>('value');
  const value=measure==='value',unit=value?'₮':'ш';
  const flow=[
@@ -33,7 +33,7 @@ export default function InventoryBalanceReport({summary,categories,from,to,wareh
   {view!=='list'&&<><div className="balance-chart-toolbar"><h3>Үлдэгдлийн бүтэц</h3><Segmented aria-label="Графикийн хэмжүүр" value={measure} onChange={setMeasure} options={[{label:'Өртөг (₮)',value:'value'},{label:'Тоо ширхэг',value:'qty'}]}/></div>
    {!summary.count?<Empty description="Сонгосон шүүлтүүрт бараа алга"/>:<div className="balance-charts">
     <Card title={value?'Өртгийн өөрчлөлт':'Тоо ширхэгийн өөрчлөлт'} size="small"><div className="balance-flow-chart" role="img" aria-label={flow.map(r=>`${r.name}: ${number(r.amount)} ${unit}`).join('; ')}><ResponsiveContainer width="100%" height="100%"><BarChart data={flow} margin={{top:18,right:8,bottom:12,left:0}} accessibilityLayer><CartesianGrid vertical={false} strokeDasharray="3 3"/><XAxis dataKey="name" tickFormatter={label=>String(label).replace(" үлдэгдэл","")} tick={{fontSize:11}} interval={0}/><YAxis allowDecimals={value} tickFormatter={compact} width={54} tick={{fontSize:11}}/><Tooltip formatter={v=>[`${number(Number(v))} ${unit}`,value?'Өртөг':'Тоо ширхэг']}/><Bar dataKey="amount" radius={[5,5,0,0]} maxBarSize={64} isAnimationActive={false}>{flow.map((r,i)=><Cell key={r.name} fill={colors[i]}/>)}</Bar></BarChart></ResponsiveContainer></div><p className="muted">{value?'Худалдах үнэ бус, агуулахын өртгөөр тооцсон.':'Бүх барааны хэмжих нэгж: ширхэг.'}</p></Card>
-    <Card title="Эцсийн үлдэгдэл · Ангиллаар" size="small"><div className="balance-category-list">{top.map((c,i)=><div key={c.label} className="balance-category"><div><span>{c.label||'Ангилаагүй'}</span><strong>{number(c.amount)} {unit}</strong></div><Progress percent={Math.abs(c.amount)/max*100} showInfo={false} strokeColor={c.amount<0?'#dc2626':colors[i%colors.length]} size="small"/><small>{number(c.item_count)} барааны бүртгэл {c.amount<0&&<Tag color="red">Сөрөг үлдэгдэл</Tag>}</small></div>)}</div><p className="muted">{ranked.length>7?'Хамгийн их дүнтэй 7 ангилал; үлдсэнийг “Бусад”-д нэгтгэв.':`Тохирох бүх ${ranked.length} ангиллыг харуулж байна.`}</p></Card>
+    <Card title="Эцсийн үлдэгдэл · Ангиллаар" size="small"><div className="balance-category-list">{top.map((c,i)=><div key={c.label} className="balance-category"><div>{i<7?<button className="inventory-chart-link" onClick={()=>onCategory(c.label||'__uncategorized__')}>{c.label||'Ангилаагүй'}</button>:<span>{c.label}</span>}<strong>{number(c.amount)} {unit}</strong></div><Progress percent={Math.abs(c.amount)/max*100} showInfo={false} strokeColor={c.amount<0?'#dc2626':colors[i%colors.length]} size="small"/><small>{number(c.item_count)} барааны бүртгэл {c.amount<0&&<Tag color="red">Сөрөг үлдэгдэл</Tag>}</small></div>)}</div><p className="muted">{ranked.length>7?'Хамгийн их дүнтэй 7 ангилал; үлдсэнийг “Бусад”-д нэгтгэв.':`Тохирох бүх ${ranked.length} ангиллыг харуулж байна.`}</p></Card>
    </div>}
   </>}
  </div>;

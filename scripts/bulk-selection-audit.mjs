@@ -52,9 +52,9 @@ try{
   const response=await fetch(base+'/api/crm',{method:'POST',headers,body:JSON.stringify({action:'create',data:{name:'Bulk lead '+String(i).padStart(2,'0'),phone:String(99130000+i),product:'Phone',source:'Facebook',owner:'owner@example.test',status:'new',next_at:new Date().toISOString(),next_action:'Call'}})});
   assert.equal(response.status,200);
  }
- const navigate=async view=>{await cdp('Page.navigate',{url:base+'/?view='+view});await wait("document.querySelectorAll('tbody .selection-cell input').length===50&&!document.querySelector('tbody .selection-cell input').disabled");};
- const count=()=>evaluate("document.querySelectorAll('tbody .selection-cell input:checked').length");
- const check=async selector=>{await wait(`!document.querySelector(${JSON.stringify(selector)}).disabled`);await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await pause(150);await wait("!document.querySelector('tbody .selection-cell input').disabled");};
+ const navigate=async view=>{await cdp('Page.navigate',{url:base+'/?view='+view});await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===50&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");};
+ const count=()=>evaluate("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input:checked').length");
+ const check=async selector=>{await wait(`!document.querySelector(${JSON.stringify(selector)}).disabled`);await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await pause(150);await wait("!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");};
  const selectedExport=async()=>{
   await evaluate("window.__csv='';window.__oldBlob=URL.createObjectURL;URL.createObjectURL=b=>{window.__csvPromise=b.text().then(t=>window.__csv=t);return window.__oldBlob(b)};window.__oldAnchor=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){if(!this.download)window.__oldAnchor.call(this)};");
   await click('Сонгосныг CSV татах');await evaluate('window.__csvPromise');
@@ -63,22 +63,25 @@ try{
  };
  for(const view of ['inventory','all']){
   await navigate(view);assert.equal(await count(),0);
-  await check('tbody tr:nth-child(1) .selection-cell input');await check('tbody tr:nth-child(2) .selection-cell input');assert.equal(await count(),2);
+  await check('tbody tr:nth-child(1 of :not(.ant-table-measure-row)) :is(.selection-cell,.ant-table-selection-column) input');await check('tbody tr:nth-child(2 of :not(.ant-table-measure-row)) :is(.selection-cell,.ant-table-selection-column) input');assert.equal(await count(),2);
   assert.ok(await evaluate("!!document.querySelector('thead .ant-checkbox-indeterminate')"));
   assert.equal(await evaluate("document.querySelectorAll('.ant-drawer-open').length"),0,'Selecting must not open detail');
   await selectedExport();
-  await check('thead .selection-cell input');assert.equal(await count(),50);
+  await check('thead :is(.selection-cell,.ant-table-selection-column) input');assert.equal(await count(),50);
   await check('button[title="Шинэчлэх"]');assert.equal(await count(),50,'Refreshing identical rows preserves selection');
-  await evaluate("document.querySelector('.ant-pagination-item-2').click()");await wait("document.querySelectorAll('tbody .selection-cell input').length===1&&!document.querySelector('tbody .selection-cell input').disabled");assert.equal(await count(),0);
-  await check('tbody .selection-cell input');assert.equal(await count(),1);
-  await evaluate("document.querySelector('.ant-pagination-item-1').click()");await wait("document.querySelectorAll('tbody .selection-cell input').length===50&&!document.querySelector('tbody .selection-cell input').disabled");assert.equal(await count(),0,'Page one must not restore old selections');
-  await evaluate("document.querySelector('tbody .selection-cell input').focus()");
+  await evaluate("document.querySelector('.ant-pagination-item-2').click()");await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===1&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");assert.equal(await count(),0);
+  await check('tbody :is(.selection-cell,.ant-table-selection-column) input');assert.equal(await count(),1);
+  await evaluate("document.querySelector('.ant-pagination-item-1').click()");await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===50&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");assert.equal(await count(),0,'Page one must not restore old selections');
+  await evaluate("document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').focus()");
   await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});await pause(150);assert.equal(await count(),1,'Keyboard Space selects a row');
   const selector=view==='inventory'?'input[aria-label="Бараа хайх"]':'input[aria-label="Хүсэлт хайх"]';
-  await fill(selector,view==='inventory'?'BULK-49':'99130000');await wait("document.querySelectorAll('tbody .selection-cell input').length===1&&!document.querySelector('tbody .selection-cell input').disabled");assert.equal(await count(),0,'Filter resets selection');
-  await check('thead .selection-cell input');await click('Сонголт цэвэрлэх');assert.equal(await count(),0);
-  await fill(selector,'');await wait("document.querySelectorAll('tbody .selection-cell input').length===50&&!document.querySelector('tbody .selection-cell input').disabled");assert.equal(await count(),0);
-  await snap(view+'-desktop');await viewport(390);await check('tbody .selection-cell input');assert.equal(await count(),1);await snap(view+'-mobile');await viewport(1440);
+  await fill(selector,view==='inventory'?'BULK-49':'99130000');await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===1&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");assert.equal(await count(),0,'Filter resets selection');
+  await check('thead :is(.selection-cell,.ant-table-selection-column) input');await click('Сонголт цэвэрлэх');assert.equal(await count(),0);
+  await fill(selector,'');await wait("document.querySelectorAll('tbody :is(.selection-cell,.ant-table-selection-column) input').length===50&&!document.querySelector('tbody :is(.selection-cell,.ant-table-selection-column) input').disabled");assert.equal(await count(),0);
+  await snap(view+'-desktop');await viewport(390);
+  if(view==='inventory'){await wait("!!document.querySelector('.inventory-card-title input')");await evaluate("document.querySelector('.inventory-card-title input').click()");await pause(200);assert.equal(await evaluate("document.querySelectorAll('.inventory-card-title input:checked').length"),1);}
+  else{await check('tbody :is(.selection-cell,.ant-table-selection-column) input');assert.equal(await count(),1);}
+  await snap(view+'-mobile');await viewport(1440);
   evidence.checks[view]={selectedExport:true,selectPage:true,pageAndFilterReset:true,keyboard:true,mobile:true};
  }
  assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));

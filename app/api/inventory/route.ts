@@ -37,7 +37,7 @@ export async function GET(req:Request){try{
   const productId=p.get('id');
   if(productId){where+=' AND it.group_id=?';args.push(productId);}
   if(q){where+=' AND (it.name LIKE ? OR it.code LIKE ? OR it.imei LIKE ? OR it.barcode LIKE ? OR it.brand LIKE ? OR it.supplier LIKE ? OR EXISTS(SELECT 1 FROM inventory_units u WHERE u.item_id=it.id AND (u.serial LIKE ? OR u.barcode LIKE ?)))';args.push(...Array(8).fill('%'+q+'%'));}
-  for(const [column,value] of [['brand',brand],['category',category],['supplier',supplier]])if(value){where+=` AND it.${column}=?`;args.push(value);}
+  for(const [column,value] of [['brand',brand],['category',category],['supplier',supplier]])if(value){where+=` AND it.${column}=?`;args.push(column==='category'&&value==='__uncategorized__'?'':value);}
   const moveArgs=warehouse?[warehouse]:[];
   const cte=`WITH totals AS (SELECT item_id,SUM(qty_delta) stock,SUM(value_cents) value_cents,MAX(cost_estimated) cost_estimated FROM inventory_stock_moves ${warehouse?'WHERE warehouse_id=?':''} GROUP BY item_id),base AS (SELECT it.*,COALESCE(NULLIF(it.product_key,''),it.id) group_id,COALESCE(t.stock,0) stock,COALESCE(t.value_cents,0) value_cents,COALESCE(t.cost_estimated,0) cost_estimated FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id),matched AS (SELECT * FROM base it WHERE ${where}),products AS (SELECT group_id id,group_id product_key,MIN(name) name,MIN(brand) brand,CASE WHEN COUNT(DISTINCT category)>1 THEN 'Олон ангилал' ELSE MIN(category) END category,MIN(capacity) capacity,MIN(color) color,MIN(variant) variant,CASE WHEN COUNT(*)=1 THEN MIN(code) ELSE '' END code,CASE WHEN COUNT(*)=1 THEN MIN(imei) ELSE NULL END imei,CASE WHEN COUNT(*)=1 THEN MIN(barcode) ELSE '' END barcode,CASE WHEN COUNT(DISTINCT supplier)>1 THEN 'Олон нийлүүлэгч' ELSE MIN(supplier) END supplier,CASE WHEN COUNT(*)=1 THEN MIN(id) ELSE NULL END single_item_id,COUNT(*) unit_count,SUM(stock) stock,SUM(value_cents) value_cents,SUM(min_stock) min_stock,MAX(cost_estimated) cost_estimated,MIN(sale_price) sale_price,MAX(sale_price) sale_price_max,MIN(COALESCE(cash_price,sale_price)) cash_price,MAX(COALESCE(cash_price,sale_price)) cash_price_max FROM matched GROUP BY group_id)`;
   const bindArgs=[...moveArgs,...args];
@@ -54,10 +54,11 @@ export async function GET(req:Request){try{
    return json({product,items:units.results,count:count?.count||0,page,history:history.results});
   }
   const stock=p.get('stock')||'';
+  const order=p.get('sort')==='value_desc'?'value_cents DESC,name,id':p.get('sort')==='stock_asc'?'stock,name,id':'name,id';
   const stockWhere=stock==='positive'?'stock>0':stock==='empty'?'stock<=0':stock==='low'?'stock<=min_stock':stock==='reorder'?'stock>0 AND stock<=min_stock':'1=1';
   const [rows,summary]=await Promise.all([
-   db().prepare(`${cte} SELECT * FROM products WHERE ${stockWhere} ORDER BY name,id LIMIT ? OFFSET ?`).bind(...bindArgs,limit,limit===5000?0:(page-1)*50).all(),
-   db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(unit_count),0) unit_count,COALESCE(SUM(stock),0) units,COALESCE(SUM(value_cents),0) value_cents,COALESCE(SUM(stock<=min_stock),0) low_stock,COALESCE(MAX(cost_estimated),0) cost_estimated FROM products WHERE ${stockWhere}`).bind(...bindArgs).first(),
+   db().prepare(`${cte} SELECT * FROM products WHERE ${stockWhere} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...bindArgs,limit,limit===5000?0:(page-1)*50).all(),
+   db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(unit_count),0) unit_count,COALESCE(SUM(stock),0) units,COALESCE(SUM(value_cents),0) value_cents,COALESCE(SUM(stock<=min_stock),0) low_stock,COALESCE(SUM(stock<=0),0) empty_stock,COALESCE(SUM(stock>0 AND stock<=min_stock),0) reorder_stock,COALESCE(MAX(cost_estimated),0) cost_estimated FROM products WHERE ${stockWhere}`).bind(...bindArgs).first(),
   ]);
   return json({items:rows.results,count:summary?.count||0,summary,page,truncated:limit===5000&&Number(summary?.count)>limit});
  }
@@ -75,7 +76,7 @@ export async function GET(req:Request){try{
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ? OR it.imei LIKE ? OR it.supplier LIKE ? OR it.brand LIKE ? OR it.capacity LIKE ? OR it.color LIKE ? OR it.variant LIKE ? OR it.barcode LIKE ?)';args.push(...Array(9).fill('%'+q+'%'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
-  if(category){where+=' AND it.category=?';args.push(category);}
+  if(category){where+=' AND it.category=?';args.push(category==='__uncategorized__'?'':category);}
   const moveArgs:unknown[]=warehouse?[warehouse]:[];let cte='';
   if(view==='balance'){
    const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -90,7 +91,7 @@ export async function GET(req:Request){try{
   if(stock==='reorder')where+=' AND COALESCE(t.stock,0)>0 AND t.stock<=it.min_stock';
   const extra=view==='balance'?',COALESCE(t.opening_qty,0) opening_qty,COALESCE(t.opening_cents,0) opening_cents,COALESCE(t.in_qty,0) in_qty,COALESCE(t.in_cents,0) in_cents,COALESCE(t.out_qty,0) out_qty,COALESCE(t.out_cents,0) out_cents':'';
   // Aggregate the whole filtered result, never only the current 50-row page.
-  const flowSummary=view==='balance'?`,COALESCE(SUM(t.opening_qty),0) opening_qty,COALESCE(SUM(t.opening_cents),0) opening_cents,COALESCE(SUM(t.in_qty),0) in_qty,COALESCE(SUM(t.in_cents),0) in_cents,COALESCE(SUM(t.out_qty),0) out_qty,COALESCE(SUM(t.out_cents),0) out_cents,COALESCE(SUM(COALESCE(t.stock,0)<=0),0) empty_stock,COALESCE(SUM(t.stock>0 AND t.stock<=it.min_stock),0) reorder_stock,COALESCE(SUM(t.stock<0),0) negative_stock`:'';
+  const flowSummary=view==='balance'?`,COALESCE(SUM(t.opening_qty),0) opening_qty,COALESCE(SUM(t.opening_cents),0) opening_cents,COALESCE(SUM(t.in_qty),0) in_qty,COALESCE(SUM(t.in_cents),0) in_cents,COALESCE(SUM(t.out_qty),0) out_qty,COALESCE(SUM(t.out_cents),0) out_cents,COALESCE(SUM(COALESCE(t.stock,0)<=0),0) empty_stock,COALESCE(SUM(t.stock>0 AND t.stock<=it.min_stock),0) reorder_stock,COALESCE(SUM(t.stock<0),0) negative_stock`:',COALESCE(SUM(COALESCE(t.stock,0)<=0),0) empty_stock,COALESCE(SUM(t.stock>0 AND t.stock<=it.min_stock),0) reorder_stock';
   const summaryQuery=()=>db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(t.stock),0) units,COALESCE(SUM(t.value_cents),0) value_cents,COALESCE(SUM(COALESCE(t.stock,0)<=it.min_stock),0) low_stock,COALESCE(MAX(t.cost_estimated),0) cost_estimated${flowSummary} FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where}`).bind(...moveArgs,...args).first();
   const balanceReport=view==='balance'?await Promise.all([
    summaryQuery(),
@@ -113,10 +114,12 @@ export async function GET(req:Request){try{
   const args:unknown[]=[];let where='1=1';
   if(warehouse){where+=' AND t.warehouse_id=?';args.push(warehouse);}
   if(q){where+=' AND (it.code LIKE ? OR it.name LIKE ?)';args.push('%'+q+'%','%'+q+'%');}
+  if(view==='moves'&&p.get('ref_id')){where+=' AND t.ref_id=?';args.push(p.get('ref_id'));}
+  if(view==='moves'&&p.get('kind')){where+=' AND t.kind=?';args.push(p.get('kind'));}
   if(view==='purchases'&&p.get('status')){where+=' AND t.status=?';args.push(p.get('status'));}
   if(brand){where+=' AND it.brand=?';args.push(brand);}
   if(supplier){where+=' AND it.supplier=?';args.push(supplier);}
-  if(category){where+=' AND it.category=?';args.push(category);}
+  if(category){where+=' AND it.category=?';args.push(category==='__uncategorized__'?'':category);}
   // Шууд бэлэн борлуулалт: зарсан ажилтан бүртгэгдсэн мөрүүд. "__direct__" нь зарагч тодорхой бүхнийг заана.
   if(view==='sales'&&p.get('seller')){const seller=p.get('seller')!;if(seller==='__direct__')where+=" AND t.seller!=''";else{where+=' AND t.seller=?';args.push(seller);}}
   const date=view==='purchases'?'COALESCE(t.received_at,t.ordered_at,t.created_at)':view==='sales'?'COALESCE(t.sold_at,t.created_at)':'t.occurred_at';

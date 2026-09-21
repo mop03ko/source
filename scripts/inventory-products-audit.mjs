@@ -49,14 +49,15 @@ try{
  assert.ok(await evaluate("document.querySelector('.inventory-unit-link').textContent.includes('SERIAL-B')"));
  await evaluate("document.querySelector('.inventory-unit-link').click()");await wait("!!document.querySelector('.inventory-detail .ant-descriptions')");
  assert.ok(await evaluate("document.querySelector('.inventory-detail').textContent.includes('222222222222222')"));
- await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('1 ш')");
+ await click('Борлуулалт бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('1 ш')");
  await click('Бүртгэх');await wait("!document.querySelector('select[name=warehouse_id]')");
  const one=await (await fetch(base+'/api/inventory?view=items&id='+first,{headers})).json(),two=await (await fetch(base+'/api/inventory?view=items&id='+second,{headers})).json();assert.equal(one.item.stock,1);assert.equal(two.item.stock,0);assert.equal(two.identifiers[0].serial,'222222222222222');
  await evaluate("[...document.querySelectorAll('.ant-drawer-close')].at(-1).click()");await pause(300);
- await click('Grouped phone2 дугаарын бүртгэл','.inventory-item-link');await wait("document.querySelectorAll('.inventory-unit-link').length===2");
+ await wait("!!document.querySelector('input[aria-label=\"Барааны дотор дугаар хайх\"]')");assert.equal(await evaluate("document.querySelector('input[aria-label=\"Барааны дотор дугаар хайх\"]').value"),'222222');await fill('input[aria-label="Барааны дотор дугаар хайх"]','');await wait("document.querySelectorAll('.inventory-unit-link').length===2");
  await click('Энэ бараанд дугаар нэмэх');await wait("!!document.querySelector('input[name=code]')");
  assert.equal(await evaluate("document.querySelector('input[name=name]').value"),'Grouped phone');
  await fill('input[name=code]','SERIAL-C');await fill('input[name=imei]','333333333333333');await fill('input[name=barcode]','8800000000001');await click('Бараа хадгалах');await wait("!document.querySelector('input[name=code]')");await wait("[...document.querySelectorAll('.inventory-item-link')].some(e=>e.textContent==='Grouped phone3 дугаарын бүртгэл')");
+ await evaluate("[...document.querySelectorAll('.ant-drawer-close')].at(-1).click()");await pause(300);
  await click('Худалдан авалт','[role=tab]');await click('Худалдан авалт','.inventory-commandbar button');await wait("!!document.querySelector('input[placeholder=\"Код, IMEI эсвэл нэр бичнэ үү\"]')");
  await fill('input[placeholder="Код, IMEI эсвэл нэр бичнэ үү"]','Grouped phone');await wait("document.querySelectorAll('.inventory-picker button').length===3");
  await evaluate("[...document.querySelectorAll('.inventory-picker button')].find(e=>e.textContent.includes('3 дугаарын бүртгэл')).click()");await wait("document.querySelectorAll('.inventory-picker button').length===3&&document.querySelector('.inventory-selection')?.textContent.includes('Дугаараа сонгоно уу')");

@@ -61,8 +61,8 @@ try{
  assert.equal(updated.item.category,'Таблет');assert.equal(updated.item.sale_price,2100000);assert.equal(updated.item.stock,4);assert.equal(updated.item.supplier,'Шинэ нийлүүлэгч');
  evidence.checks.productEditPreservesStock=true;await snap('detail-edited');
  await viewport(390);await snap('product-detail-mobile');await viewport(1440);
- await click('Зарлага бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');await fill('select[name=platform]','STOREPAY');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'2100000');await fill('select[name=platform]','');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');evidence.checks.cashCreditPrices=true;await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
- evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(200);
+ await click('Борлуулалт бүртгэх');await wait("!!document.querySelector('select[name=warehouse_id]')");assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');await fill('select[name=platform]','STOREPAY');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'2100000');await fill('select[name=platform]','');assert.equal(await evaluate("document.querySelector('input[name=unit]').value"),'1800000');evidence.checks.cashCreditPrices=true;await fill('select[name=warehouse_id]',wh);await wait("document.querySelector('.inventory-stock-note')?.textContent.includes('4 ш')");
+ evidence.checks.detailSale=true;await snap('02-sale-dialog');await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await pause(500);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(300);await evaluate("document.querySelector('.ant-drawer-close').click()");await pause(300);
  await click('Борлуулалт','[role=tab]');await wait("document.querySelector('.inventory-panel')?.textContent.includes('TEST-BILL')");await snap('03-sales-profit');
  await click('Үлдэгдлийн тайлан','[role=tab]');await wait("!!document.querySelector('.inventory-item-link')");await snap('04-balance');
  await wait("!!document.querySelector('.balance-report .recharts-wrapper')");
@@ -94,13 +94,13 @@ try{
  await snap('category-report');evidence.checks.categories=true;
  await fill('select[aria-label="Тайлангийн ангилал"]','brand');
  await wait("document.querySelector('.inventory-panel table')?.textContent.includes('SearchBrand')");
- await click('Борлуулалт','[role=tab]');
+ await click('Борлуулалт','[role=tab]');await fill('select[aria-label="Тайлангийн ангилал"]','brand');
  await wait("document.querySelector('.inventory-panel table')?.textContent.includes('SearchBrand')");
  await snap('brand-sales-report');
- await fill('select[aria-label="Тайлангийн ангилал"]','');await click('Бараа, үлдэгдэл','[role=tab]');await click('Шүүлтүүр цэвэрлэх');
+ await fill('select[aria-label="Тайлангийн ангилал"]','');await click('Бараа, үлдэгдэл','[role=tab]');await fill('select[aria-label="Тайлангийн ангилал"]','');await click('Шүүлтүүр цэвэрлэх');
  await wait("!!document.querySelector('.inventory-item-link')");evidence.checks.brandSupplierReports=true;
  if(process.argv[2]){
-  await click('Excel импорт');await wait("!!document.querySelector('input[type=file]')");
+  await click('Агуулахын тохиргоо');await click('Эхний үлдэгдэл импортлох','[role=menuitem]');await wait("!!document.querySelector('input[type=file]')");
   const root=await cdp('DOM.getDocument');const node=await cdp('DOM.querySelector',{nodeId:root.root.nodeId,selector:'input[type=file]'});
   await cdp('DOM.setFileInputFiles',{nodeId:node.nodeId,files:[resolve(process.argv[2])]});
   await wait("document.querySelector('[role=dialog]')?.textContent.includes('3096 мөр импортод бэлэн')");
