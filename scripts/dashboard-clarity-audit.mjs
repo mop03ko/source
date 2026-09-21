@@ -62,7 +62,8 @@ try{
  assert.ok(await evaluate("document.querySelector('[data-slot=sidebar-inner]').inert"));
  await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");await pause(400);
  await viewport(390);await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");
- await wait("!!document.querySelector('.ant-drawer-open .crm-ant-menu')");await snap('sidebar-mobile-open');
+ await wait("!!document.querySelector('.ant-drawer-open .crm-ant-menu')");await pause(450);
+ assert.ok(await evaluate("(()=>{const r=document.querySelector('.ant-drawer-open .crm-ant-menu').getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.width>200})()"));await snap('sidebar-mobile-open');
  await evaluate("[...document.querySelectorAll('.ant-drawer-open .ant-menu-item')].find(e=>e.textContent.includes('Борлуулалт')).click()");
  await wait("!document.querySelector('.ant-drawer-open')&&!!document.querySelector('input[aria-label=\"Хүсэлт хайх\"]')");
  await viewport(1440);await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.dashboard-report-tabs')");
