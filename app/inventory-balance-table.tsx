@@ -1,16 +1,18 @@
 "use client";
+import {useInventoryCost} from '@/components/inventory-cost-access';
 import {Table,Tag} from 'antd';
 import {useIsMobile} from '@/hooks/use-mobile';
 import {cash} from './inventory-forms';
 type BalanceRow={id?:string;name?:string;code?:string;label?:string;item_count?:number;category?:string;brand?:string;stock:number;value_cents:number;opening_qty?:number;opening_cents?:number;in_qty?:number;in_cents?:number;out_qty?:number;out_cents?:number;cost_estimated?:number};
 const stages=[['Эхний үлдэгдэл','opening_qty','opening_cents'],['Орлого (+)','in_qty','in_cents'],['Зарлага (−)','out_qty','out_cents'],['Эцсийн үлдэгдэл','stock','value_cents']] as const;
 export default function InventoryBalanceTable({rows,summary,group,onOpen}:{rows:BalanceRow[];summary:Record<string,number>;group:string;onOpen:(id:string)=>void}){
+ const showCost=useInventoryCost();
  const mobile=useIsMobile();
  const label=group?({category:'Ангилал',brand:'Брэнд',supplier:'Нийлүүлэгч'}[group]||'Бүлэг'):'Бараа / код';
  const identity=(r:BalanceRow)=>group?<div><strong>{r.label||'Бүртгээгүй'}</strong><small>{r.item_count?.toLocaleString()} дугаарын бүртгэл</small></div>:<button className="inventory-item-link" onClick={()=>r.id&&onOpen(r.id)}><strong>{r.name}</strong><small>{r.code}</small><small>{[r.category||'Ангилаагүй',r.brand].filter(Boolean).join(' · ')}</small></button>;
- const value=(r:BalanceRow,qty:keyof BalanceRow,cost:keyof BalanceRow)=><div className="balance-table-value"><strong>{Number(r[qty]||0).toLocaleString()} <small>ш</small></strong><span>{cash(Number(r[cost]||0)/100)}</span></div>;
+ const value=(r:BalanceRow,qty:keyof BalanceRow,cost:keyof BalanceRow)=><div className="balance-table-value"><strong>{Number(r[qty]||0).toLocaleString()} <small>ш</small></strong>{showCost&&<span>{cash(Number(r[cost]||0)/100)}</span>}</div>;
  const adjustment=(r:BalanceRow)=>r.value_cents-Number(r.opening_cents||0)-Number(r.in_cents||0)+Number(r.out_cents||0);
- const note=(r:BalanceRow)=><>{r.stock<0&&<Tag color="red">Сөрөг үлдэгдэл</Tag>}{!!r.cost_estimated&&<Tag>Өртөг ойролцоо</Tag>}{adjustment(r)!==0&&<small>Өртгийн тохируулга: {cash(adjustment(r)/100)}</small>}</>;
+ const note=(r:BalanceRow)=><>{r.stock<0&&<Tag color="red">Сөрөг үлдэгдэл</Tag>}{showCost&&!!r.cost_estimated&&<Tag>Өртөг ойролцоо</Tag>}{showCost&&adjustment(r)!==0&&<small>Өртгийн тохируулга: {cash(adjustment(r)/100)}</small>}</>;
  const total:BalanceRow={...summary,stock:summary.units,value_cents:summary.value_cents};
  return <div className="balance-detail-table">{mobile?<><div className="balance-mobile-list">{rows.map(r=><article className="balance-mobile-card" key={r.id??r.label}>{identity(r)}<div className="balance-mobile-stages">{stages.map(([title,qty,cost])=><div key={qty}><span>{title}</span>{value(r,qty,cost)}</div>)}</div>{note(r)}</article>)}</div><section className="balance-mobile-card balance-total"><strong>Нийт · бүх хуудасны дүн</strong><div className="balance-mobile-stages">{stages.map(([title,qty,cost])=><div key={qty}><span>{title}</span>{value(total,qty,cost)}</div>)}</div></section></>:<Table<BalanceRow> size="middle" rowKey={r=>r.id??r.label??''} dataSource={rows} pagination={false} scroll={{x:1000}} columns={[{title:label,key:'name',width:280,fixed:'left',render:(_,r)=><>{identity(r)}{note(r)}</>},...stages.map(([title,qty,cost])=>({title,key:qty,width:180,align:'right' as const,className:qty==='stock'?'balance-closing-cell':'',render:(_:unknown,r:BalanceRow)=>value(r,qty,cost)}))]} summary={()=><Table.Summary><Table.Summary.Row><Table.Summary.Cell index={0}><strong>Нийт · {summary.count?.toLocaleString()} бүртгэл</strong><small>Бүх хуудасны дүн</small></Table.Summary.Cell>{stages.map(([,qty,cost],i)=><Table.Summary.Cell index={i+1} key={qty} align="right">{value(total,qty,cost)}</Table.Summary.Cell>)}</Table.Summary.Row></Table.Summary>}/>}</div>;
 }

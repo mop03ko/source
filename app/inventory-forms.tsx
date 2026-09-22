@@ -1,4 +1,5 @@
 'use client';
+import {useInventoryCost} from '@/components/inventory-cost-access';
 import {ProductPhoto} from './inventory-product-visual';
 import {productCategories} from '@/lib/product-categories';
 import {salePrice} from '@/lib/inventory-pricing';
@@ -75,6 +76,7 @@ export function ItemPicker({value,onChange,warehouse,label='Бараа сонг�
 }
 
 export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,submitLabel,creditOnly=false}:{creditOnly?:boolean;kind:'purchase'|'sale'|'transfer';item?:Item;options:Options;warehouse:string;busy:boolean;onSave:(data:unknown)=>Promise<void>;customer?:{name:string;phone:string};submitLabel?:string}){
+ const showCost=useInventoryCost();
  const formId=useId();
  const [destination,setDestination]=useState('');
  const [picked,setPicked]=useState<Item|null>(item||null),[source,setSource]=useState(warehouse),[channel,setChannel]=useState(''),[qty,setQty]=useState(1),[purchaseStatus,setPurchaseStatus]=useState('received');
@@ -91,7 +93,7 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
  }}>
   <ItemPicker value={picked} onChange={chooseItem} warehouse={source}/>
   <Field label={kind==='purchase'?'Хүлээн авах агуулах *':'Зарлагадах агуулах *'}><SelectControl name="warehouse_id" value={source} onChange={e=>{setSource(e.target.value);if(destination===e.target.value)setDestination('');}} required><option value="">Сонгох…</option>{options.warehouses.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}</SelectControl></Field>
-  {picked&&source&&<><AsyncStatus error={stock.error} loading={stock.loading} retry={stock.retry}/>{available&&<p className="inventory-stock-note">Энэ агуулахад <strong>{available.qty} ш</strong> · Өртөг {cash(available.value_cents/100)}</p>}</>}
+  {picked&&source&&<><AsyncStatus error={stock.error} loading={stock.loading} retry={stock.retry}/>{available&&<p className="inventory-stock-note">Энэ агуулахад <strong>{available.qty} ш</strong>{showCost&&<> · Өртөг {cash(available.value_cents/100)}</>}</p>}</>}
   {kind==='transfer'&&<Field label="Очих агуулах *"><SelectControl name="to_warehouse_id" required value={destination} onChange={e=>setDestination(e.target.value)}><option value="">Сонгох…</option>{options.warehouses.filter(w=>w.id!==source).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</SelectControl></Field>}
   <div className="form-grid"><Field label="Тоо ширхэг *"><Input name="qty" type="number" min={1} max={kind==='purchase'?1_000_000:available?.qty||1} step={1} required value={qty} onChange={e=>setQty(Number(e.target.value))}/></Field>{kind!=='transfer'&&<Field label={kind==='purchase'?'Худалдан авах нэгжийн үнэ':'Борлуулах нэгжийн үнэ'}><Input name="unit" type="number" min={0} max={1_000_000_000} step="0.01" required value={unit} onChange={e=>setUnit(Number(e.target.value))}/></Field>}</div>
   {kind==='purchase'&&<>

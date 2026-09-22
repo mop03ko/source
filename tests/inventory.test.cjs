@@ -9,7 +9,7 @@ DB.transaction=work=>{const result=transactionQueue.then(async()=>{sqlite.exec('
 let user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
 const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=>user}};
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
-deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/serials']=load('lib/serials.ts');deps['./serials']=deps['@/lib/serials'];deps['@/lib/crm']=common;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const sms=load('lib/sms.ts');deps['@/lib/sms']=sms;deps['./crm']=common;deps['@/lib/assign']=load('lib/assign.ts');deps['./assign']=deps['@/lib/assign'];const crmRoute=load('app/api/crm/route.ts');deps['../crm/route']=crmRoute;deps['@/lib/inventory']=load('lib/inventory.ts');const invRoute=load('app/api/inventory/route.ts');
+deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps['@/lib/access']=access;const notifications=load('lib/notifications.ts');deps['@/lib/notifications']=notifications;deps['./notifications']=notifications;const common=load('lib/crm.ts');deps['@/lib/serials']=load('lib/serials.ts');deps['./serials']=deps['@/lib/serials'];deps['@/lib/crm']=common;const sound=load('lib/sound.ts');deps['./sound']=sound;deps['@/lib/sound']=sound;const settings=load('lib/settings.ts');deps['@/lib/settings']=settings;const sms=load('lib/sms.ts');deps['@/lib/sms']=sms;deps['./crm']=common;deps['@/lib/assign']=load('lib/assign.ts');deps['./assign']=deps['@/lib/assign'];const crmRoute=load('app/api/crm/route.ts');deps['../crm/route']=crmRoute;deps['@/lib/inventory']=load('lib/inventory.ts');const invRoute=(deps['@/lib/inventory-visibility']=load('lib/inventory-visibility.ts'),load('app/api/inventory/route.ts'));
 async function crmGet(query=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()];}
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function invGet(query=''){const r=await invRoute.GET(new Request('https://crm.test/api/inventory'+query));return [r.status,await r.json()];}
@@ -130,5 +130,27 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100,cash_price:1200},priced[1].id))[0],400);
  assert.equal((await invPost('update_item',{code:'DUAL-PRICE',name:'Dual price',sale_price:1100,cash_price:null},priced[1].id))[0],200);
  assert.equal((await invGet('?view=items&id='+priced[1].id))[1].item.cash_price,null);
+
+ // Cost visibility is enforced for every response shape, including exports and profit.
+ for(const role of ['operator','delivery'])assert.equal((await crmPost('member',{email:role+'@example.test',name:role,role,active:true}))[0],200);
+ const privateKeys=new Set(['value_cents','unit_cost','base_unit_cost','total_cost','additional_cost','cost_cents','cost_estimated','profit_cents','opening_cents','in_cents','out_cents']);
+ const noCost=value=>{if(value&&typeof value==='object')for(const [key,v] of Object.entries(value)){assert.ok(!privateKeys.has(key),'cost leaked: '+key);noCost(v);}};
+ const queries=['?view=items','?view=products','?view=items&id='+itemId,'?view=purchases','?view=sales','?view=moves','?view=balance&from=2026-01-01&to=2026-12-31','?view=options'];
+ const productId=(await invGet('?view=products&q=DUAL-PRICE'))[1].items[0].id;
+ queries.push('?view=products&id='+productId);
+ for(const role of ['manager','agent','operator','delivery']){
+  user={userId:role==='agent'?'a':role,email:role+'@example.test',displayName:role};
+  for(const query of queries)for(const extra of ['', '&export=1','&group=brand','&group=supplier','&group=category','&breakdown=warehouse','&sort=value_desc']){
+   const [code,data]=await invGet(query+extra);
+   assert.equal(code,role==='delivery'?403:200,role+' '+query+extra);noCost(data);
+  }
+  for(const action of ['record_purchase','preview_import','import_opening'])assert.equal((await invPost(action,{}))[0],403);
+  if(role!=='delivery'){const data=(await invGet('?view=items&id='+priced[1].id))[1];assert.equal(data.item.sale_price,1100);assert.equal(typeof data.item.stock,'number');}
+ }
+ for(const role of ['admin','director']){
+  user={userId:role==='admin'?'owner-test':role,email:role==='admin'?'owner@example.test':role+'@example.test',displayName:role};
+  const data=(await invGet('?view=items&id='+itemId))[1];assert.equal(typeof data.item.value_cents,'number');assert.equal(typeof data.moves[0].unit_cost,'number');
+ }
+ console.log('PASS: inventory costs and derived profit excluded from restricted roles, grouped reports, detail, exports and movement APIs; privileged costs and sale prices retained.');
  console.log('PASS: inventory role isolation, admin/manager-only item edits, denied-edit immutability, revoked-role request replay, item creation, purchases/sales and stock enforcement.');
 })().catch(e=>{console.error(e);process.exit(1)});

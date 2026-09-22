@@ -6,7 +6,7 @@ const scenario=String.raw`
 (async()=>{
  await crmGet();
  deps['@/lib/access']={...access,member:async()=>({email:'owner@example.test',name:'Owner',role:'admin',active:1,user_id:'owner-test'})};
- const inventory=load('app/api/inventory/route.ts'),counts=load('app/api/inventory-counts/route.ts');
+ const inventory=(deps['@/lib/inventory-visibility']=load('lib/inventory-visibility.ts'),load('app/api/inventory/route.ts')),counts=load('app/api/inventory-counts/route.ts');
  async function post(route,action,data,id,version,request_id){const r=await route.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version,request_id})}));return [r.status,await r.json()];}
  async function get(route,q=''){const r=await route.GET(new Request('https://crm.test/api/inventory'+q));return [r.status,await r.json()];}
  const inv=(...args)=>post(inventory,...args),cnt=(...args)=>post(counts,...args);

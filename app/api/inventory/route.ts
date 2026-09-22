@@ -1,6 +1,7 @@
+import {inventoryForRole} from '@/lib/inventory-visibility';
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
-import {canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
+import {canViewInventoryCost,canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {unitsSchema,saveUnits} from '@/lib/serials';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey,planInventoryBulkEdit} from '@/lib/inventory';
@@ -22,8 +23,10 @@ async function requireRow(d:DatabaseSession,table:'inventory_items'|'inventory_w
  if(!row)throw new Failure('Бүртгэл олдсонгүй.',404);return row;
 }
 export async function GET(req:Request){try{
- access(await member());
+ const m=await member();access(m);
+ const json=(value:unknown)=>Response.json(inventoryForRole(value,m.role),{headers:{'Cache-Control':'no-store'}});
  const p=new URL(req.url).searchParams,view=p.get('view')||'items';
+ if(!canViewInventoryCost(m.role)&&p.get('sort')==='value_desc')p.set('sort','name');
  const page=Math.max(1,Math.min(10000,Math.floor(Number(p.get('page'))||1))),limit=p.get('export')==='1'?5000:50;
  const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'',supplier=p.get('supplier')||'',category=p.get('category')||'';
  const group=p.get('group')==='brand'?'brand':p.get('group')==='supplier'?'supplier':p.get('group')==='category'?'category':null;
@@ -99,14 +102,14 @@ export async function GET(req:Request){try{
   const summaryQuery=()=>db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(t.stock),0) units,COALESCE(SUM(t.value_cents),0) value_cents,COALESCE(SUM(COALESCE(t.stock,0)<=it.min_stock),0) low_stock,COALESCE(MAX(t.cost_estimated),0) cost_estimated${flowSummary} FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where}`).bind(...moveArgs,...args).first();
   const balanceReport=view==='balance'?await Promise.all([
    summaryQuery(),
-   db().prepare(`${cte} SELECT it.category label,COUNT(*) item_count,SUM(COALESCE(t.stock,0)) stock,SUM(COALESCE(t.value_cents,0)) value_cents FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} GROUP BY it.category ORDER BY value_cents DESC,it.category`).bind(...moveArgs,...args).all(),
+   db().prepare(`${cte} SELECT it.category label,COUNT(*) item_count,SUM(COALESCE(t.stock,0)) stock,SUM(COALESCE(t.value_cents,0)) value_cents FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} GROUP BY it.category ORDER BY ${canViewInventoryCost(m.role)?'value_cents':'stock'} DESC,it.category`).bind(...moveArgs,...args).all(),
   ]):null;
   const dimension=['brand','supplier','warehouse'].includes(p.get('breakdown')||'')?p.get('breakdown')!:'category';
   let breakdown=balanceReport?.[1].results;
   if(balanceReport&&dimension==='warehouse'){
-   breakdown=(await db().prepare(`${cte} SELECT w.id key,w.name label,COUNT(DISTINCT it.id) item_count,SUM(m.qty_delta) stock,SUM(m.value_cents) value_cents FROM inventory_stock_moves m JOIN inventory_warehouses w ON w.id=m.warehouse_id JOIN inventory_items it ON it.id=m.item_id LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} AND m.occurred_at<? ${warehouse?'AND m.warehouse_id=?':''} GROUP BY w.id,w.name ORDER BY value_cents DESC,w.name`).bind(...moveArgs,...args,moveArgs[6],...(warehouse?[warehouse]:[])).all()).results;
+   breakdown=(await db().prepare(`${cte} SELECT w.id key,w.name label,COUNT(DISTINCT it.id) item_count,SUM(m.qty_delta) stock,SUM(m.value_cents) value_cents FROM inventory_stock_moves m JOIN inventory_warehouses w ON w.id=m.warehouse_id JOIN inventory_items it ON it.id=m.item_id LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} AND m.occurred_at<? ${warehouse?'AND m.warehouse_id=?':''} GROUP BY w.id,w.name ORDER BY ${canViewInventoryCost(m.role)?'value_cents':'stock'} DESC,w.name`).bind(...moveArgs,...args,moveArgs[6],...(warehouse?[warehouse]:[])).all()).results;
   }else if(balanceReport&&dimension!=='category'){
-   breakdown=(await db().prepare(`${cte} SELECT it.${dimension} label,COUNT(*) item_count,SUM(COALESCE(t.stock,0)) stock,SUM(COALESCE(t.value_cents,0)) value_cents FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} GROUP BY it.${dimension} ORDER BY value_cents DESC,it.${dimension}`).bind(...moveArgs,...args).all()).results;
+   breakdown=(await db().prepare(`${cte} SELECT it.${dimension} label,COUNT(*) item_count,SUM(COALESCE(t.stock,0)) stock,SUM(COALESCE(t.value_cents,0)) value_cents FROM inventory_items it LEFT JOIN totals t ON t.item_id=it.id WHERE ${where} GROUP BY it.${dimension} ORDER BY ${canViewInventoryCost(m.role)?'value_cents':'stock'} DESC,it.${dimension}`).bind(...moveArgs,...args).all()).results;
   }
   const report=balanceReport?{categories:balanceReport[1].results,breakdown,dimension}:undefined;
   const rankOrder=q&&view==='items'?'CASE WHEN it.code=? COLLATE NOCASE OR it.imei=? COLLATE NOCASE OR it.barcode=? COLLATE NOCASE THEN 0 WHEN it.name=? COLLATE NOCASE THEN 1 ELSE 2 END,':'';
@@ -156,6 +159,7 @@ export async function POST(req:Request){try{
  const raw=await req.text();if(raw.length>5_000_000)throw new Failure('Файл хэт том.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
  if(['update_item','preview_bulk_items','bulk_update_items'].includes(b.action)&&!canEditInventoryItem(m.role))throw new Failure('Барааны мэдээллийг зөвхөн админ болон ахлах засах эрхтэй.',403);
+ if(['record_purchase','preview_import','import_opening'].includes(b.action)&&!canViewInventoryCost(m.role))throw new Failure('Өртөг бүртгэх эрхгүй.',403);
  const result=await db().transaction(async d=>{
   const payload=JSON.stringify({action:b.action,id:b.id,data:b.data});
   if(b.request_id){const prev=await d.prepare('SELECT * FROM inventory_requests WHERE id=?').bind(b.request_id).first();if(prev){if(prev.payload!==payload)throw new Failure('Давтан хүсэлтийн өгөгдөл өөрчлөгдсөн.',409);return JSON.parse(String(prev.response));}}
@@ -280,5 +284,5 @@ export async function POST(req:Request){try{
   const value=await run();
   if(b.request_id&&!['preview_import','preview_bulk_items'].includes(b.action))await d.prepare('INSERT INTO inventory_requests(id,action,payload,response,created_at) VALUES(?,?,?,?,?)').bind(b.request_id,b.action,payload,JSON.stringify(value),now).run();
   return value;
- });return json(result);
+ });return json(inventoryForRole(result,m.role));
 }catch(e){return error(e);}}

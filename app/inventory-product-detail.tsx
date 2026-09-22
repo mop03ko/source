@@ -1,4 +1,5 @@
 'use client';
+import {useInventoryCost} from '@/components/inventory-cost-access';
 import {Descriptions,Pagination,Tag} from 'antd';
 import {useDebouncedValue} from '@/hooks/use-debounced-value';
 import {useIsMobile} from '@/hooks/use-mobile';
@@ -12,6 +13,7 @@ import {Table,TableHeader,TableHead,TableBody,TableRow,TableCell} from '@/compon
 import {cash,type Item} from './inventory-forms';
 type ProductDetail={product:Item;items:Item[];count:number;history:{id:string;serial:string;barcode:string;source:string;created_at:string}[]};
 export default function InventoryProductDetail({id,initialProduct,open=true,revision,warehouse,onClose,onOpenUnit,onAdd}:{id:string;initialProduct:Item;open?:boolean;revision:number;warehouse:string;onClose:()=>void;onOpenUnit:(id:string)=>void;onAdd:(item:Item)=>void}){
+ const showCost=useInventoryCost();
  const [q,setQ]=useState(''),[page,setPage]=useState(1);
  const searchQ=useDebouncedValue(q),mobile=useIsMobile(),scroll=useRef(0);
  useEffect(()=>{if(open){const t=setTimeout(()=>{const body=document.querySelector('.inventory-product-detail')?.closest('.ant-drawer-body');if(body)body.scrollTop=scroll.current;},100);return()=>clearTimeout(t);}},[open]);
@@ -24,7 +26,7 @@ export default function InventoryProductDetail({id,initialProduct,open=true,revi
    {key:'variant',label:'Багтаамж / өнгө / хувилбар',children:[p.capacity,p.color,p.variant].filter(Boolean).join(' / ')||'—'},
    {key:'stock',label:warehouse?'Сонгосон агуулахын үлдэгдэл':'Нийт үлдэгдэл',children:`${p.stock} ш · ${p.unit_count} дугаарын бүртгэл`},
    {key:'price',label:'Үндсэн үнэ',children:cash(p.sale_price)+(p.sale_price_max!==p.sale_price?' — '+cash(p.sale_price_max||0):'')},
-   {key:'value',label:'Үлдэгдлийн өртөг',children:cash(p.value_cents/100)},
+   ...(showCost?[{key:'value',label:'Үлдэгдлийн өртөг',children:cash(p.value_cents/100)}]:[]),
   ]}/>
   <div className="inventory-product-actions"><Button onClick={()=>onAdd(p)}>Энэ бараанд дугаар нэмэх</Button></div>
   <h3>Баркод / IMEI / сериал</h3><p className="muted">Дугаараа нээгээд тухайн бүртгэлийн агуулах, хөдөлгөөн, үнийг харж, орлого/зарлага бүртгэнэ. Нэг мөр олон ширхэгтэй бол тоо нь тусдаа харагдана.</p>
