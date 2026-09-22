@@ -1,4 +1,5 @@
 'use client';
+import AssignmentSettingsPanel from './assignment-settings';
 import {ChoiceInput} from '@/components/ui/choice-input';
 import {TextareaControl} from '@/components/ui/form-controls';
 import {useUnsavedChanges} from '@/components/draft-guard';
@@ -56,7 +57,7 @@ export default function SettingsPanel({me,members,initial,onSaved,onProfileSaved
  <div className="form-grid"><label className="field"><span>Утасны дугаар</span><Input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="8 оронтой дугаар" inputMode="tel" maxLength={16}/></label></div>
  <div className="row"><Button className="primary" disabled={phoneBusy||phone===(me.phone||'')} onClick={savePhone}>{phoneBusy?<Loader2 className="spin" size={16}/>:<Save size={16}/>}Хадгалах</Button></div>
  </section></TabsContent>
- {admin&&<TabsContent value="system"><section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
+ {admin&&<TabsContent value="system"><AssignmentSettingsPanel members={members} onSaved={onSaved}/><section className="panel"><div className="section-heading"><div><div className="eyebrow">СИСТЕМИЙН ТОХИРГОО</div><h2>Мэдэгдлийн дуу</h2><p className="muted">Шинэ хүсэлт хуваарилагдах, холбоо барих тов болоход CRM нээлттэй бүх ажилтанд ижил дуугаар мэдэгдэнэ.</p></div></div>
  {error&&<div role="alert" className="error-box">{error}</div>}
  <div className="sound-options">{Object.entries(soundPresets).map(([k,v])=><div key={k} className={'sound-option'+(sound===k?' active':'')}><ChoiceInput type="radio" name="sound" value={k} checked={sound===k} onChange={()=>setSound(k)}><Volume2 size={16}/><span>{v}</span></ChoiceInput><Button type="button" variant="ghost" size="icon" aria-label={v+' сонсох'} disabled={k==='none'} onClick={()=>playNotificationSound(k)}><PlayCircle size={17}/></Button></div>)}</div>
  <div className="row"><Button className="primary" disabled={busy||!dirty} onClick={save}><Save size={16}/>Хадгалах</Button>{dirty&&<Button variant="ghost" onClick={()=>setSound(initial.notification_sound)}>Цуцлах</Button>}</div>

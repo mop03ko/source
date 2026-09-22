@@ -86,3 +86,6 @@ export function requestDateLabel(v:string|null){if(!v)return 'Огноогүй';
 
 /** Shared positive allowlist for work module navigation and API access. */
 export function canAccessWorkModule(role:string,module:"marketing"|"it"){return ["admin","director","manager",module].includes(role);}
+
+export type AssignmentSettings={enabled:boolean;automatic:boolean;days:number;assignments:string[];excluded_emails:string[]};
+export const defaultAssignmentSettings:AssignmentSettings={enabled:true,automatic:true,days:7,assignments:[],excluded_emails:[]};

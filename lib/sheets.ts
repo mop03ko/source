@@ -1,5 +1,5 @@
 import {assignmentNotice,newLeadNotice} from './notifications';
-import {dutyRoster,createRotation,ubDay,type Candidate} from './assign';
+import {getAssignmentSettings,dutyRoster,createRotation,ubDay,type Candidate} from './assign';
 import {env} from '@/lib/runtime';import {z} from 'zod';
 import {defaults,label,configSchema,transformRows} from './sheet-model';import {closed,type Lead} from './crm';
 const db=()=>env.DB!;const enc=new TextEncoder();
@@ -52,7 +52,8 @@ export async function syncSheets(id?:ConnectionId){
 }
 export async function applyRows(rows:ReturnType<typeof transformRows>['rows'],issues:ReturnType<typeof transformRows>['issues'],lease:string,connectionId:ConnectionId=1){
  const links=await db().prepare('SELECT * FROM sheet_links').all<{external_key:string;lead_id:string;owner_label:string;owner_email:string;auto_assigned:number}>();const byKey=new Map(links.results.map(l=>[l.external_key,l]));const members=await db().prepare("SELECT email FROM members WHERE active=1 AND role IN ('admin','manager','agent')").all<{email:string}>();const active=new Set(members.results.map(m=>m.email));const existingRows=await db().prepare('SELECT id,phone,registration,registration_manual FROM leads').all<{id:string;phone:string;registration:string;registration_manual:number}>();const existing=new Map(existingRows.results.map(l=>[l.id,l]));const now=new Date().toISOString();let added=0,reassigned=0,backfilled=0,unchanged=0,waiting=0,handled=0,pending=0;const unresolved=new Set<string>();
- const rotation=createRotation(await dutyRoster(ubDay()));
+ const assignmentSettings=await getAssignmentSettings();
+ const rotation=createRotation(assignmentSettings.automatic?await dutyRoster(ubDay(),assignmentSettings):[]);
  const stoppedRows=await db().prepare('SELECT phone FROM suppressions').all<{phone:string}>();const stopped=new Set(stoppedRows.results.map(r=>r.phone));let suppressed=0;
  const jobs=await Promise.all(rows.map(async r=>{const digest=await crypto.subtle.digest('SHA-256',enc.encode(r.identity));return {...r,key:url64(new Uint8Array(digest))};}));
  jobs.sort((a,b)=>Number(byKey.has(b.key))-Number(byKey.has(a.key))||b.created.localeCompare(a.created));

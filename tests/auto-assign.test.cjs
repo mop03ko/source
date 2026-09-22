@@ -126,5 +126,28 @@ const ownerOf=(id)=>sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(id)
  assert.equal((await crmPost('auto_assign',{}))[0],403);
  assert.equal((await crmPost('bulk_recycle',{}))[0],403);
  assert.equal((await crmPost('member',{email:'op@example.test',name:'Operator',role:'admin',active:true}))[0],403);
+
+ const settingsRoute=load('app/api/settings/route.ts');
+ const saveConfig=async config=>{const response=await settingsRoute.POST(new Request('https://crm.test/api/settings',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({auto_assignment:config})}));return [response.status,await response.json()];};
+ const defaults=common.defaultAssignmentSettings;
+ assert.equal((await saveConfig({...defaults,enabled:false}))[0],403,'operator cannot configure');
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ assert.equal((await saveConfig({...defaults,days:31}))[0],400);
+ assert.equal((await saveConfig({...defaults,assignments:['Амралт']}))[0],400);
+ assert.equal((await saveConfig({...defaults,enabled:false}))[0],200);
+ const disabled=waitingLead(new Date().toISOString());assert.equal((await crmPost('auto_assign',{}))[0],409);assert.equal(ownerOf(disabled),'__sheet_unassigned__');
+ const offRow={...row('',''),identity:'off-import',phone:'99119911'};
+ await sheets.applyRows([offRow],[],'L',1);assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE phone=?').get(offRow.phone).owner,'__sheet_unassigned__');
+ assert.equal((await saveConfig({...defaults,automatic:false,assignments:['Олимпик']}))[0],200);
+ assert.deepEqual((await assign.dutyRoster(today)).map(r=>r.email),['a2@example.test']);
+ const manualOnly={...row('',''),identity:'manual-only',phone:'99119912'};await sheets.applyRows([manualOnly],[],'L',1);assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE phone=?').get(manualOnly.phone).owner,'__sheet_unassigned__');
+ assert.equal((await crmPost('auto_assign',{}))[0],200);assert.equal(ownerOf(disabled),'a2@example.test');
+ assert.equal((await saveConfig({...defaults,excluded_emails:['a2@example.test']}))[0],200);
+ assert.deepEqual((await assign.dutyRoster(today)).map(r=>r.email),['a1@example.test']);
+ const newAuto={...row('',''),identity:'enabled-import',phone:'99119913'};await sheets.applyRows([newAuto],[],'L',1);assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE phone=?').get(newAuto.phone).owner,'a1@example.test');
+ await saveConfig({...defaults,enabled:false});await sheets.applyRows([newAuto],[],'L',1);assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE phone=?').get(newAuto.phone).owner,'a1@example.test','disable preserves ownership');
+ await saveConfig({...defaults,days:1});const pastLead=waitingLead(new Date(Date.now()-3*86400000).toISOString());const closedLead=waitingLead(new Date().toISOString());sqlite.prepare("UPDATE leads SET status='won' WHERE id=?").run(closedLead);
+ await crmPost('auto_assign',{});assert.equal(ownerOf(pastLead),'__sheet_unassigned__');assert.equal(ownerOf(closedLead),'__sheet_unassigned__');
+ await saveConfig({...defaults,days:7});await crmPost('auto_assign',{});assert.notEqual(ownerOf(pastLead),'__sheet_unassigned__');assert.equal(ownerOf(closedLead),'__sheet_unassigned__');
  console.log('PASS: smart lead assignment — duty roster limited to active sales agents scheduled to work that day (days off, couriers and managers excluded), even round-robin weighted by leads already received today, manager/director/admin-only trigger, assigned leads becoming actionable with an auto_assign audit trail, sheet_links kept in step so a later sync cannot revert the owner, the recent-only window protecting the historical backlog, suppressed numbers skipped, and a sync round-trip that keeps an auto-assigned owner while still unassigning a lead whose named sheet owner stops matching an employee.');
 })().catch(e=>{console.error(e);process.exit(1)});

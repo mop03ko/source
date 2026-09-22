@@ -8,6 +8,6 @@ export async function getSettings(){
  const values=Object.fromEntries(r.results.map(row=>[row.key,row.value]));
  return {...defaults,...values} as typeof defaults;
 }
-export async function setSetting(key:keyof typeof defaults,value:string){
+export async function setSetting(key:keyof typeof defaults|'auto_assignment',value:string){
  await db().prepare('INSERT INTO app_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at').bind(key,value,new Date().toISOString()).run();
 }

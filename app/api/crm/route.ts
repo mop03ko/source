@@ -16,7 +16,7 @@ import {
   type Lead,
 } from "@/lib/crm";
 import { getSettings } from "@/lib/settings";
-import { dutyRoster, createRotation, ubDay } from "@/lib/assign";
+import { getAssignmentSettings, dutyRoster, createRotation, ubDay } from "@/lib/assign";
 import { sendSms } from "@/lib/sms";
 export const dynamic = "force-dynamic";
 const db = () => env.DB!;
@@ -760,18 +760,20 @@ export async function POST(req: Request) {
       const v = z
         .object({ days: z.number().int().min(1).max(30).optional() })
         .parse(b.data ?? {});
+      const config=await getAssignmentSettings();
+      if(!config.enabled)throw new Failure("Ухаалаг хуваарилалт унтраалттай байна. Тохиргооноос асаана уу.",409);
       const day = ubDay();
-      const roster = await dutyRoster(day);
+      const roster = await dutyRoster(day,config);
       if (!roster.length)
         throw new Failure(
           "Өнөөдөр ажлын хуваарьт байгаа борлуулалтын ажилтан байхгүй тул хуваарилах боломжгүй.",
         );
       const since = new Date(
-        Date.now() - (v.days ?? 7) * 86400000,
+        Date.now() - (v.days ?? config.days) * 86400000,
       ).toISOString();
       const waiting = await db()
         .prepare(
-          "SELECT id,version,status FROM leads WHERE deleted_at IS NULL AND owner='__sheet_unassigned__' AND created_at>=? AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone) ORDER BY created_at LIMIT 200",
+          "SELECT id,version,status FROM leads WHERE deleted_at IS NULL AND owner='__sheet_unassigned__' AND created_at>=? AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone) ORDER BY created_at LIMIT 200",
         )
         .bind(since)
         .all<{ id: string; version: number; status: string }>();
