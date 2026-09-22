@@ -57,7 +57,7 @@ export async function GET(req:Request){try{
   }
   const stock=p.get('stock')||'';
   const order=(q?'search_rank,':'')+(p.get('sort')==='value_desc'?'value_cents DESC,name,id':p.get('sort')==='stock_asc'?'stock,name,id':p.get('sort')==='stock_desc'?'stock DESC,name,id':p.get('sort')==='price_asc'?'sale_price,name,id':p.get('sort')==='price_desc'?'sale_price DESC,name,id':p.get('sort')==='name_desc'?'name DESC,id':'name,id');
-  const stockWhere=stock==='nonzero'?'stock!=0':stock==='positive'?'stock>0':stock==='empty'?'stock<=0':stock==='low'?'stock<=min_stock':stock==='reorder'?'stock>0 AND stock<=min_stock':'1=1';
+  const stockWhere=stock==='nonzero'?'stock!=0':stock==='positive'?'stock>0':stock==='negative'?'stock<0':stock==='empty'?'stock<=0':stock==='low'?'stock<=min_stock':stock==='reorder'?'stock>0 AND stock<=min_stock':'1=1';
   const [rows,summary]=await Promise.all([
    db().prepare(`${cte} SELECT * FROM products WHERE ${stockWhere} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...bindArgs,limit,limit===5000?0:(page-1)*50).all(),
    db().prepare(`${cte} SELECT COUNT(*) count,COALESCE(SUM(unit_count),0) unit_count,COALESCE(SUM(stock),0) units,COALESCE(SUM(value_cents),0) value_cents,COALESCE(SUM(stock<=min_stock),0) low_stock,COALESCE(SUM(stock<=0),0) empty_stock,COALESCE(SUM(stock>0 AND stock<=min_stock),0) reorder_stock,COALESCE(MAX(cost_estimated),0) cost_estimated FROM products WHERE ${stockWhere}`).bind(...bindArgs).first(),
@@ -89,6 +89,7 @@ export async function GET(req:Request){try{
   const stock=p.get('stock')||'';
   if(stock==='nonzero')where+=' AND COALESCE(t.stock,0)!=0';
   if(stock==='positive')where+=' AND COALESCE(t.stock,0)>0';
+  if(stock==='negative')where+=' AND COALESCE(t.stock,0)<0';
   if(stock==='empty')where+=' AND COALESCE(t.stock,0)<=0';
   if(stock==='low')where+=' AND COALESCE(t.stock,0)<=it.min_stock';
   if(stock==='reorder')where+=' AND COALESCE(t.stock,0)>0 AND t.stock<=it.min_stock';

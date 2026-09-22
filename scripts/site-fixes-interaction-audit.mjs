@@ -8,12 +8,12 @@ import {encode} from 'next-auth/jwt';
 import assert from 'node:assert/strict';
 
 // Disposable local database. Optional argv[2] exercises the supplied workbook in the browser.
-const dir=await mkdtemp(join(tmpdir(),'antmall-products-')),out=resolve('artifacts/chat-workspace-audit');
+const dir=await mkdtemp(join(tmpdir(),'antmall-products-')),out=resolve('artifacts/site-fixes-interactions');
 await mkdir(out,{recursive:true});
-const base='http://127.0.0.1:34686',secret=randomBytes(32).toString('base64');
+const base='http://127.0.0.1:34687',secret=randomBytes(32).toString('base64');
 const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true',AUTH_GOOGLE_ID:'test',AUTH_GOOGLE_SECRET:'test',CRM_OWNER_EMAIL:'owner@example.test',TURSO_DATABASE_URL:'file:'+join(dir,'test.db'),TURSO_AUTH_TOKEN:'',ANTMALL_SMS_API_KEY:'',CRM_GOOGLE_SERVICE_ACCOUNT_JSON:'',NEXT_TELEMETRY_DISABLED:'1'};delete env.VERCEL;
 execFileSync(process.execPath,['scripts/migrate.mjs'],{env,stdio:'pipe'});
-const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','34686'],{env,stdio:'ignore',windowsHide:true});
+const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','34687'],{env,stdio:'ignore',windowsHide:true});
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let chrome,ws;const evidence={checks:{},screens:[],errors:[]};
 try{
@@ -31,8 +31,8 @@ try{
  for(let i=0;i<1001;i++)leadFixture.run('nav-'+i,'Sidebar test',String(90000000+i),'Item','Test','agent@example.test',stamp,stamp,'nav-'+i);
  for(let i=0;i<205;i++)fixture.prepare('INSERT INTO team_messages(id,channel,sender,body,created_at) VALUES(?,?,?,?,?)').run('history-'+String(i).padStart(3,'0'),'all','agent@example.test','History '+i,'2026-01-01T00:00:00.000Z');
  fixture.close();
- chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9347','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
- let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9347/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
+ chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9348','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
+ let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9348/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
  if(!target)throw new Error('Chrome did not start');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
  let sequence=0;const pending=new Map();
@@ -48,33 +48,32 @@ try{
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
 
 
- await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('.daily-staffing')");
- await evaluate("[...document.querySelectorAll('.crm-ant-menu .ant-menu-item')].find(e=>e.textContent.includes('Ажилтны чат')).click()");
- await wait("document.querySelector('.chat-list')?.textContent.includes('Бүх ажилчид')");
- await evaluate("[...document.querySelectorAll('.chat-peer')].find(e=>e.textContent.includes('Бүх ажилчид')).click()");
- await wait("document.querySelectorAll('.chat-bubble').length===200");
- assert.ok(await evaluate("document.querySelector('.chat-messages').textContent.includes('History 204')"));
- await evaluate("document.querySelector('.chat-load-older').click()");await wait("document.querySelectorAll('.chat-bubble').length===205");
- assert.ok(await evaluate("document.querySelector('.chat-messages').textContent.includes('History 0')"));
- const typeBody=async text=>{await evaluate(`(()=>{const e=document.querySelector('.chat-composer textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`);};
- await typeBody('First line\nSecond line');await evaluate("document.querySelector('.chat-composer').requestSubmit()");
- await wait("!document.querySelector('.chat-composer button[type=submit]').disabled||document.querySelector('.chat-composer textarea')?.value===''");
- await wait("[...document.querySelectorAll('.chat-bubble p')].some(e=>e.textContent==="+JSON.stringify('First line\nSecond line')+")");
- const check=new DatabaseSync(join(dir,'test.db'));assert.equal(check.prepare('SELECT COUNT(*) n FROM team_messages WHERE body=?').get('First line\nSecond line').n,1);check.close();
- await wait("!document.querySelector('.chat-composer textarea').disabled");await typeBody('Keep this draft');await evaluate("[...document.querySelectorAll('.chat-peer')].find(e=>e.querySelector('strong')?.textContent==='agent').click()");
- await wait("document.querySelector('.chat-thread-head')?.textContent.includes('agent')");
- await evaluate("[...document.querySelectorAll('.chat-peer')].find(e=>e.textContent.includes('Бүх ажилчид')).click()");await wait("document.querySelector('.chat-composer textarea')?.value==='Keep this draft'");
- await wait("!document.querySelector('.chat-messages').getAttribute('aria-busy')||document.querySelector('.chat-messages').getAttribute('aria-busy')==='false'");
- // Failed sends keep text for retry rather than losing it.
- await evaluate("window.chatAuditFetch=window.fetch;window.fetch=(url,options)=>options?.body&&JSON.parse(options.body).action==='send_team'?Promise.resolve(new Response(JSON.stringify({error:'Audit send failure'}),{status:500,headers:{'Content-Type':'application/json'}})):window.chatAuditFetch(url,options)");
- await evaluate("document.querySelector('.chat-composer').requestSubmit()");await wait("document.querySelector('.chat-composer textarea')?.value==='Keep this draft'&&!document.querySelector('.chat-composer textarea').disabled");
- await evaluate("window.fetch=window.chatAuditFetch");await typeBody('');
- await evaluate("document.querySelector('.chat-thread .error-box button').click()");await wait("!document.querySelector('.chat-thread .error-box')&&document.querySelectorAll('.chat-bubble').length>=200");await snap('chat-desktop');
- await click('Зурвас хайх');await fill('input[aria-label="Зурвасын агуулгаар хайх"]','History 204');await wait("document.querySelector('[aria-label=\"Зурвасын хайлтын үр дүн\"]')?.textContent.includes('History 204')");await click('Зурвас хайх');
- await fill('input[aria-label="Чат хайх"]','no-such-person');await wait("document.querySelector('.chat-list')?.textContent.includes('Хайлттай тохирох чат алга.')");await fill('input[aria-label="Чат хайх"]','');
- await viewport(390);await pause(450);await snap('chat-mobile-thread');assert.ok(await evaluate("(()=>{const e=document.querySelector('.ant-drawer-body'),composer=document.querySelector('.chat-composer').getBoundingClientRect();return e.scrollWidth<=e.clientWidth&&e.scrollHeight<=e.clientHeight+1&&composer.bottom<=innerHeight})()"),'mobile chat must fit the drawer including the composer');
- assert.equal(await evaluate("getComputedStyle(document.querySelector('.chat-list')).display"),'none');
- await evaluate("document.querySelector('.chat-back').click()");await wait("!document.querySelector('.chat-layout.has-peer')");await snap('chat-mobile-list');
- assert.equal(await evaluate("getComputedStyle(document.querySelector('.chat-thread')).display"),'none');
- assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));console.log('PASS: chat history paging, multiline send, drafts, failed send recovery, search, desktop and mobile navigation.');
+ const post=async(path,action,data)=>{const r=await fetch(base+path,{method:'POST',headers,body:JSON.stringify({action,data})});assert.equal(r.status,200,await r.clone().text());return r.json();};
+ const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10),month=today.slice(0,7),date=new Date(today+'T00:00:00Z');date.setUTCMonth(date.getUTCMonth()+1,1);const nextMonth=date.toISOString().slice(0,7);
+ await post('/api/schedule','set_shift',{person_name:'agent',member_email:'agent@example.test',day:today,assignment:'Хүргэлт'});
+ await post('/api/schedule','set_shift',{person_name:'agent',member_email:'agent@example.test',day:nextMonth+'-01',assignment:'Чөлөө'});
+ await cdp('Page.navigate',{url:base+'/?view=all&q=Sidebar'});await wait("document.querySelectorAll('.lead-row').length>0");
+ await click('Хадгалсан шүүлтүүр');await fill('input[aria-label="Харагдацын нэр"]','Audit view');await click('Одоогийн шүүлтүүрийг хадгалах');
+ assert.ok(await evaluate("JSON.parse(localStorage.getItem('antmall:saved-views:owner@example.test:admin:sales'))[0].query.includes('q=Sidebar')"));
+ await cdp('Page.navigate',{url:base+'/?view=all&q=missing'});await wait("!!document.querySelector('main')&&document.body.textContent.includes('Хадгалсан шүүлтүүр')");
+ await click('Хадгалсан шүүлтүүр');
+ await evaluate("document.querySelector('[aria-label=\"Хадгалсан харагдац\"]').closest('.ant-select').querySelector('.ant-select-content').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}))");
+ await wait("!!document.querySelector('.ant-select-item-option')");await click('Audit view','.ant-select-item-option-content');await wait("document.querySelectorAll('.lead-row').length>0&&location.search.includes('q=Sidebar')");
+ await snap('saved-view-restored');
+ // Stable sync revisions must not repeatedly invalidate the CRM list.
+ await evaluate("window.originalAuditFetch=window.fetch;window.auditCrmReads=0;window.fetch=(url,options)=>{if(String(url).startsWith('/api/crm?'))window.auditCrmReads++;if(String(url)==='/api/sheets'&&options?.body&&JSON.parse(options.body).action==='sync')return Promise.resolve(new Response(JSON.stringify({state:'synced',revision:'stable-audit-revision'}),{headers:{'Content-Type':'application/json'}}));return window.originalAuditFetch(url,options)};document.dispatchEvent(new Event('visibilitychange'))");
+ await wait('window.auditCrmReads>0');await pause(500);
+ await evaluate("window.auditCrmReads=0;document.dispatchEvent(new Event('visibilitychange'))");await pause(800);assert.equal(await evaluate('window.auditCrmReads'),0,'unchanged sync must not reload CRM');
+ await evaluate('window.fetch=window.originalAuditFetch');
+
+ await cdp('Page.navigate',{url:base+'/?view=schedule'});await wait("!!document.querySelector('.schedule-panel')&&!document.querySelector('.loading')");await pause(500);await click('Сар төлөвлөх');await wait("!!document.querySelector('.schedule-planner')");
+ await click(nextMonth+' сарын хуваарь бүртгэх');await wait("!!document.querySelector('.ant-modal-confirm')");assert.ok(await evaluate("document.querySelector('.ant-modal-confirm').textContent.includes('алгасах')"));await snap('month-plan-preview');
+ await click('Баталгаажуулж бүртгэх');await wait("!document.querySelector('.schedule-planner')");
+ const db=new DatabaseSync(join(dir,'test.db'));assert.equal(db.prepare('SELECT assignment FROM work_shifts WHERE person_name=? AND day=?').get('agent',nextMonth+'-01').assignment,'Чөлөө');assert.ok(db.prepare('SELECT COUNT(*) n FROM work_shifts WHERE day LIKE ?').get(nextMonth+'%').n>=28);db.close();
+ await viewport(390);await cdp('Page.navigate',{url:base+'/?view=inventory'});await wait("!!document.querySelector('.inventory-tabs .ant-select')");await snap('inventory-mobile-selector');
+ await cdp('Page.navigate',{url:base+'/?view=reports'});await wait("!!document.querySelector('.ant-table-content table')");
+ await evaluate("document.querySelector('.ant-table-content table').focus()");const before=await evaluate("document.querySelector('.ant-table-content').scrollLeft");
+ await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});await pause(250);await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+ assert.ok(await evaluate("document.querySelector('.ant-table-content').scrollLeft")>before,'keyboard scroll must move the report');
+ assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));console.log('PASS: saved filters restore, monthly preview preserves existing assignments, mobile tab selector, keyboard report scrolling.');
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

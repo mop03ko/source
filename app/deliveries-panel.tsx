@@ -1,4 +1,5 @@
 'use client';
+import {App,Input as AntInput} from 'antd';
 import {ListPagination} from '@/components/list-pagination';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
@@ -36,6 +37,8 @@ function DeliveryForm({row,units:initialUnits=[],members,legacy,busy,onSubmit}:{
  // Хүргэж буй барааг агуулахын бүртгэлтэй холбоно. Гэрээ, баримт хүргэх мөрүүд бий тул сонголттой.
  const [day,setDay]=useState(row?.delivered_on||todayUB());
  const [courier,setCourier]=useState(courierValue(row));
+ const [formStatus,setFormStatus]=useState(row?.status||'pending');
+ const reasonRequired=formStatus!==row?.status&&['failed','cancelled'].includes(formStatus);
  // Тэр өдөр хуваарьт "Хүргэлт"-д томилогдсон ажилтнуудыг харуулж, хуваарьт бусыг сонговол сануулна.
  const onDuty=useRemote<{items:{person_name:string;member_email:string|null}[]}>('/api/schedule?'+new URLSearchParams({day,assignment:'Хүргэлт'}));
  const duty=onDuty.data?.items||[];
@@ -61,12 +64,12 @@ function DeliveryForm({row,units:initialUnits=[],members,legacy,busy,onSubmit}:{
  <Field label="Барааны нэмэлт тайлбар"><Input name="item_info" maxLength={400} defaultValue={row?.item_info} placeholder="Агуулахын бүртгэлд байхгүй бол гараар бичнэ"/></Field>
  <div className="form-grid"><Field label="Харилцагчийн утас"><Input name="customer_phone" maxLength={120} defaultValue={row?.customer_phone} placeholder="99112233"/></Field><Field label="Төлбөрийн суваг"><Input name="payment_channel" maxLength={60} defaultValue={row?.payment_channel} placeholder="Зөгий, Гэгээн, Storepay…"/></Field></div>
  <Field label="Хаягийн мэдээлэл"><TextareaControl name="address" rows={2} maxLength={500} defaultValue={row?.address} placeholder="Дүүрэг, хороо, байр, орц, тоот…"/></Field>
- <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><SelectControl name="courier" required value={courier} onChange={e=>setCourier(e.target.value)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</SelectControl></Field><Field label="Төлөв"><SelectControl name="status" defaultValue={row?.status||'pending'}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl></Field></div>
+ <div className="form-grid"><Field label="Хүргэлтийн ажилтан *"><SelectControl name="courier" required value={courier} onChange={e=>setCourier(e.target.value)}>{[<option key="" value="" disabled>Сонгох…</option>,...members.map(m=><option key={m.email} value={m.email}>{m.name}</option>),...legacy.map(n=><option key={'name:'+n} value={'name:'+n}>{n} (хуучин бүртгэл)</option>)]}</SelectControl></Field><Field label="Төлөв"><SelectControl name="status" value={formStatus} onChange={e=>setFormStatus(e.target.value)}>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl></Field></div>
  {!!dutyNames&&<p className="form-help">{day}-нд хуваарьт хүргэлтэд: <strong>{dutyNames}</strong></p>}
  {!duty.length&&!onDuty.loading&&<p className="form-help">{day}-нд хуваарьт хүргэлтийн ажилтан бүртгэгдээгүй.</p>}
  {offDuty&&<p className="form-help" style={{color:'#b54708'}}>Анхаар: {chosen} тэр өдөр хуваарьт хүргэлтэд томилогдоогүй байна.</p>}
  <Field label="Хамт хүргэх зүйлс"><Input name="contents" maxLength={200} defaultValue={row?.contents} placeholder="Бараа, гэрээ, баталгааны хуудас"/></Field>
- <Field label="Нэмэлт тайлбар"><TextareaControl name="note" rows={2} maxLength={2000} defaultValue={row?.note}/></Field>
+ <Field label={reasonRequired?"Шалтгаан *":"Нэмэлт тайлбар"}><TextareaControl required={reasonRequired} name="note" rows={2} maxLength={2000} defaultValue={row?.note}/></Field>
  <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}Хадгалах</Button>
  </GuardedForm>;
 }
@@ -88,6 +91,7 @@ function SerialSearch({q,onQ}:{q:string;onQ:(v:string)=>void}){
  </>;
 }
 export default function DeliveriesPanel({me,members,initialTaskId}:{me:Member;members:Member[];initialTaskId?:string}){
+ const {modal:confirmation}=App.useApp();
  const [mode,setMode]=useState<'list'|'report'|'serials'>('list');
  const [serialQ,setSerialQ]=useState('');
  const [q,setQ]=useState(''),[status,setStatus]=useState(''),[courier,setCourier]=useState(''),[channel,setChannel]=useState(''),[kind,setKind]=useState('');
@@ -134,7 +138,7 @@ export default function DeliveriesPanel({me,members,initialTaskId}:{me:Member;me
  <div className="table-toolbar"><h2>{courierOnly?'Миний хүргэлтүүд':'Хүргэлтийн журнал'}<span>{mode==='report'?report.data?.total||0:total}</span></h2><div className="row">{!courierOnly&&<Button className="primary" size="sm" onClick={()=>setCreate(true)}><Plus size={16}/>Шинэ хүргэлт</Button>}<div className="view-toggle"><Button variant={mode==='serials'?'default':'outline'} className={mode==='serials'?'primary':''} size="sm" onClick={()=>setMode('serials')}><Search size={14}/>Сериал хайх</Button><Button variant={mode==='list'?'default':'outline'} className={mode==='list'?'primary':''} size="sm" onClick={()=>setMode('list')}><List size={14}/>Жагсаалт</Button><Button variant={mode==='report'?'default':'outline'} className={mode==='report'?'primary':''} size="sm" onClick={()=>setMode('report')}><ChartNoAxesCombined size={14}/>Дашбоард</Button></div></div></div>
  {mode==='serials'?<SerialSearch q={serialQ} onQ={setSerialQ}/>:mode==='list'?<>
  {stats&&<MobileDisclosure label="Хүргэлтийн үзүүлэлт"><div className="metrics"><div className="metric"><div><span>Нийт хүргэлт</span><Truck size={19}/></div><strong>{stats.total.toLocaleString()}</strong><small>Шүүлтүүрт тохирсон</small></div><div className="metric"><div><span>Хүргэсэн</span><CheckCircle2 size={19}/></div><strong>{stats.done.toLocaleString()}</strong><small>{pct(stats.done,stats.total)}% гүйцэтгэл</small></div><div className="metric metric-focus"><div><span>Хүлээгдэж буй</span><Clock size={19}/></div><strong>{stats.pending.toLocaleString()}</strong><small>Хүргэгдэх шаардлагатай</small></div><div className={'metric'+(stats.failed?' metric-alert':'')}><div><span>Хүргэгдээгүй</span><CircleX size={19}/></div><strong>{stats.failed.toLocaleString()}</strong><small>Цуцалсан, бүтээгүй</small></div><div className="metric"><div><span>Бараатай холбогдсон</span><Link2 size={19}/></div><strong>{stats.linked.toLocaleString()}</strong><small>{pct(stats.linked,stats.total)}% агуулахын бүртгэлтэй</small></div></div></MobileDisclosure>}
- <ResponsiveFilters active={[status,courier,channel,kind,from,to].filter(Boolean).length}><div className="search"><Search size={17}/><Input aria-label="Хүргэлт хайх" placeholder="Утас, хаяг, бараагаар хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
+ <div className="row wrap"><Button variant="outline" onClick={()=>{setFrom(todayUB());setTo(todayUB());setStatus('');setPage(1);}}>Өнөөдөр</Button><Button variant="outline" onClick={()=>{setFrom('');setTo(new Date(Date.now()+8*3600000-86400000).toISOString().slice(0,10));setStatus('pending');setPage(1);}}>Хоцорсон</Button><Button variant="outline" onClick={()=>{setFrom('');setTo('');setStatus('failed');setPage(1);}}>Биелээгүй</Button></div><ResponsiveFilters active={[status,courier,channel,kind,from,to].filter(Boolean).length}><div className="search"><Search size={17}/><Input aria-label="Хүргэлт хайх" placeholder="Утас, хаяг, бараагаар хайх…" value={q} onChange={e=>setFilter(setQ,e.target.value)}/></div>
  <SelectControl aria-label="Төлөвөөр шүүх" value={status} onChange={e=>setFilter(setStatus,e.target.value)}><option value="">Бүх төлөв</option>{Object.entries(deliveryStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SelectControl>
  {!courierOnly&&<SelectControl aria-label="Хүргэгчээр шүүх" value={courier} onChange={e=>setFilter(setCourier,e.target.value)}><option value="">Бүх хүргэгч</option>{(list.data?.couriers||[]).map(c=><option key={c.name} value={c.name}>{c.name} ({c.total})</option>)}</SelectControl>}
  <SelectControl aria-label="Сувгаар шүүх" value={channel} onChange={e=>setFilter(setChannel,e.target.value)}><option value="">Бүх суваг</option>{(list.data?.channels||[]).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</SelectControl>
@@ -162,7 +166,7 @@ export default function DeliveriesPanel({me,members,initialTaskId}:{me:Member;me
  <AsyncStatus error={detail.error} loading={detail.loading} retry={detail.retry}/>
  {d&&!detail.error&&<div className="detail-body">
  <div className="next-box"><Truck size={18}/><div><strong>{d.item_name||d.item_info||'Барааны мэдээлэл бүртгээгүй'}</strong>{d.item_name&&<p className="muted"><Link2 size={12}/> Агуулахын бараа: {d.item_code} {d.item_brand?'· '+d.item_brand:''}</p>}{!!detail.data?.units.length&&<p className="muted">Сериал: {detail.data.units.map(u=>u.serial||u.barcode).join(', ')}</p>}<p>{d.customer_phone||'утасгүй'} · {d.address||'хаяггүй'}</p><p className="muted">Бүртгэсэн: {d.entered_by_name||d.created_by} · {requestDateLabel(d.created_at)}</p></div></div>
- <div className="row">{Object.entries(deliveryStatuses).filter(([k])=>k!==d.status).map(([k,v])=><Button key={k} size="sm" variant="outline" disabled={busy} onClick={()=>post('set_status',{status:k},d.id,d.version)}>{v}</Button>)}</div>
+ <div className="row">{Object.entries(deliveryStatuses).filter(([k])=>k!==d.status).map(([k,v])=><Button key={k} size="sm" variant="outline" disabled={busy} onClick={()=>{let note='';confirmation.confirm({title:v,okText:'Баталгаажуулах',cancelText:'Буцах',content:<AntInput.TextArea aria-label="Төлөв өөрчилсөн тайлбар" placeholder={['failed','cancelled'].includes(k)?'Шалтгаан заавал бичнэ үү':'Тайлбар (сонголттой)'} maxLength={2000} onChange={e=>{note=e.target.value;}}/>,onOk:async()=>{if(['failed','cancelled'].includes(k)&&!note.trim()){toast.error('Шалтгаанаа бичнэ үү.');throw new Error('Reason required');}if(!await post('set_status',{status:k,...note.trim()?{note:note.trim()}:{}},d.id,d.version))throw new Error('Save failed');}});}}>{v}</Button>)}</div>
  {!courierOnly&&<><div className="section-heading"><div><h2>Мэдээлэл засах</h2><p className="muted">Огноо, хаяг, суваг, хүргэгчийг шинэчилнэ.</p></div></div>
  <DeliveryForm key={d.version} row={d} units={detail.data?.units||[]} members={activeMembers} legacy={legacy} busy={busy} onSubmit={v=>post('update',v,d.id,d.version)}/></>}
  </div>}

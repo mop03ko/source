@@ -63,6 +63,7 @@ const base=(o={})=>({delivered_on:'2026-09-10',kind:'24 цаг',item_info:'Dyson
  assert.equal((await get('?id='+c))[0],403);
  let ver=(await get('?id='+a))[1].delivery.version;
  assert.equal((await post('update',base(),a,ver))[0],403);
+ assert.equal((await post('set_status',{status:'failed'},a,ver))[0],400);
  assert.equal((await post('set_status',{status:'delivered',note:'Хүлээлгэж өглөө'},a,ver))[0],200);
  [status,d]=await get('?id='+a);assert.equal(d.delivery.status,'delivered');assert.equal(d.delivery.note,'Хүлээлгэж өглөө');
  // Бусдын хүргэлтийн төлөвийг хүргэгч солихгүй.

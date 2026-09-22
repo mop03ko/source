@@ -100,8 +100,8 @@ try{
  }
  assert.deepEqual(evidence.scanFailures,[]);assert.deepEqual(evidence.errors,[]);
  assert.ok(evidence.screens.every(s=>s.scrollWidth<=s.viewport),'Page overflows horizontally');
- // Chrome's automatic scroll-container focus was verified separately with real Tab/ArrowRight events.
- assert.deepEqual(evidence.accessibility.flatMap(s=>s.violations.filter(v=>v.id!=='scrollable-region-focusable').map(v=>({screen:s.name,rule:v.id}))),[]);
+ // All WCAG/best-practice rules must pass, including keyboard scroll access.
+ assert.deepEqual(evidence.accessibility.flatMap(s=>s.violations.map(v=>({screen:s.name,rule:v.id}))),[]);
  console.log('Full UI/UX audit complete:',evidence.screens.length,'screens;',evidence.scanFailures.length,'scan failures.');
 }finally{
  await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));

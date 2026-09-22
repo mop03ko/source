@@ -24,7 +24,7 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  // Зураг илгээх: 5MB хүртэл, зөвшөөрөгдсөн MIME төрлийн base64 dataURL зөвшөөрнө; текстгүй (зурагтай ганцаараа) ч болно.
  const tinyPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
  [status,d]=await post({action:'send',peer:'owner@example.test',image:tinyPng});assert.equal(status,200);const imgMsgId=d.id;
- [status,d]=await get('?peer=owner@example.test');const imgMsg=d.items.find(m=>m.id===imgMsgId);assert.equal(imgMsg.image,tinyPng);assert.equal(imgMsg.body,'');
+ [status,d]=await get('?peer=owner@example.test');const imgMsg=d.items.find(m=>m.id===imgMsgId);assert.equal(imgMsg.image,'/api/messages?kind=dm&image='+imgMsgId);const media=await route.GET(new Request('https://crm.test'+imgMsg.image));assert.equal(media.status,200);assert.equal(media.headers.get('content-type'),'image/png');assert.equal(Buffer.from(await media.arrayBuffer()).toString('base64'),tinyPng.split(',')[1]);assert.equal(imgMsg.body,'');
  assert.equal((await post({action:'send',peer:'owner@example.test',image:'data:text/plain;base64,aGk='}))[0],400); // зурагны бус MIME
  assert.equal((await post({action:'send',peer:'owner@example.test',image:'data:image/png;base64,'+'A'.repeat(7000000)}))[0],400); // 5MB-аас том
  // Reply: зөвхөн харилцан ярианы жинхэнэ оролцогч мессежийг эх сурвалж болгож чадна; сервэр өөрөө snapshot-ыг уншина.
@@ -182,6 +182,17 @@ async function post(body){const r=await route.POST(new Request('https://crm.test
  assert.equal(await msgLib.teamUnread('agent@example.test',pageGroup),1,'stale reads cannot move the cursor backwards');
  await msgLib.markRead('agent@example.test','second@example.test',pageStamp);
  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM messages WHERE id LIKE 'page-%' AND read_at IS NULL").get().n,0);
+ const searchTeam=await get('?team=1&channel='+pageGroup+'&search=page-00');
+ assert.equal(searchTeam[0],200);assert.equal(searchTeam[1].items.length,10);
+ assert.equal((await get('?peer=second@example.test&search=page-00'))[1].items.length,10);
+ assert.equal((await get('?peer=nobody@example.test&search=page-00'))[1].items.length,0);
+ await msgLib.sendTeam('owner@example.test',pageGroup,'ӨНӨӨДӨР ҮЛДЭГДЭЛ');
+ assert.equal((await get('?team=1&channel='+pageGroup+'&search='+encodeURIComponent('өнөөдөр үлдэгдэл')))[1].items.length,1);
+ sqlite.prepare('DELETE FROM group_chat_members WHERE channel_id=? AND email=?').run(pageGroup,user.email);
+ assert.equal((await get('?team=1&channel='+pageGroup+'&search=page'))[0],403);
+ assert.equal((await route.GET(new Request('https://crm.test/api/messages?kind=team&image=page-001'))).status,404);
+ user={userId:'s',email:'second@example.test',displayName:'Second'};
+ assert.equal((await route.GET(new Request('https://crm.test/api/messages?kind=dm&image='+imgMsgId))).status,404);
  console.log('PASS: latest chat pages, stable history cursors, cross-channel cursor isolation and bounded read receipts.');
  console.log('PASS: sidebar unread count respects director channel isolation, group membership and per-channel read timestamps.');
  console.log('PASS: DM send/read/thread, image attachments (size/MIME validation, image-only messages), reply snapshot integrity and cross-conversation rejection, reaction toggling and cross-user access control, team channel reply/react, per-role channel access control, director DM isolation (manager/admin only), manager/admin-created group chats with membership-based access control, and @mention/@all detection with per-channel "mentioned" summary flag.');

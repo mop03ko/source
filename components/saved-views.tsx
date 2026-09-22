@@ -1,0 +1,12 @@
+ 'use client';
+import {Button,Input,Popover,Select,Space,App} from 'antd';
+import {useState} from 'react';
+import {useDraftGuard} from './draft-guard';
+type View={name:string;query:string};
+export function SavedViews({scope}:{scope:string}){
+ const [views,setViews]=useState<View[]>([]),[loaded,setLoaded]=useState(false),[name,setName]=useState(''),[selected,setSelected]=useState<string>();
+ const allow=useDraftGuard(),{message}=App.useApp(),key='antmall:saved-views:'+scope;
+ const read=()=>{if(loaded)return;try{const rows=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(rows))setViews(rows.filter(v=>typeof v.name==='string'&&typeof v.query==='string').slice(0,20));}catch{}setLoaded(true);};
+ const write=(next:View[])=>{try{localStorage.setItem(key,JSON.stringify(next));setViews(next);return true;}catch{void message.error('Харагдац хадгалах зай хүрэлцэхгүй.');return false;}};
+ return <Popover trigger="click" title="Хадгалсан шүүлтүүр" onOpenChange={open=>{if(open)read();}} content={<Space orientation="vertical" style={{width:260,maxWidth:'70vw'}}><Select aria-label="Хадгалсан харагдац" style={{width:'100%'}} value={selected} placeholder="Харагдац сонгох" options={views.map(v=>({value:v.name,label:v.name}))} onChange={value=>{const view=views.find(v=>v.name===value);if(view&&allow()){setSelected(value);window.history.pushState(null,'','?'+view.query);window.dispatchEvent(new PopStateEvent('popstate'));}}}/><Input aria-label="Харагдацын нэр" placeholder="Жишээ: Сонсголон · үлдэгдэл" maxLength={60} value={name} onChange={e=>setName(e.target.value)}/><Button disabled={!name.trim()||views.length>=20&&!views.some(v=>v.name===name.trim())} onClick={()=>{const query=new URLSearchParams(window.location.search);query.delete('lead');query.set('page','1');for(const key of [...query.keys()])if(key.endsWith('_page'))query.set(key,'1');if(write([...views.filter(v=>v.name!==name.trim()),{name:name.trim(),query:query.toString()}])){setSelected(name.trim());setName('');void message.success('Шүүлтүүр хадгаллаа.');}}}>Одоогийн шүүлтүүрийг хадгалах</Button><Button danger disabled={!selected} onClick={()=>{if(write(views.filter(v=>v.name!==selected)))setSelected(undefined);}}>Сонгосон харагдцыг устгах</Button><small>Энэ төхөөрөмж дээр таны хэрэглэгчээр хадгална. Огнооны шүүлтүүр нь хадгалсан огноогоор хэвээр байна.</small></Space>}><Button>Хадгалсан шүүлтүүр</Button></Popover>;
+}

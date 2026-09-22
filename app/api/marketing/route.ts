@@ -1,3 +1,4 @@
+import {canAccessWorkModule} from '@/lib/crm';
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
@@ -6,7 +7,7 @@ export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 // Борлуулалтын ажилтан, IT ажилтан хоёул энэ модульд хамааралгүй тул бүрмөсөн хаана; Маркетинг эрхтэй
 // хүн харин борлуулалтын хүсэлт (/api/crm) рүү огт хандахгүй (тэнд тусад нь хориглосон).
-function assertAccess(m:Member){if(m.role==='operator'||m.role==='agent'||m.role==='it')throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
+function assertAccess(m:Member){if(!canAccessWorkModule(m.role,'marketing'))throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
 async function getTask(id:string){
  const t=await db().prepare('SELECT * FROM marketing_tasks WHERE id=?').bind(id).first<MarketingTask>();
  if(!t)throw new Failure('Ажил олдсонгүй.',404);
@@ -43,6 +44,10 @@ export async function GET(req:Request){try{
  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
  const q=(url.searchParams.get('q')||'').slice(0,100),status=url.searchParams.get('status')||'',owner=(url.searchParams.get('owner')||'').trim().toLowerCase().slice(0,120);
  let where='1=1';const args:unknown[]=[];
+ const focus=url.searchParams.get('focus');
+ if(focus==='overdue'){where+=" AND due_at<? AND status NOT IN ('done','cancelled')";args.push(new Date().toISOString());}
+ if(focus==='unassigned')where+=" AND NOT EXISTS (SELECT 1 FROM members m WHERE m.email=owner AND m.active=1)";
+ if(focus==='approval')where+=" AND approved_at IS NULL AND status!='cancelled'";
  if(q){where+=' AND title LIKE ?';args.push('%'+q+'%');}
  if(status&&Object.hasOwn(marketingStages,status)){where+=' AND status=?';args.push(status);}
  if(owner){where+=' AND owner=?';args.push(owner);}

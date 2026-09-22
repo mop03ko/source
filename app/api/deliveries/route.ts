@@ -153,6 +153,7 @@ export async function POST(req:Request){try{
   // Хүргэгч зөвхөн өөрийн хүргэлтийн төлөвийг л шинэчилнэ.
   if(isCourierOnly(m.role)&&!(row.courier_email===m.email||(!row.courier_email&&row.courier_name===m.name)))throw new Failure('Энэ хүргэлтийг шинэчлэх эрхгүй.',403);
   const d=z.object({status:z.string().refine(v=>Object.hasOwn(deliveryStatuses,v),'Төлөв буруу.'),note:z.string().trim().max(2000).optional()}).parse(b.data);
+  if(['failed','cancelled'].includes(d.status)&&!d.note?.trim())throw new Failure('Биелээгүй эсвэл цуцалсан шалтгаанаа бичнэ үү.',400);
   const r=await db().prepare('UPDATE deliveries SET status=?,note=COALESCE(?,note),updated_at=?,version=version+1 WHERE id=? AND version=?').bind(d.status,d.note??null,now,row.id,b.version).run();
   if(!r.meta.changes)throw new Failure('Хүргэлт шинэчлэгдсэн байна. Дахин нээнэ үү.',409);
   return Response.json({ok:true});
@@ -160,6 +161,7 @@ export async function POST(req:Request){try{
  if(b.action==='update'){
   if(isCourierOnly(m.role))throw new Failure('Хүргэлтийн мэдээллийг засах эрхгүй.',403);
   const d=deliverySchema.parse(b.data);
+  if(d.status!==row.status&&['failed','cancelled'].includes(d.status)&&!d.note.trim())throw new Failure('Биелээгүй эсвэл цуцалсан шалтгаанаа бичнэ үү.',400);
   const courier=await resolveCourier(d);
   const r=await db().prepare('UPDATE deliveries SET delivered_on=?,kind=?,item_id=?,item_info=?,customer_phone=?,address=?,payment_channel=?,contents=?,courier_email=?,courier_name=?,status=?,sale_id=?,lead_id=?,note=?,updated_at=?,version=version+1 WHERE id=? AND version=?')
    .bind(d.delivered_on,d.kind,await resolveItem(d.item_id),d.item_info,d.customer_phone,d.address,d.payment_channel,d.contents,courier.email,courier.name,d.status,d.sale_id||null,d.lead_id||null,d.note,now,row.id,b.version).run();

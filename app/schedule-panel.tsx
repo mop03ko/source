@@ -1,4 +1,5 @@
 'use client';
+import {App,Alert,Steps,Table as AntTable} from 'antd';
 import {Disclosure} from '@/components/disclosure';
 import {useState,useRef,useEffect} from 'react';
 import {useIsMobile} from '@/hooks/use-mobile';
@@ -123,7 +124,7 @@ export default function SchedulePanel({month,onMonthChange,cache,refresh=0}:{mon
    <Button type="submit" className="primary full" disabled={busy}>{busy?<Loader2 className="spin" size={16}/>:<Users size={16}/>}Нэмэх</Button>
   </GuardedForm>
  </DialogContent></Dialog>
- {d?.can_manage&&<MonthPlanner open={planOpen} onClose={()=>setPlanOpen(false)} month={month} people={d.people} shifts={d.shifts}
+ {d?.can_manage&&planOpen&&<MonthPlanner key={month} open={planOpen} onClose={()=>setPlanOpen(false)} month={month} people={d.people} shifts={d.shifts}
    onDone={(written:number,skipped:number)=>{setPlanOpen(false);data.retry();toast.success(`${written} өдрийн томилгоо бүртгэв.`+(skipped?` ${skipped} нүд аль хэдийн томилгоотой тул хөндөөгүй.`:''));}}/>}
  </section>;
 }
@@ -133,29 +134,21 @@ type PlanRow={person:string;email:string|null;include:boolean;assignment:string;
 // гарагаас хамаарахгүй шилждэг, зарим нь жигд бус) тул амрах өдрийг нүдэн дээр дарж шууд сонгоно.
 // Түргэн товчнууд нь зөвхөн эхлэлийг тавина — дараа нь өдөр тус бүрийг дарж тааруулна.
 function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;onClose:()=>void;month:string;people:{person_name:string;member_email:string|null}[];shifts:WorkShift[];onDone:(written:number,skipped:number)=>void}){
+ const {modal:confirmation}=App.useApp();
  const [target,setTarget]=useState(()=>shiftMonth(month,1));
- const [rows,setRows]=useState<PlanRow[]>([]);
- const [busy,setBusy]=useState(false),[loaded,setLoaded]=useState('');
- const days=monthDays(target);
- const weekday=(day:string)=>new Date(day+'T00:00:00Z').getUTCDay();
- const isWeekend=(day:string)=>[0,6].includes(weekday(day));
- useEffect(()=>{
-  if(!open)return;
-  const key=month+'|'+target;
-  if(loaded===key)return;
-  // Томилгоог одоогийн сард хамгийн олон тохиолдсоноор нь урьдчилж сонгоно.
+ const initialRows=(target:string):PlanRow[]=>{
   const seen=new Map<string,Map<string,number>>();
   for(const shift of shifts)if(shiftIsWork(shift.assignment)){
    if(!seen.has(shift.person_name))seen.set(shift.person_name,new Map());
    const tally=seen.get(shift.person_name)!;tally.set(shift.assignment,(tally.get(shift.assignment)||0)+1);
   }
-  setRows(people.map(person=>{
-   const tally=[...(seen.get(person.person_name)||new Map<string,number>()).entries()].sort((a,b)=>b[1]-a[1]);
-   return {person:person.person_name,email:person.member_email,include:true,
-    assignment:tally[0]?.[0]||shiftAssignments[0],rest:monthDays(target).filter(day=>[0,6].includes(new Date(day+'T00:00:00Z').getUTCDay()))};
-  }));
-  setLoaded(key);
- },[open,month,target,people,shifts,loaded]);
+  return people.map(person=>({person:person.person_name,email:person.member_email,include:true,assignment:[...(seen.get(person.person_name)||new Map<string,number>()).entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||shiftAssignments[0],rest:monthDays(target).filter(day=>[0,6].includes(new Date(day+'T00:00:00Z').getUTCDay()))}));
+ };
+ const [rows,setRows]=useState<PlanRow[]>(()=>initialRows(target));
+ const [busy,setBusy]=useState(false);
+ const days=monthDays(target);
+ const weekday=(day:string)=>new Date(day+'T00:00:00Z').getUTCDay();
+ const isWeekend=(day:string)=>[0,6].includes(weekday(day));
  const update=(person:string,patch:Partial<PlanRow>)=>setRows(list=>list.map(r=>r.person===person?{...r,...patch}:r));
  const toggleDay=(person:string,day:string)=>setRows(list=>list.map(r=>r.person!==person?r:{...r,rest:r.rest.includes(day)?r.rest.filter(v=>v!==day):[...r.rest,day]}));
  // Баганын толгойг дарахад тухайн өдөр бүх сонгосон ажилтанд ажил ↔ амралт болно (нийтийн амралт).
@@ -179,14 +172,25 @@ function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;on
    onDone(value.written||0,value.skipped||0);
   }catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
  };
+ const preview=async()=>{
+  setBusy(true);
+  try{
+   const response=await fetch('/api/schedule?'+new URLSearchParams({month:target}),{cache:'no-store'});
+   const result=await response.json() as Data&{error?:string};
+   if(!response.ok)throw new Error(result.error||'Урьдчилсан тооцоо авч чадсангүй.');
+   const existing=new Set(result.shifts.map(s=>s.person_name+'|'+s.day));
+   const counts=chosen.map(r=>({person:r.person,skip:days.filter(day=>existing.has(r.person+'|'+day)).length,add:days.filter(day=>!existing.has(r.person+'|'+day)).length}));
+   confirmation.confirm({title:target+' сарын төлөвлөгөө',width:700,okText:'Баталгаажуулж бүртгэх',cancelText:'Буцах',content:<><Steps size="small" current={1} items={[{title:'Төлөвлөх'},{title:'Хянах'},{title:'Бүртгэх'}]}/><Alert style={{marginBlock:16}} type="info" showIcon title={`${chosen.length} ажилтан · ${counts.reduce((n,r)=>n+r.add,0)} шинэ томилгоо`} description="Бүртгэлтэй өдрүүдийг алгасана. Баталгаажуулах хүртэл бусдын нэмсэн томилгоог мөн хөндөхгүй."/><AntTable rowKey="person" size="small" pagination={{pageSize:5}} dataSource={counts} columns={[{title:'Ажилтан',dataIndex:'person'},{title:'Нэмэх өдөр',dataIndex:'add'},{title:'Бүртгэлтэй / алгасах',dataIndex:'skip'}]}/></>,onOk:save});
+  }catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
+ };
  return <Dialog open={open} onOpenChange={o=>{if(!o)onClose();}}><DialogContent className="schedule-planner" width="min(1500px, 96vw)" style={{maxHeight:'90dvh',overflowY:'auto',background:'#fff'}}>
   <DialogHeader><DialogTitle>Шинэ сарын хуваарь төлөвлөх</DialogTitle><DialogDescription>Амрах өдрийг нүдэн дээр дарж сонгоно — саарал нь амралт, цэнхэр нь ажлын өдөр. Баганын толгойг дарвал тэр өдөр бүх ажилтанд нэгэн зэрэг солигдоно. Аль хэдийн томилгоотой нүдийг хөндөхгүй.</DialogDescription></DialogHeader>
   <div className="form-stack">
    <div className="form-grid">
-    <Field label="Төлөвлөх сар *"><Input type="month" value={target} onChange={e=>{setTarget(e.target.value||target);setLoaded('');}}/></Field>
+    <Field label="Төлөвлөх сар *"><Input type="month" value={target} onChange={e=>{const next=e.target.value||target;setTarget(next);setRows(initialRows(next));}}/></Field>
     <Field label="Сонгосон ажилтан"><Input value={chosen.length+' / '+rows.length} disabled/></Field>
    </div>
-   {!rows.length&&<p className="muted">Одоогийн сард хуваарьтай ажилтан байхгүй тул төлөвлөх хүн алга. "Томилгоо нэмэх"-ээр ажилтан бүртгэнэ үү.</p>}
+   {!rows.length&&<p className="muted">Одоогийн сард хуваарьтай ажилтан байхгүй тул төлөвлөх хүн алга. “Томилгоо нэмэх”-ээр ажилтан бүртгэнэ үү.</p>}
    {!!rows.length&&<div style={{overflowX:'auto'}}>
     <table style={{borderCollapse:'collapse',fontSize:12,whiteSpace:'nowrap'}}>
      <thead><tr>
@@ -221,7 +225,7 @@ function MonthPlanner({open,onClose,month,people,shifts,onDone}:{open:boolean;on
       </tr>;})}</tbody>
     </table>
    </div>}
-   <Button className="primary full" disabled={busy||!chosen.length} onClick={save}>{busy?<Loader2 className="spin" size={16}/>:<CalendarPlus size={16}/>}{target+' сарын хуваарь бүртгэх'}</Button>
+   <Button className="primary full" disabled={busy||!chosen.length} onClick={preview}>{busy?<Loader2 className="spin" size={16}/>:<CalendarPlus size={16}/>}{target+' сарын хуваарь бүртгэх'}</Button>
   </div>
  </DialogContent></Dialog>;
 }

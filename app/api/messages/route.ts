@@ -5,6 +5,13 @@ import {teamChannels,channelsForRole,canDm,isAdminLike} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
+// Keep each expression shallow enough for libSQL's parser while folding Cyrillic.
+function searchSql(table:'messages'|'team_messages',scope:string,search:string){
+ const letters=[...new Set(search.toUpperCase().match(/[А-ЯӨҮЁ]/g)||[])];
+ const stages=[`s0 AS MATERIALIZED (SELECT id,sender,body,created_at,lower(body) folded FROM ${table} WHERE ${scope})`];
+ for(let i=0;i<letters.length;i+=8){const expression=letters.slice(i,i+8).reduce((sql,c)=>`replace(${sql},'${c}','${c.toLowerCase()}')`,'folded');stages.push(`s${stages.length} AS MATERIALIZED (SELECT id,sender,body,created_at,${expression} folded FROM s${stages.length-1})`);}
+ return `WITH ${stages.join(',')} SELECT id,sender,body,created_at FROM s${stages.length-1} WHERE instr(folded,?)>0 ORDER BY created_at DESC,id DESC LIMIT 50`;
+}
 const respondError=(e:unknown)=>Response.json({error:e instanceof z.ZodError?'Мессежийн хүсэлт буруу.':(e as Error).message},{status:(e as {status?:number}).status||400});
 // Тогтмол 3 сувгаас гадна Ахлах, Админ үүсгэсэн групп чатын id (UUID) энд орох тул чөлөөт стринг болгосон;
 // хандах эрхийг channelAccess() өөрөө (тогтмол бол channelsForRole, групп бол гишүүнчлэл) шалгана.
@@ -31,6 +38,16 @@ const MAX_IMAGE_B64=Math.ceil(5*1024*1024/3)*4+64;
 const imageSchema=z.string().refine(v=>/^data:image\/(png|jpeg|webp|gif);base64,/.test(v),'Зөвхөн PNG/JPEG/WEBP/GIF зураг оруулна уу.').refine(v=>v.length<=MAX_IMAGE_B64,'Зургийн хэмжээ 5MB-аас бага байна.');
 export async function GET(req:Request){try{
  const m=await member(),url=new URL(req.url),myChannels=channelsForRole(m.role);
+ const search=z.string().trim().max(100).parse(url.searchParams.get('search')||'');
+ const imageId=url.searchParams.get('image');
+ if(imageId){
+  const id=z.string().min(1).max(80).parse(imageId),kind=z.enum(['dm','team']).parse(url.searchParams.get('kind'));
+  if(!await messageSnapshot(kind,id,m))throw new Failure('Зураг олдсонгүй.',404);
+  const row=await db().prepare(`SELECT image FROM ${kind==='dm'?'messages':'team_messages'} WHERE id=?`).bind(id).first<{image:string|null}>();
+  const match=row?.image?.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+  if(!match)throw new Failure('Зураг олдсонгүй.',404);
+  return new Response(Buffer.from(match[2],'base64'),{headers:{'Content-Type':match[1],'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+ }
  const before=z.string().min(1).max(80).optional().parse(url.searchParams.get('before')||undefined);
  if(url.searchParams.get('summary')==='1'){
   const groups=await myGroupChats(m.email);
@@ -48,10 +65,12 @@ export async function GET(req:Request){try{
   if(!channel.success)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
   const access=await channelAccess(m,channel.data);
   if(!access.ok)throw new Failure('Энэ сувагт хандах эрхгүй.',403);
+  if(search){const items=await db().prepare(searchSql('team_messages','channel=?',search)).bind(channel.data,search.toLowerCase()).all();return Response.json({items:items.results},{headers:{'Cache-Control':'no-store'}});}
   const [items,reads,roster]=await Promise.all([teamMessages(m.email,channel.data,before),teamReadState(m.email,channel.data),channelRoster(channel.data)]);
   return Response.json({items,reads,members:roster.filter(r=>r.email!==m.email)},{headers:{'Cache-Control':'no-store'}});
  }
  const peer=(url.searchParams.get('peer')||'').trim().toLowerCase();
+ if(peer&&search){const items=await db().prepare(searchSql('messages','pair_key=?',search)).bind([m.email,peer].sort().join('|'),search.toLowerCase()).all();return Response.json({items:items.results},{headers:{'Cache-Control':'no-store'}});}
  if(peer)return Response.json({items:await thread(m.email,peer,before)},{headers:{'Cache-Control':'no-store'}});
  return Response.json({items:await conversations(m.email)},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return respondError(e);}}

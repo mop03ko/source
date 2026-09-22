@@ -55,7 +55,7 @@ async function post(action,extra={}){const r=await integration.POST(new Request(
  // Only admin sync can consume the deployment key; failed header validation stays disabled.
  sqlite.prepare('DELETE FROM sheet_connection').run();user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  // Non-admin хариу нь connections дэлгэрэнгүйг харуулахгүй, зөвхөн ерөнхий төлөвийг л буцаана.
- {const r=(await post('sync'))[1];assert.deepEqual(r,{state:'synced'});}assert.equal(sqlite.prepare('SELECT * FROM sheet_connection').get(),undefined);
+ {const r=(await post('sync'))[1];assert.deepEqual(Object.keys(r).sort(),['revision','state']);assert.equal(r.state,'synced');assert.equal(typeof r.revision,'string');assert.equal((await post('sync'))[1].revision,r.revision);}assert.equal(sqlite.prepare('SELECT * FROM sheet_connection').get(),undefined);
  user={userId:'o',email:'owner@example.test',displayName:'Owner'};
  assert.equal((await post('sync'))[0],400);let seeded=sqlite.prepare('SELECT * FROM sheet_connection').get();assert.equal(seeded.enabled,0);assert.equal(seeded.checked,0);assert.ok(seeded.last_error);assert.ok(!seeded.credential.includes('PRIVATE KEY'));
  // A fresh valid setup validates headers before enabling; credentials are never returned.

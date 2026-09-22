@@ -83,3 +83,6 @@ export function parseCSV(text:string){const rows:string[][]=[];let row:string[]=
 export function normalizeRegistration(v:string){const s=v.trim().replace(/\s/g,'').toUpperCase();if(s&&!/^[А-ЯЁӨҮ]{2}\d{8}$/.test(s))throw new Error('Регистрийн дугаар 2 кирилл үсэг, 8 цифртэй байна.');return s;}
 
 export function requestDateLabel(v:string|null){if(!v)return 'Огноогүй';const d=new Date(v);if(Number.isNaN(d.getTime()))return 'Огноо шалгах';const local=new Date(d.getTime()+8*3600000);return local.toISOString().slice(0,19).replace('T',' ')+' · УБ';}
+
+/** Shared positive allowlist for work module navigation and API access. */
+export function canAccessWorkModule(role:string,module:"marketing"|"it"){return ["admin","director","manager",module].includes(role);}

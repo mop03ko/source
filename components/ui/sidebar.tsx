@@ -9,7 +9,7 @@ export function SidebarProvider({children,...props}:React.ComponentProps<'div'>)
  const mobile=useIsMobile(),[open,setOpen]=React.useState(true),[mobileOpen,setMobileOpen]=React.useState(false);
  const toggle=React.useCallback(()=>{if(mobile)setMobileOpen(value=>!value);else setOpen(value=>!value);},[mobile]);
  React.useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='b'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggle();}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[toggle]);
- return <Context.Provider value={{open,mobile,mobileOpen,setMobileOpen,toggle}}><Layout {...props} data-slot="sidebar-wrapper" className={`crm-ant-layout ${props.className??''}`}>{children}</Layout></Context.Provider>;
+ return <Context.Provider value={{open,mobile,mobileOpen,setMobileOpen,toggle}}><Layout {...props} hasSider data-slot="sidebar-wrapper" className={`crm-ant-layout ${props.className??''}`}>{children}</Layout></Context.Provider>;
 }
 export function Sidebar({children,className,...props}:React.ComponentProps<'div'>){
  const ctx=React.useContext(Context);

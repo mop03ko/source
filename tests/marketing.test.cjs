@@ -108,5 +108,25 @@ const taskData=(overrides={})=>({title:'Facebook сурталчилгаа',chann
  const dayUrl='?calendar=1&month='+calDay.slice(0,7)+'&day='+calDay;
  const firstDay=(await mGet(dayUrl))[1],secondDay=(await mGet(dayUrl+'&page=2'))[1];
  assert.equal(firstDay.items.length,50);assert.ok(firstDay.total>=55);assert.equal(firstDay.total,secondDay.total);assert.equal(firstDay.items.length+secondDay.items.length,firstDay.total);assert.ok(!firstDay.items.some(a=>secondDay.items.some(b=>a.id===b.id)));
+ // Allowed roles and server-side quick filters share the same access scope.
+ for(const role of ['admin','director','manager','marketing']){
+  sqlite.prepare("INSERT OR REPLACE INTO members(email,name,role,active) VALUES (?,?,?,1)").run('allowed@example.test','Allowed',role);
+  user={userId:'allowed',email:'allowed@example.test',displayName:'Allowed'};
+  assert.equal((await mGet())[0],200,role+' list');
+ }
+ const overdueResult=await mGet('?focus=overdue');assert.equal(overdueResult[0],200);
+ assert.ok(overdueResult[1].items.every(t=>t.due_at&&t.due_at<new Date().toISOString()&&!['done','cancelled'].includes(t.status)));
+ const unassignedResult=await mGet('?focus=unassigned');assert.equal(unassignedResult[0],200);
+ assert.ok(unassignedResult[1].items.every(t=>!sqlite.prepare('SELECT email FROM members WHERE email=? AND active=1').get(t.owner)));
+ // Every excluded role must be rejected before any task mutation.
+ for(const role of ['agent', 'operator', 'it', 'delivery']){
+  sqlite.prepare("INSERT OR REPLACE INTO members(email,name,role,active) VALUES (?,?,?,1)").run('denied@example.test','Denied',role);
+  user={userId:'denied',email:'denied@example.test',displayName:'Denied'};
+  const before=sqlite.prepare('SELECT COUNT(*) n FROM marketing_tasks').get().n;
+  assert.equal((await mGet())[0],403,role+' list');
+  assert.equal((await mGet('?id=missing'))[0],403,role+' detail');
+  for(const action of ['create', 'update', 'activity', 'approve', 'unapprove'])assert.equal((await mPost(action,{},'missing',1))[0],403,role+' '+action);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM marketing_tasks').get().n,before);
+ }
  console.log('PASS: marketing role isolation from sales leads, cross-module access control, task CRUD, optimistic locking, activity logging, calendar filtering, report breakdown (status/channel/owner/budget), budget approve/unapprove with mandatory notes and admin dashboard pending-approvals access control.');
 })().catch(e=>{console.error(e);process.exit(1)});

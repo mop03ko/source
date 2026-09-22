@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils"
 const TableContext=React.createContext<{header:React.ReactNode;body:React.ReactNode}>({header:null,body:null});
 function HeaderWrapper(){return <>{React.useContext(TableContext).header}</>;}
 function BodyWrapper(){return <>{React.useContext(TableContext).body}</>;}
-const tableComponents={header:{wrapper:HeaderWrapper},body:{wrapper:BodyWrapper}};
+function KeyboardTable(props:React.ComponentProps<"table">){return <table {...props} tabIndex={0}/>;}
+const tableComponents={table:KeyboardTable,header:{wrapper:HeaderWrapper},body:{wrapper:BodyWrapper}};
 function Table({className,children,...props}:React.ComponentProps<"table">){
  const parts=React.Children.toArray(children);
  const header=parts.find(child=>React.isValidElement(child)&&child.type===TableHeader);

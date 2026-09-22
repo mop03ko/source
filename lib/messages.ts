@@ -66,7 +66,7 @@ export async function toggleReaction(kind:'dm'|'team',messageId:string,emoji:str
 // Хамтрагч тус бүрийн сүүлийн мессеж, уншаагүй тоог нэг дороос гаргана (харилцан яриаг жагсаах жагсаалт).
 export async function conversations(email:string){
  const [last,unread]=await Promise.all([
- db().prepare(`SELECT peer,body,created_at,sender,image FROM (SELECT CASE WHEN sender=? THEN recipient ELSE sender END peer,body,created_at,sender,image,ROW_NUMBER() OVER (PARTITION BY CASE WHEN sender=? THEN recipient ELSE sender END ORDER BY created_at DESC) rn FROM messages WHERE sender=? OR recipient=?) WHERE rn=1 ORDER BY created_at DESC`).bind(email,email,email,email).all<{peer:string;body:string;created_at:string;sender:string;image:string|null}>(),
+ db().prepare(`SELECT peer,body,created_at,sender,CASE WHEN image IS NULL THEN NULL ELSE 'image' END image FROM (SELECT CASE WHEN sender=? THEN recipient ELSE sender END peer,body,created_at,sender,image,ROW_NUMBER() OVER (PARTITION BY CASE WHEN sender=? THEN recipient ELSE sender END ORDER BY created_at DESC) rn FROM messages WHERE sender=? OR recipient=?) WHERE rn=1 ORDER BY created_at DESC`).bind(email,email,email,email).all<{peer:string;body:string;created_at:string;sender:string;image:string|null}>(),
  db().prepare('SELECT sender peer,COUNT(*) count FROM messages WHERE recipient=? AND read_at IS NULL GROUP BY sender').bind(email).all<{peer:string;count:number}>()]);
  const unreadMap=new Map(unread.results.map(r=>[r.peer,r.count]));
  return last.results.map(r=>({peer:r.peer,body:r.body,created_at:r.created_at,mine:r.sender===email,unread:unreadMap.get(r.peer)||0,image:r.image}));
@@ -76,7 +76,7 @@ export async function unreadTotal(email:string){
  return r?.total||0;
 }
 export async function thread(email:string,peer:string,before?:string){
- const r=await db().prepare(`SELECT * FROM messages WHERE pair_key=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM messages WHERE id=? AND pair_key=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(pairKey(email,peer),...(before?[before,pairKey(email,peer)]:[])).all<Message>();
+ const r=await db().prepare(`SELECT id,pair_key,sender,recipient,body,created_at,read_at,reply_to_id,reply_to_sender,reply_to_body,CASE WHEN image IS NULL THEN NULL ELSE '/api/messages?kind=dm&image='||id END image FROM messages WHERE pair_key=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM messages WHERE id=? AND pair_key=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(pairKey(email,peer),...(before?[before,pairKey(email,peer)]:[])).all<Message>();
  return attachReactions('dm',r.results.reverse(),email);
 }
 export async function send(sender:string,recipient:string,body:string,replyTo?:ReplySnapshot|null,image?:string|null){
@@ -89,12 +89,12 @@ export async function markRead(email:string,peer:string,through?:string){
 }
 export type TeamMessage={id:string;channel:string;sender:string;body:string;created_at:string;reply_to_id:string|null;reply_to_sender:string|null;reply_to_body:string|null;image:string|null;mentions:string[];mentions_all:boolean;reactions:Reaction[]};
 export async function teamMessages(viewer:string,channel:string,before?:string){
- const r=await db().prepare(`SELECT * FROM team_messages WHERE channel=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM team_messages WHERE id=? AND channel=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(channel,...(before?[before,channel]:[])).all<Omit<TeamMessage,'mentions'|'mentions_all'|'reactions'>&{mentions:string|null;mentions_all:number}>();
+ const r=await db().prepare(`SELECT id,channel,sender,body,created_at,reply_to_id,reply_to_sender,reply_to_body,mentions,mentions_all,CASE WHEN image IS NULL THEN NULL ELSE '/api/messages?kind=team&image='||id END image FROM team_messages WHERE channel=? ${before?'AND (created_at,id)<(SELECT created_at,id FROM team_messages WHERE id=? AND channel=?)':''} ORDER BY created_at DESC,id DESC LIMIT 200`).bind(channel,...(before?[before,channel]:[])).all<Omit<TeamMessage,'mentions'|'mentions_all'|'reactions'>&{mentions:string|null;mentions_all:number}>();
  const rows=r.results.reverse().map(row=>({...row,mentions:row.mentions?JSON.parse(row.mentions) as string[]:[],mentions_all:!!row.mentions_all}));
  return attachReactions('team',rows,viewer);
 }
 export async function lastTeamMessage(channel:string){
- return db().prepare('SELECT sender,body,created_at,image FROM team_messages WHERE channel=? ORDER BY created_at DESC LIMIT 1').bind(channel).first<{sender:string;body:string;created_at:string;image:string|null}>();
+ return db().prepare(`SELECT sender,body,created_at,CASE WHEN image IS NULL THEN NULL ELSE 'image' END image FROM team_messages WHERE channel=? ORDER BY created_at DESC LIMIT 1`).bind(channel).first<{sender:string;body:string;created_at:string;image:string|null}>();
 }
 export async function sendTeam(sender:string,channel:string,body:string,replyTo?:ReplySnapshot|null,image?:string|null,mentions?:string[],mentionsAll?:boolean){
  const id=crypto.randomUUID(),now=new Date().toISOString();
