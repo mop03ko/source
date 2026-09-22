@@ -1,5 +1,5 @@
 import {member,isSameOrigin} from '@/lib/access';
-import {sendSms} from '@/lib/sms';
+import {sendSms,SmsError} from '@/lib/sms';
 import {normalizePhone,isAdminLike} from '@/lib/crm';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
@@ -11,4 +11,4 @@ export async function POST(req:Request){try{
  const b=z.object({to:z.string().transform((v,ctx)=>{try{return normalizePhone(v);}catch{ctx.addIssue({code:z.ZodIssueCode.custom,message:'8 оронтой утасны дугаар оруулна уу.'});return z.NEVER;}}),message:z.string().trim().min(1).max(600)}).parse(JSON.parse(raw));
  const d=await sendSms(b.to,b.message);
  return Response.json({ok:true,...d});
-}catch(e){return Response.json({error:e instanceof z.ZodError?'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.message).join('; '):(e as Error).message},{status:(e as {status?:number}).status||400});}}
+}catch(e){if(e instanceof SmsError)return Response.json({error:e.message,code:e.code,provider_status:e.providerStatus},{status:e.status});return Response.json({error:e instanceof z.ZodError?'Мэдээллээ шалгана уу: '+e.issues.map(i=>i.message).join('; '):(e as Error).message},{status:(e as {status?:number}).status||400});}}

@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const ts=require('typescript');
 const deps={};
 function load(path){const js=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',js)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
-const {sendSms}=load('lib/sms.ts');
+const {sendSms,SmsError}=load('lib/sms.ts');
 const originalFetch=global.fetch,originalKey=process.env.ANTMALL_SMS_API_KEY;
 let calls=[],next=()=>new Response('{}');
 global.fetch=async(url,options)=>{calls.push({url:new URL(url),options});return next();};
@@ -25,11 +25,19 @@ global.fetch=async(url,options)=>{calls.push({url:new URL(url),options});return 
  await assert.rejects(sendSms('99112233',message),e=>!e.message.includes(key)&&e.message.includes('түүх'));
  // The manual route retains role/origin checks and returns only a normalized receipt.
  let role='admin';deps['@/lib/access']={member:async()=>({role}),isSameOrigin:r=>r.headers.get('origin')==='https://crm.test'};
- deps['@/lib/sms']={sendSms};deps['@/lib/crm']=load('lib/crm.ts');const route=load('app/api/sms/route.ts');
+ deps['@/lib/sms']={sendSms,SmsError};deps['@/lib/crm']=load('lib/crm.ts');const route=load('app/api/sms/route.ts');
  const request=(origin='https://crm.test')=>new Request('https://crm.test/api/sms',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({to:'+976 99112233',message})});
  next=()=>new Response(JSON.stringify({success:true,internalSecret:key,recipient:'99112233'}));
  for(role of ['admin','director']){const r=await route.POST(request());assert.equal(r.status,200);assert.deepEqual(await r.json(),{ok:true,success:true});}
  for(role of ['agent','manager','operator','delivery']){const before=calls.length;assert.equal((await route.POST(request())).status,403);assert.equal(calls.length,before);}
  role='admin';assert.equal((await route.POST(request('https://other.test'))).status,403);
+ role='admin';
+ for(const upstream of [401,403,429,500]){
+  next=()=>new Response(JSON.stringify({error:key}),{status:upstream});const before=calls.length;
+  const r=await route.POST(request());assert.equal(r.status,502);const body=await r.json();assert.equal(body.provider_status,upstream);assert.ok(body.code.startsWith('SMS_PROVIDER_'));assert.ok(!JSON.stringify(body).includes(key));assert.equal(calls.length,before+1);
+  if(upstream===403){assert.equal(body.code,'SMS_PROVIDER_FORBIDDEN');assert.ok(body.error.includes('Hosts/IP'));}
+ }
+ next=()=>{throw new DOMException('timeout','TimeoutError');};assert.equal((await route.POST(request())).status,504);
+ delete process.env.ANTMALL_SMS_API_KEY;assert.equal((await route.POST(request())).status,503);
  console.log('PASS: Unitel JSON POST contract, Unicode, encoded key, sanitized receipts/errors, no retries, failure handling and manual SMS permissions. No real SMS sent.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{global.fetch=originalFetch;if(originalKey===undefined)delete process.env.ANTMALL_SMS_API_KEY;else process.env.ANTMALL_SMS_API_KEY=originalKey;});
