@@ -52,7 +52,7 @@ try{
   const email=role==='admin'?'owner@example.test':role+'@example.test';
   const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'google:'+(role==='admin'?'owner':role),email,name:role},maxAge:3600});
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
-  const privileged=['admin','director'].includes(role);
+  const privileged=['admin','director','manager'].includes(role);
   for(const tab of ['items','balance','purchases','sales','moves']){
    await cdp('Page.navigate',{url:base+'/?view=inventory&inv_tab='+tab});
    await wait("!!document.querySelector('.inventory-panel') && !document.querySelector('.inventory-loading') && document.querySelector('.inventory-panel').textContent.includes('Cost visibility item')");
@@ -79,5 +79,5 @@ try{
   assert.equal(direct.includes('Ашиг'),privileged,role+' direct sales profit');assert.ok(!direct.includes('NaN'));
   evidence.checks[role]='cost visibility passed in five inventory views';
  }
- assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));console.log('PASS: admin/director costs retained; manager/agent/operator costs hidden across catalog, detail, balances, purchases, sales and movements; mobile fits.');
+ assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));console.log('PASS: admin/director/manager costs retained; agent/operator costs hidden across catalog, detail, balances, purchases, sales and movements; mobile fits.');
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

@@ -138,7 +138,7 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  const queries=['?view=items','?view=products','?view=items&id='+itemId,'?view=purchases','?view=sales','?view=moves','?view=balance&from=2026-01-01&to=2026-12-31','?view=options'];
  const productId=(await invGet('?view=products&q=DUAL-PRICE'))[1].items[0].id;
  queries.push('?view=products&id='+productId);
- for(const role of ['manager','agent','operator','delivery']){
+ for(const role of ['agent','operator','delivery']){
   user={userId:role==='agent'?'a':role,email:role+'@example.test',displayName:role};
   for(const query of queries)for(const extra of ['', '&export=1','&group=brand','&group=supplier','&group=category','&breakdown=warehouse','&sort=value_desc']){
    const [code,data]=await invGet(query+extra);
@@ -147,7 +147,8 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
   for(const action of ['record_purchase','preview_import','import_opening'])assert.equal((await invPost(action,{}))[0],403);
   if(role!=='delivery'){const data=(await invGet('?view=items&id='+priced[1].id))[1];assert.equal(data.item.sale_price,1100);assert.equal(typeof data.item.stock,'number');}
  }
- for(const role of ['admin','director']){
+ sqlite.prepare("UPDATE members SET role='manager' WHERE email='manager@example.test'").run();
+ for(const role of ['admin','director','manager']){
   user={userId:role==='admin'?'owner-test':role,email:role==='admin'?'owner@example.test':role+'@example.test',displayName:role};
   const data=(await invGet('?view=items&id='+itemId))[1];assert.equal(typeof data.item.value_cents,'number');assert.equal(typeof data.moves[0].unit_cost,'number');
  }

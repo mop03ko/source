@@ -90,4 +90,4 @@ export function canAccessWorkModule(role:string,module:"marketing"|"it"){return 
 export type AssignmentSettings={enabled:boolean;automatic:boolean;days:number;assignments:string[];excluded_emails:string[]};
 export const defaultAssignmentSettings:AssignmentSettings={enabled:true,automatic:true,days:7,assignments:[],excluded_emails:[]};
 
-export const canViewInventoryCost=(role:string)=>role==='admin'||role==='director';
+export const canViewInventoryCost=(role:string)=>role==='admin'||role==='director'||role==='manager';
