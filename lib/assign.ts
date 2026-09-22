@@ -40,3 +40,24 @@ export function createRotation(roster:Candidate[]){
   },
  };
 }
+
+// The preview and actual batch use exactly the same waiting-lead scope.
+export const assignmentWaitingWhere="deleted_at IS NULL AND owner='__sheet_unassigned__' AND created_at>=? AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone)";
+export async function previewAssignment(config:AssignmentSettings){
+ const at=Date.now(),day=ubDay(at),since=new Date(at-config.days*86400000).toISOString();
+ const [roster,count,people]=await Promise.all([
+  dutyRoster(day,config),
+  db().prepare(`SELECT COUNT(*) count FROM leads WHERE ${assignmentWaitingWhere}`).bind(since).first<{count:number}>(),
+  db().prepare(`SELECT m.email,m.name,m.active,w.assignment FROM members m LEFT JOIN work_shifts w ON w.member_email=m.email AND w.day=? WHERE m.role='agent' ORDER BY m.name,m.email`).bind(day).all<{email:string;name:string;active:number;assignment:string|null}>(),
+ ]);
+ const waiting=Number(count?.count||0),batch=Math.min(waiting,200),rotation=createRotation(roster),planned=new Map<string,number>();
+ for(let i=0;i<batch;i++){const next=rotation.next();if(!next)break;planned.set(next.email,(planned.get(next.email)||0)+1);}
+ const unique=new Map<string,{email:string;name:string;active:boolean;assignments:string[]}>();
+ for(const row of people.results){const person=unique.get(row.email)||{email:row.email,name:row.name,active:!!row.active,assignments:[]};if(row.assignment&&!person.assignments.includes(row.assignment))person.assignments.push(row.assignment);unique.set(row.email,person);}
+ const staff=[...unique.values()].map(person=>{
+  const match=roster.find(r=>r.email===person.email),work=person.assignments.filter(a=>!shiftOff.includes(a));
+  const reason=match?'Хамрагдана':!person.active?'Идэвхгүй':!person.assignments.length?'Өнөөдрийн хуваарьгүй':!work.length?'Амралт / чөлөө':config.excluded_emails.includes(person.email)?'Түр алгассан':config.assignments.length&&!work.some(a=>config.assignments.includes(a))?'Томилгоо тохирохгүй':!config.enabled?'Хуваарилалт унтраалттай':'Хамрагдахгүй';
+  return {...person,eligible:!!match,reason,today:match?.today??null,planned:planned.get(person.email)||0};
+ });
+ return {day,since,generated_at:new Date(at).toISOString(),waiting,batch,eligible:roster.length,assigned:roster.length?batch:0,staff};
+}

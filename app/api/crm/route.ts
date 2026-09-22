@@ -16,7 +16,7 @@ import {
   type Lead,
 } from "@/lib/crm";
 import { getSettings } from "@/lib/settings";
-import { getAssignmentSettings, dutyRoster, createRotation, ubDay } from "@/lib/assign";
+import { assignmentWaitingWhere, getAssignmentSettings, dutyRoster, createRotation, ubDay } from "@/lib/assign";
 import { sendSms } from "@/lib/sms";
 export const dynamic = "force-dynamic";
 const db = () => env.DB!;
@@ -773,7 +773,7 @@ export async function POST(req: Request) {
       ).toISOString();
       const waiting = await db()
         .prepare(
-          "SELECT id,version,status FROM leads WHERE deleted_at IS NULL AND owner='__sheet_unassigned__' AND created_at>=? AND status NOT IN ('won','lost','invalid') AND NOT EXISTS(SELECT 1 FROM suppressions WHERE phone=leads.phone) ORDER BY created_at LIMIT 200",
+          `SELECT id,version,status FROM leads WHERE ${assignmentWaitingWhere} ORDER BY created_at LIMIT 200`,
         )
         .bind(since)
         .all<{ id: string; version: number; status: string }>();

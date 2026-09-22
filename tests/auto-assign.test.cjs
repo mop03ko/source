@@ -149,5 +149,19 @@ const ownerOf=(id)=>sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(id)
  await saveConfig({...defaults,days:1});const pastLead=waitingLead(new Date(Date.now()-3*86400000).toISOString());const closedLead=waitingLead(new Date().toISOString());sqlite.prepare("UPDATE leads SET status='won' WHERE id=?").run(closedLead);
  await crmPost('auto_assign',{});assert.equal(ownerOf(pastLead),'__sheet_unassigned__');assert.equal(ownerOf(closedLead),'__sheet_unassigned__');
  await saveConfig({...defaults,days:7});await crmPost('auto_assign',{});assert.notEqual(ownerOf(pastLead),'__sheet_unassigned__');assert.equal(ownerOf(closedLead),'__sheet_unassigned__');
+
+ // Draft previews are read-only, share actual waiting scope, and respect access controls.
+ for(let i=0;i<5;i++)waitingLead(new Date().toISOString());
+ const settingBefore=sqlite.prepare("SELECT value FROM app_settings WHERE key='auto_assignment'").get().value;
+ const ownersBefore=sqlite.prepare('SELECT id,owner,version FROM leads ORDER BY id').all();
+ const previewRequest=async(config,extra={})=>{const response=await settingsRoute.POST(new Request('https://crm.test/api/settings',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({preview_assignment:config,...extra})}));return [response.status,await response.json()];};
+ const [previewStatus,preview]=await previewRequest(defaults);assert.equal(previewStatus,200);assert.equal(preview.eligible,2);assert.ok(preview.waiting>=5);assert.equal(preview.assigned,Math.min(preview.waiting,200));assert.equal(preview.staff.reduce((n,p)=>n+p.planned,0),preview.assigned);
+ assert.ok(preview.staff.find(p=>p.email==='a3@example.test').reason.includes('Амралт'));assert.ok(!preview.staff.some(p=>p.email==='op@example.test'));
+ const excludedPreview=(await previewRequest({...defaults,excluded_emails:['a1@example.test']}))[1];assert.equal(excludedPreview.eligible,1);assert.equal(excludedPreview.staff.find(p=>p.email==='a2@example.test').planned,excludedPreview.assigned);
+ assert.equal((await previewRequest({...defaults,enabled:false}))[1].assigned,0);
+ assert.equal((await previewRequest({...defaults,assignments:['Gotomarket']}))[1].eligible,0);
+ assert.equal((await previewRequest(defaults,{auto_assignment:{...defaults,enabled:false}}))[0],400,'preview cannot also save');
+ assert.equal(sqlite.prepare("SELECT value FROM app_settings WHERE key='auto_assignment'").get().value,settingBefore);assert.deepEqual(sqlite.prepare('SELECT id,owner,version FROM leads ORDER BY id').all(),ownersBefore);
+ user={userId:'op',email:'op@example.test',displayName:'Operator'};assert.equal((await previewRequest(defaults))[0],403);
  console.log('PASS: smart lead assignment — duty roster limited to active sales agents scheduled to work that day (days off, couriers and managers excluded), even round-robin weighted by leads already received today, manager/director/admin-only trigger, assigned leads becoming actionable with an auto_assign audit trail, sheet_links kept in step so a later sync cannot revert the owner, the recent-only window protecting the historical backlog, suppressed numbers skipped, and a sync round-trip that keeps an auto-assigned owner while still unassigning a lead whose named sheet owner stops matching an employee.');
 })().catch(e=>{console.error(e);process.exit(1)});

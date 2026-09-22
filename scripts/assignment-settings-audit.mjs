@@ -1,5 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
-import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
@@ -30,6 +30,10 @@ try{
  const leadFixture=fixture.prepare("INSERT INTO leads(id,name,phone,product,source,owner,status,next_action,created_at,updated_at,op) VALUES(?,?,?,?,?,?,'review','',?,?,?)");
  for(let i=0;i<1001;i++)leadFixture.run('nav-'+i,'Sidebar test',String(90000000+i),'Item','Test','agent@example.test',stamp,stamp,'nav-'+i);
  for(let i=0;i<205;i++)fixture.prepare('INSERT INTO team_messages(id,channel,sender,body,created_at) VALUES(?,?,?,?,?)').run('history-'+String(i).padStart(3,'0'),'all','agent@example.test','History '+i,'2026-01-01T00:00:00.000Z');
+ fixture.prepare("INSERT INTO members(email,name,role,active) VALUES('agent2@example.test','Agent Two','agent',1)").run();
+ const day=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+ for(const email of ['agent@example.test','agent2@example.test'])fixture.prepare('INSERT INTO work_shifts(id,day,person_name,member_email,assignment,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run('shift-'+email,day,email.split('@')[0],email,'Олимпик','','owner@example.test',stamp,stamp);
+ fixture.prepare("UPDATE leads SET owner='__sheet_unassigned__' WHERE id IN ('nav-0','nav-1','nav-2','nav-3','nav-4','nav-5','nav-6')").run();
  fixture.close();
  chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9348','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
  let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9348/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
@@ -50,6 +54,19 @@ try{
 
  await cdp('Page.navigate',{url:base+'/?view=settings'});await wait("!!document.querySelector('[role=tab]')");await click('Системийн тохиргоо','[role=tab]');await wait("!!document.querySelector('[aria-label=\"Ухаалаг хуваарилалтыг идэвхжүүлэх\"]')");
  assert.equal(await evaluate("document.querySelector('[aria-label=\"Ухаалаг хуваарилалтыг идэвхжүүлэх\"]').getAttribute('aria-checked')"),'true');
+ await wait("document.querySelectorAll('.assignment-person').length===2");
+ assert.ok(await evaluate("document.querySelector('[data-email=\"agent2@example.test\"]').textContent.includes('+7')"));
+ await click('3 хоног');await wait("document.querySelector('[aria-label=\"Хуваарилах хүсэлтийн хоног\"]').value==='3'");
+ await wait("!!document.querySelector('[data-email=\"agent2@example.test\"]')");
+ await evaluate("document.querySelector('[aria-label=\"Agent Two ажилтныг түр алгасах\"]').click()");
+ await wait("document.querySelector('[data-email=\"agent2@example.test\"]')?.textContent.includes('Түр алгассан')");
+ assert.ok(await evaluate("document.querySelector('[data-email=\"agent@example.test\"]').textContent.includes('+7')"));
+ const unchanged=new DatabaseSync(join(dir,'test.db'));assert.equal(unchanged.prepare("SELECT COUNT(*) n FROM leads WHERE owner='__sheet_unassigned__'").get().n,7);assert.equal(unchanged.prepare("SELECT value FROM app_settings WHERE key='auto_assignment'").get(),undefined);unchanged.close();
+ await click('Өөрчлөлт цуцлах');await wait("document.querySelector('[data-email=\"agent2@example.test\"]')?.textContent.includes('+7')");assert.equal(await evaluate("document.querySelector('[aria-label=\"Хуваарилах хүсэлтийн хоног\"]').value"),'7');
+ await evaluate(await readFile('node_modules/axe-core/axe.min.js','utf8'));
+ const issues=await evaluate("axe.run(document.querySelector('.assignment-settings'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa','best-practice']}}).then(r=>r.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.failureSummary)})))");assert.deepEqual(issues,[]);
+ await viewport(320);await snap('assignment-interactive-320');await viewport(1440);
+
  await evaluate("document.querySelector('[aria-label=\"Ухаалаг хуваарилалтыг идэвхжүүлэх\"]').click()");await click('Хуваарилалтын тохиргоо хадгалах');await wait("[...document.querySelectorAll('.ant-tag')].some(e=>e.textContent==='Унтраалттай')");
  let response=await fetch(base+'/api/settings',{headers});assert.equal(JSON.parse((await response.json()).auto_assignment).enabled,false);
  await viewport(390);await snap('assignment-settings-mobile');await viewport(1440);
