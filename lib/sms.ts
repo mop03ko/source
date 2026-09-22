@@ -1,36 +1,49 @@
-const API_URL = "https://new.antmall.mn/api/4.0/send_sms";
-// Түлхүүрийг эх кодод хатуу бичихгүй; ANTMALL_SMS_API_KEY орчны хувьсагчаар өгнө (Vercel дээр тохируулна).
+const API_URL = "https://pn.unitel.mn/api/message/send/sms";
+// Server-only secret. The existing environment variable now contains the Unitel enc key.
 export async function sendSms(toNumber: string, message: string) {
-  const key = process.env.ANTMALL_SMS_API_KEY;
+  const key = process.env.ANTMALL_SMS_API_KEY?.trim();
   if (!key) throw new Error("SMS API түлхүүр тохируулаагүй.");
-  const r = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "storefront-api-access-key": key,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      to_number: toNumber,
-      template: "custom_message",
-      variables: { message },
-    }),
-    signal: AbortSignal.timeout(10000),
-  });
-  const raw = await r.text();
-  let d: { success?: boolean; message?: string; messages?: string[] } | null = null;
+  const url = new URL(API_URL);
+  url.searchParams.set("enc", key);
+  let response: Response;
+  let raw: string;
   try {
-    d = JSON.parse(raw);
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ to: toNumber, message }),
+      signal: AbortSignal.timeout(10000),
+      redirect: "error",
+      cache: "no-store",
+    });
+    raw = await response.text();
   } catch {
-    // Нийлүүлэгч JSON бус хариу өгсөн; доорх лог-оор шалтгааныг олно.
+    // Do not expose the request URL (enc), recipient, message, or provider response.
+    // A timeout may occur after acceptance: never automatically retry an SMS.
+    throw new Error("Unitel SMS үйлчилгээний хариу ирсэнгүй. Дахин илгээхээс өмнө илгээлтийн түүхийг шалгана уу.");
   }
-  if (!r.ok || !d?.success) {
-    // Vercel-ийн function log-д бодит хариуг бүтнээр нь үлдээж, шалтгааныг олоход туслана
-    // (жишээ нь буруу дугаарын формат, template тохироогүй г.м нийлүүлэгчийн талын алдаа байж болно).
-    console.error("SMS send failed", r.status, raw.slice(0, 500));
-    // Нийлүүлэгчийн "message" талбар ерөнхий ("Bad Request" гэх мэт) байдаг тул бодит шалтгааг
-    // агуулсан "messages" массивыг байвал давуу тал болгож ашиглана.
-    const detail = d?.messages?.length ? d.messages.join(" ") : d?.message;
-    throw new Error(detail ? `${detail} (${r.status})` : `SMS илгээж чадсангүй (${r.status}).`);
+  if (!response.ok) throw new Error(`Unitel SMS илгээж чадсангүй (HTTP ${response.status}).`);
+  const text = raw.trim();
+  let result: unknown;
+  if (text) {
+    try { result = JSON.parse(text); } catch { result = text; }
+    const acceptedText = (value: string) => /^(ok|success|accepted|sent)$/i.test(value.trim());
+    if (typeof result === "string") {
+      if (!acceptedText(result)) throw new Error("Unitel SMS илгээлтийн хариуг баталгаажуулж чадсангүй. Илгээлтийн түүхийг шалгана уу.");
+    } else if (result && typeof result === "object" && !Array.isArray(result)) {
+      const data = result as Record<string, unknown>;
+      const failed = data.success === false || data.ok === false || !!data.error ||
+        (Array.isArray(data.errors) && data.errors.length > 0) ||
+        (typeof data.status === "string" && /^(error|failed|failure|rejected|unauthorized|forbidden)$/i.test(data.status));
+      const code = data.code ?? data.statusCode ?? (typeof data.status === "number" ? data.status : undefined);
+      const numericCode = typeof code === "number" ? code : typeof code === "string" && /^-?\d+$/.test(code) ? Number(code) : undefined;
+      if (failed || (numericCode !== undefined && numericCode !== 0 && (numericCode < 200 || numericCode >= 300))) {
+        throw new Error("Unitel SMS үйлчилгээ илгээлтийг зөвшөөрсөнгүй. Илгээлтийн түүхийг шалгана уу.");
+      }
+    } else if (result !== true) {
+      throw new Error("Unitel SMS илгээлтийн хариуг баталгаажуулж чадсангүй. Илгээлтийн түүхийг шалгана уу.");
+    }
   }
-  return d;
+  // HTTP acceptance is not a handset delivery receipt. Never return raw provider data.
+  return { success: true };
 }
