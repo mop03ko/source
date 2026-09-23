@@ -20,6 +20,15 @@ type Row={id:string;item_name:string;item_code:string;warehouse_name:string;qty:
 type List={items:Row[];count:number;summary:{revenue_cents:number;profit_cents:number}};
 type Unit={serial:string;barcode:string;note:string};
 const todayUB=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+// Шууд борлуулалтыг бүртгэх нэгдсэн хүсэлт — жагсаалтын панел, "Шинэ хүсэлт" диалог хоёулаа үүнийг дуудна.
+export async function recordDirectSale(data:unknown){
+ const form=document.activeElement?.closest('form')||null;
+ const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'record_sale',data,request_id:crypto.randomUUID()})});
+ const value=await r.json() as {error?:string;fieldErrors?:Record<string,string>;id?:string};
+ if(!r.ok){markFormError(form,value.error||'Хадгалж чадсангүй.',value.fieldErrors);throw new Error(value.error||'Хадгалж чадсангүй.');}
+ markFormSaved(form);
+ return value;
+}
 export default function DirectSalesPanel({me,members}:{me:Member;members:Member[]}){
  const showCost=canViewInventoryCost(me.role);
  const canPickSeller=canManageSchedule(me.role);
@@ -35,11 +44,8 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  const post=async(data:unknown)=>{
   setBusy(true);
   try{
-   const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'record_sale',data,request_id:crypto.randomUUID()})});
-   const d=await r.json() as {error?:string;fieldErrors?:Record<string,string>};
-   const form=document.activeElement?.closest('form')||null;
-   if(!r.ok){markFormError(form,d.error||'Хадгалж чадсангүй.',d.fieldErrors);throw new Error(d.error||'Хадгалж чадсангүй.');}
-   markFormSaved(form);setPage(1);setRevision(v=>v+1);toast.success('Борлуулалт бүртгэгдлээ.');return d;
+   const d=await recordDirectSale(data);
+   setPage(1);setRevision(v=>v+1);toast.success('Борлуулалт бүртгэгдлээ.');return d;
   }catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}
  };
  return <section className="table-panel">
@@ -72,7 +78,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  </DialogContent></Dialog>
  </section>;
 }
-function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Member;sellers:Member[];canPickSeller:boolean;options?:Options;busy:boolean;onSubmit:(d:unknown)=>unknown}){
+export function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Member;sellers:Member[];canPickSeller:boolean;options?:Options;busy:boolean;onSubmit:(d:unknown)=>unknown}){
  const [item,setItem]=useState<Item|null>(null),[warehouse,setWarehouse]=useState('');
  const [qty,setQty]=useState(1),[price,setPrice]=useState(0),[platform,setPlatform]=useState('');
  const [units,setUnits]=useState<Unit[]>([]);
