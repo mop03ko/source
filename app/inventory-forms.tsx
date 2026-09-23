@@ -19,7 +19,7 @@ import {useRemote,readJson} from '@/hooks/use-remote';
 import {fromInput} from '@/lib/crm';
 import {readInventoryFile,type ImportFile} from '@/lib/inventory-workbook';
 
-export type Item={image_url?:string;product_key?:string;barcode?:string;unit_count?:number;single_item_id?:string|null;sale_price_max?:number;cash_price_max?:number;id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
+export type Item={sku?:string;website_stock?:number;image_url?:string;product_key?:string;barcode?:string;unit_count?:number;single_item_id?:string|null;sale_price_max?:number;cash_price_max?:number;id:string;code:string;brand:string;supplier:string;category?:string;name:string;capacity:string;color:string;variant:string;imei:string|null;sale_price:number;cash_price?:number|null;min_stock:number;stock:number;value_cents:number;cost_estimated:number};
 export type Warehouse={id:string;name:string};
 export type Channel={name:string;commission_rate:number;account:string};
 export type Options={warehouses:Warehouse[];brands:{brand:string}[];suppliers?:{supplier:string}[];categories?:{category:string}[];channels:Channel[]};

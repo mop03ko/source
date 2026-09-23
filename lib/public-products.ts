@@ -13,7 +13,7 @@ export const publicProductQuery=z.object({
 }).strict();
 export type PublicProductQuery=z.infer<typeof publicProductQuery>;
 export const publicProductId=z.string().min(1).max(200).regex(/^[A-Za-z0-9_-]+$/);
-type Row={id:string;name:string;brand:string;category:string;capacity:string;color:string;variant:string;image_url:string;stock:number;price_min:number|null;price_max:number|null;cash_min:number|null;cash_max:number|null;site_id:string|null;site_code:string|null};
+type Row={id:string;sku:string;name:string;brand:string;category:string;capacity:string;color:string;variant:string;image_url:string;stock:number;price_min:number|null;price_max:number|null;cash_min:number|null;cash_max:number|null;site_id:string|null;site_code:string|null};
 const cte=`WITH quantities AS (
  SELECT item_id,SUM(qty_delta) qty FROM inventory_stock_moves GROUP BY item_id
 ), products AS (
@@ -29,14 +29,14 @@ const cte=`WITH quantities AS (
  FROM inventory_items i LEFT JOIN quantities q ON q.item_id=i.id WHERE i.active=1
  GROUP BY COALESCE(NULLIF(i.product_key,''),i.id)
 ), public_products AS (
- SELECT p.*,c.id site_id,c.code site_code FROM products p
+ SELECT p.*,printf('ANT-%06d',pc.id) sku,c.id site_id,c.code site_code FROM products p
+ JOIN inventory_product_codes pc ON pc.product_key=p.id
  LEFT JOIN site_stock_links l ON l.product_key=p.id AND l.enabled=1
  LEFT JOIN site_catalog c ON c.id=l.site_id AND c.code=l.site_code
 )`;
-export function publicSku(id:string){return 'CRM-'+id;}
 function imageUrl(raw:string){try{const u=new URL(raw);return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password?u.href:null;}catch{return null;}}
 function dto(r:Row){return {
- id:r.id,sku:publicSku(r.id),name:r.name,brand:r.brand||null,category:r.category||null,
+ id:r.id,sku:r.sku,name:r.name,brand:r.brand||null,category:r.category||null,
  capacity:r.capacity||null,color:r.color||null,variant:r.variant||null,image_url:imageUrl(r.image_url),
  stock:{quantity:Number(r.stock),in_stock:r.stock>0,scope:'all_warehouses'},
  prices:{currency:'MNT',credit:r.price_min===null?null:{min:r.price_min,max:r.price_max},cash:r.cash_min===null?null:{min:r.cash_min,max:r.cash_max}},
@@ -45,7 +45,7 @@ function dto(r:Row){return {
 export async function listPublicProducts(query:PublicProductQuery){
  const conditions:string[]=[],args:(string|number)[]=[];
  // Filtering after grouping avoids returning only part of a product's stock.
- if(query.q){conditions.push('(name LIKE ? OR id=? OR site_code=?)');args.push('%'+query.q.replace(/[\\%_]/g,'\\$&')+'%',query.q.startsWith('CRM-')?query.q.slice(4):query.q,query.q);conditions[conditions.length-1]="(name LIKE ? ESCAPE '\\' OR id=? OR site_code=?)";}
+ if(query.q){conditions.push("(name LIKE ? ESCAPE '\\' OR id=? OR site_code=? OR sku=?)");args.push('%'+query.q.replace(/[\\%_]/g,'\\$&')+'%',query.q.startsWith('CRM-')?query.q.slice(4):query.q,query.q,query.q);}
  if(query.brand){conditions.push('brand=?');args.push(query.brand);}
  if(query.category){conditions.push('category=?');args.push(query.category);}
  if(query.in_stock)conditions.push(query.in_stock==='true'?'stock>0':'stock=0');
@@ -63,7 +63,7 @@ export async function listPublicProducts(query:PublicProductQuery){
 }
 export async function getPublicProduct(id:string){
  const key=id.startsWith('CRM-')?id.slice(4):id;
- const row=await env.DB.prepare(`${cte} SELECT * FROM public_products WHERE id=?`).bind(key).first<Row>();
+ const row=await env.DB.prepare(`${cte} SELECT * FROM public_products WHERE id=? OR sku=?`).bind(key,id).first<Row>();
  return row?{data:dto(row),as_of:new Date().toISOString()}:null;
 }
 export function publicHeaders(){return {

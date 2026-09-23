@@ -34,7 +34,9 @@ async function one(id){const r=await detail.GET(new Request('https://crm.test/ap
  for(let i=0;i<101;i++)item('extra-'+i,'x_'+String(i).padStart(3,'0'),'Other');
  let [r,d]=await get();assert.equal(r.status,200);assert.equal(d.pagination.total,106);assert.equal(d.data.length,25);assert.equal(d.pagination.has_more,true);assert.equal(readTransactions,1);
  assert.equal(r.headers.get('access-control-allow-origin'),'*');assert.equal(r.headers.get('access-control-allow-credentials'),null);assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(r.headers.get('vercel-cdn-cache-control'),'no-store');assert.equal(r.headers.get('vary'),'X-Token');
- [r,d]=await one('p_group');assert.equal(r.status,200);assert.equal(d.data.stock.quantity,5);assert.equal(d.data.sku,'CRM-p_group');assert.equal(d.data.prices.credit.min,1000);assert.equal(d.data.site,null);
+ [r,d]=await one('p_group');assert.equal(r.status,200);assert.equal(d.data.stock.quantity,5);assert.equal(d.data.sku,'ANT-000001');assert.equal(d.data.prices.credit.min,1000);assert.equal(d.data.site,null);
+ assert.deepEqual((await one('ANT-000001'))[1].data,d.data);
+ assert.equal((await get('?q=ANT-000001'))[1].data[0].id,'p_group');
  assert.deepEqual(Object.keys(d.data).sort(),['id','sku','name','brand','category','capacity','color','variant','image_url','stock','prices','site'].sort());
  assert.doesNotMatch(JSON.stringify(d),/PRIVATE|supplier|imei|barcode|unit_cost|value_cents|created_by|actor|warehouse-/i);
  assert.deepEqual((await one('CRM-p_group'))[1].data,d.data);

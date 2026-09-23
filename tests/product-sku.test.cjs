@@ -1,0 +1,18 @@
+const {DatabaseSync}=require('node:sqlite'),fs=require('node:fs'),assert=require('node:assert/strict');
+const db=new DatabaseSync(':memory:');
+for(const file of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')&&f<'0034').sort())db.exec(fs.readFileSync('drizzle/'+file,'utf8'));
+db.exec("INSERT INTO inventory_items(id,code,name,product_key,created_by,created_at,updated_at) VALUES('a','OLD-A','Phone','same','tester','now','now'),('b','OLD-B','Phone','same','tester','now','now'),('c','OLD-C','Other','other','tester','now','now');INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,actor,created_at) VALUES('stock','a','w','opening',3,'tester','now');");
+const itemsBefore=db.prepare('SELECT * FROM inventory_items ORDER BY id').all(),movesBefore=db.prepare('SELECT * FROM inventory_stock_moves').all();
+db.exec(fs.readFileSync('drizzle/0034_unified_product_sku.sql','utf8'));
+assert.equal(db.prepare('SELECT COUNT(*) n FROM inventory_product_codes').get().n,2);
+assert.deepEqual(db.prepare('SELECT * FROM inventory_items ORDER BY id').all(),itemsBefore);assert.deepEqual(db.prepare('SELECT * FROM inventory_stock_moves').all(),movesBefore);
+const sku=key=>db.prepare("SELECT printf('ANT-%06d',id) sku FROM inventory_product_codes WHERE product_key=?").get(key)?.sku;
+const original=sku('same');assert.match(original,/^ANT-\d{6}$/);assert.notEqual(original,sku('other'));
+db.exec("INSERT INTO inventory_items(id,code,name,product_key,created_by,created_at,updated_at) VALUES('d','OLD-D','Phone','same','tester','now','now')");assert.equal(sku('same'),original);assert.equal(db.prepare('SELECT COUNT(*) n FROM inventory_product_codes').get().n,2);
+db.exec("UPDATE inventory_items SET sale_price=200,code='NEW-A' WHERE id='a'");assert.equal(sku('same'),original);
+db.exec("UPDATE inventory_items SET product_key='changed-variant' WHERE id='a'");assert.notEqual(sku('changed-variant'),original);assert.equal(sku('same'),original);
+db.exec("UPDATE inventory_items SET product_key='same' WHERE id='a'");assert.equal(sku('same'),original);
+db.exec("DELETE FROM inventory_items WHERE product_key='other'");const retained=sku('other');assert.ok(retained);
+db.exec("INSERT INTO inventory_items(id,code,name,product_key,created_by,created_at,updated_at) VALUES('legacy','','Legacy','','tester','now','now')");assert.ok(sku('legacy'));assert.notEqual(sku('legacy'),retained);
+assert.deepEqual(db.prepare('SELECT * FROM inventory_stock_moves').all(),movesBefore);
+console.log('PASS: SKU migration preserves inventory and ledger, same-group reuse, variant separation, no recycling, price/code edits, legacy keys and automatic assignment.');

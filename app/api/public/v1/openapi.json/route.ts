@@ -2,7 +2,7 @@ import {authorizePublicApi} from '@/lib/public-api-auth';
 import {publicHeaders} from '@/lib/public-products';
 export const dynamic='force-dynamic';
 const product={type:'object',additionalProperties:false,properties:{
- id:{type:'string'},sku:{type:'string',description:'CRM- plus the existing grouped product key. Stable while group identity is unchanged.'},name:{type:'string'},
+ id:{type:'string'},sku:{type:'string',description:'Persistent ANT-000123 style code per product group. Old CRM-{id} aliases remain accepted for lookup.'},name:{type:'string'},
  ...Object.fromEntries(['brand','category','capacity','color','variant','image_url'].map(k=>[k,{type:['string','null']}])),
  stock:{type:'object',properties:{quantity:{type:'integer',minimum:0},in_stock:{type:'boolean'},scope:{const:'all_warehouses'}}},
  prices:{type:'object',properties:{currency:{const:'MNT'},...Object.fromEntries(['credit','cash'].map(k=>[k,{oneOf:[{type:'null'},{type:'object',properties:{min:{type:'number'},max:{type:'number'}}}]}]))}},
@@ -10,7 +10,7 @@ const product={type:'object',additionalProperties:false,properties:{
 }};
 const error={description:'Request failed. Error responses are not cached.',content:{'application/json':{schema:{type:'object',properties:{error:{type:'object',properties:{code:{type:'string'},message:{type:'string'}}}}}}}};
 export function GET(req:Request){const denied=authorizePublicApi(req);if(denied)return denied;return Response.json({
- openapi:'3.1.0',info:{title:'AntMall Public Products API',version:'1.1.0',description:'Read-only grouped products and stock. A fixed X-Token is required for all GET/HEAD endpoints, including this specification. IMEI, barcode, supplier, cost and customer data are excluded. Responses are not cached. Stock is not a checkout reservation.'},
+ openapi:'3.1.0',info:{title:'AntMall Public Products API',version:'1.2.0',description:'Read-only grouped products and stock. A fixed X-Token is required for all GET/HEAD endpoints, including this specification. IMEI, barcode, supplier, cost and customer data are excluded. Responses are not cached. Stock is not a checkout reservation.'},
  servers:[{url:'https://crm.antmall.mn'}],security:[{XToken:[]}],
  paths:{
   '/api/public/v1/products':{get:{summary:'List active product groups',parameters:[

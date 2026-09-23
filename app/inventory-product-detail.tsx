@@ -1,6 +1,6 @@
 'use client';
 import {useInventoryCost} from '@/components/inventory-cost-access';
-import {Descriptions,Pagination,Tag} from 'antd';
+import {Alert,Descriptions,Pagination,Tag,Typography} from 'antd';
 import {useDebouncedValue} from '@/hooks/use-debounced-value';
 import {useIsMobile} from '@/hooks/use-mobile';
 import {useEffect,useRef,useState} from 'react';
@@ -11,7 +11,7 @@ import {Button} from '@/components/ui/button';
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from '@/components/ui/sheet';
 import {Table,TableHeader,TableHead,TableBody,TableRow,TableCell} from '@/components/ui/table';
 import {cash,type Item} from './inventory-forms';
-type ProductDetail={product:Item;items:Item[];count:number;history:{id:string;serial:string;barcode:string;source:string;created_at:string}[]};
+type ProductDetail={product:Item;items:Item[];count:number;history:{id:string;serial:string;barcode:string;source:string;created_at:string}[];website?:{site_id:string;site_code:string;enabled:number;last_qty:number|null;last_synced_at:string|null;last_error:string}|null};
 export default function InventoryProductDetail({id,initialProduct,open=true,revision,warehouse,onClose,onOpenUnit,onAdd}:{id:string;initialProduct:Item;open?:boolean;revision:number;warehouse:string;onClose:()=>void;onOpenUnit:(id:string)=>void;onAdd:(item:Item)=>void}){
  const showCost=useInventoryCost();
  const [q,setQ]=useState(''),[page,setPage]=useState(1);
@@ -22,14 +22,20 @@ export default function InventoryProductDetail({id,initialProduct,open=true,revi
  const p=result.data?.product||initialProduct;
  return <Sheet open={open} onOpenChange={o=>{if(!o)onClose();}}><SheetContent className="detail-sheet inventory-product-detail"><SheetHeader><SheetTitle>{p?.name||'Барааны бүртгэл'}</SheetTitle><SheetDescription>Ижил загвар, багтаамж, өнгөтэй бараа · Доторх дугаарын бүртгэлүүд</SheetDescription></SheetHeader><div className="detail-body"><AsyncStatus error={result.error} loading={result.loading} retry={result.retry}/>{p&&<>
   <Descriptions bordered size="small" column={1} items={[
+   {key:'product',label:'Бараа',children:p.name},
+   {key:'sku',label:'Нэгдсэн SKU',children:p.sku?<Typography.Text code copyable>{p.sku}</Typography.Text>:'Ачаалж байна…'},
    {key:'brand',label:'Брэнд / ангилал',children:[p.brand,p.category].filter(Boolean).join(' / ')||'—'},
-   {key:'variant',label:'Багтаамж / өнгө / хувилбар',children:[p.capacity,p.color,p.variant].filter(Boolean).join(' / ')||'—'},
+   {key:'variant',label:'Хувилбар',children:[p.capacity,p.color,p.variant].filter(Boolean).join(' · ')||'Бүртгээгүй'},
+   {key:'devices',label:'Доторх төхөөрөмжүүд',children:`${p.unit_count??0} бүртгэл · IMEI / баркодыг доороос харна`},
+   {key:'website_stock',label:'Сайтад дамжуулах үлдэгдэл',children:p.website_stock===undefined?'Ачаалж байна…':<strong>{p.website_stock.toLocaleString()} ширхэг</strong>},
+   {key:'site',label:'Сайт дээрх үлдэгдэл',children:result.data?.website?.last_synced_at?<><strong>{result.data.website.last_qty} ширхэг</strong><div>Сүүлд баталгаажсан: {new Date(result.data.website.last_synced_at).toLocaleString('mn-MN',{timeZone:'Asia/Ulaanbaatar'})}</div></>:'Сайтаас баталгаажаагүй'},
    {key:'stock',label:warehouse?'Сонгосон агуулахын үлдэгдэл':'Нийт үлдэгдэл',children:`${p.stock} ш · ${p.unit_count} дугаарын бүртгэл`},
    {key:'price',label:'Үндсэн үнэ',children:cash(p.sale_price)+(p.sale_price_max!==p.sale_price?' — '+cash(p.sale_price_max||0):'')},
    ...(showCost?[{key:'value',label:'Үлдэгдлийн өртөг',children:cash(p.value_cents/100)}]:[]),
   ]}/>
+  <Alert type="info" showIcon title="Нэг SKU · олон төхөөрөмж" description="Ижил загвар, багтаамж, өнгө, төлөвийн бүртгэлүүд нэг SKU-тай. Сайтад дамжуулах тоо нь бүх агуулахын идэвхтэй бүртгэлийн нийлбэр. IMEI нь төхөөрөмж тус бүрийн дотоод дугаар бөгөөд Public API-д гарахгүй."/>
   <div className="inventory-product-actions"><Button onClick={()=>onAdd(p)}>Энэ бараанд дугаар нэмэх</Button></div>
-  <h3>Баркод / IMEI / сериал</h3><p className="muted">Дугаараа нээгээд тухайн бүртгэлийн агуулах, хөдөлгөөн, үнийг харж, орлого/зарлага бүртгэнэ. Нэг мөр олон ширхэгтэй бол тоо нь тусдаа харагдана.</p>
+  <h3>Доторх төхөөрөмжүүд · IMEI / баркод</h3><p className="muted">Дугаараа нээгээд тухайн бүртгэлийн агуулах, хөдөлгөөн, үнийг харж, орлого/зарлага бүртгэнэ. Нэг мөр олон ширхэгтэй бол тоо нь тусдаа харагдана.</p>
   <Input aria-label="Барааны дотор дугаар хайх" placeholder="IMEI, баркод, код, нийлүүлэгчээр хайх" value={q} onChange={e=>{setQ(e.target.value);setPage(1);}}/>
   {mobile?<div className="inventory-cards">{result.data?.items.map(it=><article className="inventory-product-card" key={it.id}><button className="inventory-unit-link" onClick={()=>openUnit(it.id)}><strong>{it.imei||it.barcode||it.code}</strong><small>Код: {it.code}</small></button><Descriptions size="small" column={1} items={[{key:'stock',label:'Үлдэгдэл',children:it.stock+' ш'},{key:'price',label:'Үндсэн / бэлэн',children:cash(it.sale_price)+' / '+cash(it.cash_price??it.sale_price)},{key:'supplier',label:'Нийлүүлэгч',children:it.supplier||'Тодорхойгүй'}]}/><Button variant="ghost" onClick={async()=>{try{await navigator.clipboard.writeText(it.imei||it.barcode||it.code);}catch{ /* Identifier remains selectable on clipboard failure. */ }}}>Дугаар хуулах</Button></article>)}</div>:<div className="table-scroll"><Table><TableHeader><TableRow>{['ДУГААР','НИЙЛҮҮЛЭГЧ','ҮЛДЭГДЭЛ','ҮНЭ'].map(h=><TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{result.data?.items.map(it=><TableRow key={it.id}><TableCell><button className="inventory-unit-link" onClick={()=>openUnit(it.id)}><strong>{it.imei||it.barcode||it.code}</strong><small>IMEI/сериал: {it.imei||'—'}</small><small>Баркод: {it.barcode||'—'}</small><small>Код: {it.code||'—'}</small></button></TableCell><TableCell>{it.supplier||'Бүртгээгүй'}</TableCell><TableCell><Tag color={it.stock>0?'green':'default'}>{it.stock} ш</Tag></TableCell><TableCell>{cash(it.sale_price)}<small>Бэлэн: {cash(it.cash_price??it.sale_price)}</small></TableCell></TableRow>)}</TableBody></Table></div>}
   {!result.loading&&!result.error&&result.data&&!result.data.items.length&&<p className="muted">Тохирох дугаар олдсонгүй.</p>}<Pagination current={page} total={result.data?.count||0} pageSize={50} showSizeChanger={false} onChange={setPage} hideOnSinglePage/>

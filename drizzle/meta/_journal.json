@@ -239,6 +239,13 @@
       "when": 1790131977896,
       "tag": "0033_site_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1790134146384,
+      "tag": "0034_unified_product_sku",
+      "breakpoints": true
     }
   ]
 }
