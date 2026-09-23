@@ -232,6 +232,13 @@
       "when": 1789987189212,
       "tag": "0032_silly_darwin",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1790131977896,
+      "tag": "0033_site_stock",
+      "breakpoints": true
     }
   ]
 }
