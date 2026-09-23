@@ -7,20 +7,33 @@ const DB={prepare:s=>new Statement(s)};
 const deps={'./runtime':{env:{DB}},'./database':{getClient:()=>({transaction:async mode=>{assert.equal(mode,'read');readTransactions++;return {execute:async({sql,args})=>{if(failed)throw Error('private SQL and token');return {rows:sqlite.prepare(sql).all(...args)};},commit:async()=>{},rollback:async()=>{},close:()=>{},closed:false};}})}};
 function load(p){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(p,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id=>{if(deps[id])return deps[id];assert.ok(!/session|access/.test(id),'public endpoint must not load sessions');return require(id);},m,m.exports);return m.exports;}
 const lib=load('lib/public-products.ts');deps['@/lib/public-products']=lib;
+deps['./public-products']=lib;
+const auth=load('lib/public-api-auth.ts'),testToken='unit-test-public-token',digest=require('node:crypto').createHash('sha256').update(testToken).digest('hex');
+deps['@/lib/public-api-auth']={authorizePublicApi:req=>auth.authorizePublicApi(req,digest)};
+const headers={'X-Token':testToken};
 const list=load('app/api/public/v1/products/route.ts'),detail=load('app/api/public/v1/products/[id]/route.ts'),spec=load('app/api/public/v1/openapi.json/route.ts');
 const insert=sqlite.prepare("INSERT INTO inventory_items(id,code,name,brand,category,capacity,color,variant,imei,barcode,supplier,product_key,sale_price,cash_price,image_url,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'now','now')");
 function item(id,key,name,active=1,price=1000,cash=900){insert.run(id,'PRIVATE-CODE-'+id,name,'APPLE','Phone','256GB','Blue','New','PRIVATE-IMEI-'+id,'PRIVATE-BARCODE','PRIVATE-SUPPLIER',key,price,cash,'https://cdn.example.test/a.jpg',active,'PRIVATE-EMAIL');}
 function move(id,item,qty){sqlite.prepare("INSERT INTO inventory_stock_moves(id,item_id,warehouse_id,kind,qty_delta,unit_cost,value_cents,note,actor,created_at) VALUES(?,?,?,'opening',?,123,12300,'PRIVATE-NOTE','PRIVATE-ACTOR','now')").run(id,item,'warehouse-'+id,qty);}
-async function get(query=''){const r=await list.GET(new Request('https://crm.test/api/public/v1/products'+query));return [r,await r.json()];}
-async function one(id){const r=await detail.GET(new Request('https://crm.test/api/public/v1/products/'+id),{params:Promise.resolve({id})});return [r,await r.json()];}
+async function get(query=''){const r=await list.GET(new Request('https://crm.test/api/public/v1/products'+query,{headers}));return [r,await r.json()];}
+async function one(id){const r=await detail.GET(new Request('https://crm.test/api/public/v1/products/'+id,{headers}),{params:Promise.resolve({id})});return [r,await r.json()];}
 (async()=>{
+ for(const h of [{},{'X-Token':'bad'},{'Authorization':'Bearer '+testToken},{'X-Token':'x'.repeat(257)}]){
+  const req=new Request('https://crm.test/api/public/v1/products?token='+testToken,{headers:h});
+  assert.equal((await list.GET(req)).status,401);
+  assert.equal((await detail.GET(req,{params:Promise.resolve({id:'p_group'})})).status,401);
+  assert.equal(spec.GET(req).status,401);
+ }
+ assert.equal(readTransactions,0,'unauthorized requests must not query inventory');
+ assert.equal(auth.authorizePublicApi(new Request('https://crm.test',{headers:{'x-token':testToken}}),digest),null,'header names are case insensitive');
+ assert.equal(auth.authorizePublicApi(new Request('https://crm.test',{headers:{'X-Token':testToken.toUpperCase()}}),digest).status,401);
  item('a','p_group','iPhone');item('b','p_group','iPhone extra');item('inactive','p_group','PRIVATE-INACTIVE',0);move('m1','a',3);move('m2','b',2);move('m3','inactive',20);
  item('zero','p_zero','Zero');item('negative','p_negative','Negative');move('m4','negative',-1);
  item('hidden','p_hidden','Hidden',0);move('m5','hidden',9);
  item('missing-price','p_missing','Incomplete',1,0,null);item('escaped','p_escaped','100% test');
  for(let i=0;i<101;i++)item('extra-'+i,'x_'+String(i).padStart(3,'0'),'Other');
  let [r,d]=await get();assert.equal(r.status,200);assert.equal(d.pagination.total,106);assert.equal(d.data.length,25);assert.equal(d.pagination.has_more,true);assert.equal(readTransactions,1);
- assert.equal(r.headers.get('access-control-allow-origin'),'*');assert.equal(r.headers.get('access-control-allow-credentials'),null);assert.equal(r.headers.get('cache-control'),'public, max-age=0, s-maxage=15');
+ assert.equal(r.headers.get('access-control-allow-origin'),'*');assert.equal(r.headers.get('access-control-allow-credentials'),null);assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(r.headers.get('vercel-cdn-cache-control'),'no-store');assert.equal(r.headers.get('vary'),'X-Token');
  [r,d]=await one('p_group');assert.equal(r.status,200);assert.equal(d.data.stock.quantity,5);assert.equal(d.data.sku,'CRM-p_group');assert.equal(d.data.prices.credit.min,1000);assert.equal(d.data.site,null);
  assert.deepEqual(Object.keys(d.data).sort(),['id','sku','name','brand','category','capacity','color','variant','image_url','stock','prices','site'].sort());
  assert.doesNotMatch(JSON.stringify(d),/PRIVATE|supplier|imei|barcode|unit_cost|value_cents|created_by|actor|warehouse-/i);
@@ -43,8 +56,9 @@ async function one(id){const r=await detail.GET(new Request('https://crm.test/ap
  sqlite.exec("UPDATE inventory_items SET image_url='javascript:alert(1)' WHERE product_key='p_group'");assert.equal((await one('p_group'))[1].data.image_url,null);
  move('sale','a',-3);move('sale2','b',-2);assert.equal((await one('p_group'))[1].data.stock.quantity,0,'new stock moves visible immediately in origin');
  const before=sqlite.prepare('SELECT total_changes() n').get().n;await get();await one('p_group');assert.equal(sqlite.prepare('SELECT total_changes() n').get().n,before,'public reads must not mutate');
- failed=true;[r,d]=await get();assert.equal(r.status,503);assert.equal(r.headers.get('cache-control'),'no-store');assert.doesNotMatch(JSON.stringify(d),/private SQL|token/);assert.equal((await one('p_group'))[0].status,503);failed=false;
+ failed=true;[r,d]=await get();assert.equal(r.status,503);assert.equal(r.headers.get('cache-control'),'private, no-store');assert.doesNotMatch(JSON.stringify(d),/private SQL|token/);assert.equal((await one('p_group'))[0].status,503);failed=false;
  assert.equal(list.OPTIONS().status,204);assert.equal(detail.OPTIONS().headers.get('access-control-allow-origin'),'*');
- const openapi=await spec.GET().json();assert.equal(openapi.openapi,'3.1.0');assert.deepEqual(openapi.security,[]);assert.ok(openapi.paths['/api/public/v1/products/{id}']);
- console.log('PASS: public no-auth read-only catalog, exact DTO privacy, grouped stock, zero/inactive products, SKU, site links, pagination, filters, input validation, CORS, cache and sanitized errors.');
+ assert.match(list.OPTIONS().headers.get('access-control-allow-headers'),/X-Token/);assert.equal(spec.OPTIONS().status,204);
+ const openapi=await spec.GET(new Request('https://crm.test/api/public/v1/openapi.json',{headers})).json();assert.equal(openapi.openapi,'3.1.0');assert.deepEqual(openapi.security,[{XToken:[]}]);assert.equal(openapi.components.securitySchemes.XToken.name,'X-Token');assert.ok(openapi.paths['/api/public/v1/products/{id}']);
+ console.log('PASS: fixed X-Token auth on all data/spec routes, rejection before DB access, CORS preflight, no shared cache, exact DTO privacy, grouped stock, zero/inactive products, SKU, site links, pagination, filters and sanitized errors.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -66,10 +66,12 @@ export async function getPublicProduct(id:string){
  const row=await env.DB.prepare(`${cte} SELECT * FROM public_products WHERE id=?`).bind(key).first<Row>();
  return row?{data:dto(row),as_of:new Date().toISOString()}:null;
 }
-export function publicHeaders(cache=false){return {
+export function publicHeaders(){return {
  'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS',
- 'Access-Control-Allow-Headers':'Accept, Content-Type','Access-Control-Max-Age':'86400',
- 'Cache-Control':cache?'public, max-age=0, s-maxage=15':'no-store',
+ 'Access-Control-Allow-Headers':'Accept, Content-Type, X-Token','Access-Control-Max-Age':'86400',
+ 'Cache-Control':'private, no-store',
+ 'CDN-Cache-Control':'no-store','Vercel-CDN-Cache-Control':'no-store',
+ 'Vary':'X-Token',
  'X-Content-Type-Options':'nosniff',
 };}
 export function publicError(status:number,code:string,message:string){return Response.json({error:{code,message}},{status,headers:publicHeaders()});}
