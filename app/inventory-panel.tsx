@@ -31,12 +31,13 @@ import {canViewInventoryCost,canEditInventoryItem,dateLabel,type Member} from '@
 import {toast} from '@/components/ui/sonner';
 import dynamic from 'next/dynamic';
 import type {BalanceCategory,BalanceView,BalanceDimension} from './inventory-balance-report';
+const InventorySheetPanel=dynamic(()=>import('./inventory-sheet-panel'),{loading:()=> <Skeleton active/>});
 const InventoryBalanceReport=dynamic(()=>import('./inventory-balance-report'),{loading:()=> <p className="inventory-note" role="status">Тайлангийн график бэлтгэж байна…</p>});
 import InventoryProductDetail from './inventory-product-detail';
 import InventoryCountsPanel from './inventory-counts-panel';
 import {ItemForm,MovementForm,ImportForm,cash,type Item,type Options,type Detail,type Post} from './inventory-forms';
 
-type Mode='items'|'balance'|'purchases'|'sales'|'moves'|'counts';
+type Mode='items'|'balance'|'purchases'|'sales'|'moves'|'counts'|'sheet_sync';
 type Row=Item&{created_by?:string;ref_id?:string;item_id:string;item_name:string;item_code:string;warehouse_name:string;qty:number;qty_delta:number;unit_cost:number;total_cost:number;total_price:number;cost_cents:number;commission_cents:number;tax_cents:number;profit_cents:number;status:string;returned_qty:number;order_number:string;bill_number:string;payment_status:string;platform:string;customer_name:string;customer_phone:string;account:string;vat_issued:number;created_at:string;occurred_at:string;received_at:string|null;sold_at:string|null;opening_qty:number;opening_cents:number;in_qty:number;in_cents:number;out_qty:number;out_cents:number;kind:string;note:string};
 type Group=Partial<Row>&{label:string;item_count:number;stock:number;value_cents:number;revenue_cents:number};
 type List={report?:{categories:BalanceCategory[];breakdown:BalanceCategory[]};items:Row[];groups?:Group[];count:number;summary:Record<string,number>;truncated?:boolean};
@@ -49,12 +50,13 @@ const StockTag=({item}:{item:Item})=><Tag color={item.stock<=0?'default':item.st
 const modalTitle={item:'Барааны бүртгэл',warehouse:'Агуулах / салбар нэмэх',purchase:'Худалдан авалт бүртгэх',sale:'Борлуулалт бүртгэх',transfer:'Агуулах хооронд шилжүүлэх',return:'Нийлүүлэгчид буцаах',import:'Excel-ээс эхний үлдэгдэл импортлох',settings:'Платформын шимтгэл, данс'};
 
 export default function InventoryPanel({me,members}:{me:Member;members:Member[]}){
+ const visibleModes=canViewInventoryCost(me.role)?[...modes,{id:'sheet_sync' as const,label:'Sheet синк',icon:Settings2}]:modes;
  const showCost=canViewInventoryCost(me.role);
  const costLabel=(label:string)=>/өртөг|ашиг/i.test(label);
  const query=useInventoryQuery(),catalogPrefs=useCatalogPreferences(me.email+':'+me.role);
  const [bulk,setBulk]=useState<{scope:'products'|'items';ids:string[]}|null>(null),[actionTarget,setActionTarget]=useState<{action:InventoryRowAction;item:Item}|null>(null),[opening,setOpening]=useState(false);
  const scanSequence=useRef(0);
- const mode=(modes.some(m=>m.id===query.get('tab'))?query.get('tab'):'items') as Mode;
+ const mode=(visibleModes.some(m=>m.id===query.get('tab'))?query.get('tab'):'items') as Mode;
  const setMode=(v:Mode)=>{scanSequence.current++;setOpening(false);query.set('tab',v,true);};
  const q=query.get('q'),setQ=(v:string)=>query.set('q',v),searchQ=useDebouncedValue(q);
  const warehouse=query.get('warehouse'),setWarehouse=(v:string)=>query.set('warehouse',v);
@@ -88,7 +90,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  if(mode==='purchases')params.set('status',status);
  if(mode==='moves'){params.set('kind',movementKind);params.set('ref_id',query.get('ref'));}
  if(mode!=='items'){params.set('from',from);params.set('to',to);}
- const url='/api/inventory?'+params,list=useRemote<List>(mode==='counts'?null:url);
+ const url='/api/inventory?'+params,list=useRemote<List>(mode==='counts'||mode==='sheet_sync'?null:url);
  const detail=useRemote<Detail>(detailId?'/api/inventory?view=items&id='+encodeURIComponent(detailId)+'&revision='+revision:null);
  const summary=list.data?.summary,rows=list.data?.items||[],total=list.data?.count||0;
  const selectable=mode==='items'&&!grouped;
@@ -148,7 +150,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
    const blob=URL.createObjectURL(new Blob([toCsv(headers,values)],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=blob;a.download=`inventory-${mode}-${today}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000);
   }catch(e){toast.error((e as Error).message);}finally{setExporting(false);}
  };
- const content=(mode==='counts'?<InventoryCountsPanel me={me} members={members}/>:<>
+ const content=(mode==='sheet_sync'?<InventorySheetPanel onSynced={()=>setRevision(v=>v+1)}/>:mode==='counts'?<InventoryCountsPanel me={me} members={members}/>:<>
    <AsyncStatus error={options.error} loading={options.loading} retry={options.retry}/>
    {!grouped&&summary&&mode==='items'&&<MobileDisclosure label="Агуулахын үзүүлэлт"><div className="metrics inventory-metrics">{[[catalog?'Бүтээгдэхүүн':'Дугаарын бүртгэл',summary.count],['Үлдэгдэл (ш)',summary.units],['Өртөг',cash(summary.value_cents/100)],['Үлдэгдэлгүй',summary.empty_stock],['Нөхөн татах',summary.reorder_stock]].filter(([label])=>showCost||!costLabel(String(label))).map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></MobileDisclosure>}
    {!grouped&&summary&&mode==='sales'&&<MobileDisclosure label="Агуулахын үзүүлэлт"><div className="metrics inventory-metrics">{[['Борлуулалт',summary.revenue_cents],['Борлуулсан өртөг',summary.cost_cents],['Шимтгэл + татвар',summary.commission_cents+summary.tax_cents],['Ашиг',summary.profit_cents]].filter(([label])=>showCost||!costLabel(String(label))).map(([label,value])=><div className="metric" key={label}><span>{label}</span><strong>{cash(Number(value)/100)}</strong></div>)}</div></MobileDisclosure>}
@@ -198,8 +200,8 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
    {!grouped&&(mode!=='balance'||balanceView!=='charts')&&<ListPagination page={page} total={total} loading={list.loading} onChange={setPage} pageSize={50} label="бүртгэл"/>}
   </>);
  return <InventoryCostAccess.Provider value={showCost}><section className="table-panel inventory-panel">
-  <div className="inventory-heading"><div><h2>{modes.find(m=>m.id===mode)?.label}</h2></div><div className="row inventory-actions">{mode==='items'&&<Button onClick={()=>setModal({kind:'item'})}><Plus size={16}/>Бараа нэмэх</Button>}<Dropdown trigger={['click']} menu={{items:[{key:'warehouse',label:'Агуулах / салбар нэмэх'},...(canManage?[...(showCost?[{key:'import',label:'Эхний үлдэгдэл импортлох'}]:[]),{key:'settings',label:'Платформ / шимтгэл / данс'}]:[])],onClick:({key})=>setModal({kind:key as 'warehouse'|'import'|'settings'})}}><Button variant="outline" aria-label="Агуулахын тохиргоо"><Settings2 size={16}/><span>Агуулахын тохиргоо</span></Button></Dropdown></div></div>
-  <Tabs className="inventory-tabs" activeKey={mode} onChange={key=>{if(allow())setMode(key as Mode);}} items={modes.map(({id,label,icon:Icon})=>({key:id,label:<span className="row"><Icon size={16}/>{label}</span>,children:mode===id?content:null}))}/>
+  <div className="inventory-heading"><div><h2>{visibleModes.find(m=>m.id===mode)?.label}</h2></div><div className="row inventory-actions">{mode==='items'&&<Button onClick={()=>setModal({kind:'item'})}><Plus size={16}/>Бараа нэмэх</Button>}<Dropdown trigger={['click']} menu={{items:[{key:'warehouse',label:'Агуулах / салбар нэмэх'},...(canManage?[...(showCost?[{key:'import',label:'Эхний үлдэгдэл импортлох'}]:[]),{key:'settings',label:'Платформ / шимтгэл / данс'}]:[])],onClick:({key})=>setModal({kind:key as 'warehouse'|'import'|'settings'})}}><Button variant="outline" aria-label="Агуулахын тохиргоо"><Settings2 size={16}/><span>Агуулахын тохиргоо</span></Button></Dropdown></div></div>
+  <Tabs className="inventory-tabs" activeKey={mode} onChange={key=>{if(allow())setMode(key as Mode);}} items={visibleModes.map(({id,label,icon:Icon})=>({key:id,label:<span className="row"><Icon size={16}/>{label}</span>,children:mode===id?content:null}))}/>
   {bulk&&canEditItem&&<InventoryBulkEdit {...bulk} post={post} busy={busy} onClose={()=>setBulk(null)} onDone={updated=>{setBulk(null);selection.clear();toast.success(updated+' дугаарын мэдээлэл шинэчиллээ.');}}/>}
   <Dialog open={!!actionTarget} onOpenChange={open=>{if(!open&&!opening)setActionTarget(null);}}><DialogContent width={1000} className="inventory-unit-choice"><DialogHeader><DialogTitle>Үйлдэл хийх дугаараа сонгоно уу</DialogTitle><DialogDescription>Барааны зөв IMEI, баркод, кодыг шалгаад сонгоно.</DialogDescription></DialogHeader>{actionTarget&&<InventoryRowDetail item={actionTarget.item} warehouse={warehouse} revision={revision} canEdit={canEditItem} chooseAction={actionTarget.action} onOpen={id=>{setActionTarget(null);setDetailId(id);}} onAction={(action,item)=>void rowAction(action,item)}/>}</DialogContent></Dialog>
   {product&&<InventoryProductDetail key={product.id} id={product.id} initialProduct={product} open={!detailId&&!modal} revision={revision} warehouse={warehouse} onClose={()=>setProduct(null)} onOpenUnit={id=>setDetailId(id)} onAdd={p=>{setModal({kind:'item',template:{...p,id:'',code:'',barcode:'',imei:null,supplier:p.supplier==='Олон нийлүүлэгч'?'':p.supplier,category:p.category==='Олон ангилал'?'':p.category,min_stock:0}});}}/>}
