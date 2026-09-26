@@ -13,7 +13,7 @@ deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps[
 async function crmGet(query=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()];}
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function invGet(query=''){const r=await invRoute.GET(new Request('https://crm.test/api/inventory'+query));return [r.status,await r.json()];}
-async function invPost(action,data,id,request_id){const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id})}));return [r.status,await r.json()];}
+async function invPost(action,data,id,request_id=crypto.randomUUID()){const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id})}));return [r.status,await r.json()];}
 (async()=>{
  await crmGet(); // bootstrap owner as admin
  assert.equal((await crmPost('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
@@ -46,6 +46,10 @@ async function invPost(action,data,id,request_id){const r=await invRoute.POST(ne
  assert.equal((await invPost('record_sale',{item_id:itemId,warehouse_id:whId,qty:6,unit_price:1000000}))[0],409);
  [status,d]=await invPost('record_sale',{item_id:itemId,warehouse_id:whId,qty:2,unit_price:1000000,customer_name:'Бат',customer_phone:'99001122'});
  assert.equal(status,200);
+ assert.equal(d.status,'pending');
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ assert.equal((await invPost('approve_sale',{},d.id))[0],200);
+ user={userId:'a',email:'agent@example.test',displayName:'Agent'};
  [status,d]=await invGet('?view=items&id='+itemId);assert.equal(d.byWarehouse.find(w=>w.warehouse_id===whId).qty,3);assert.equal(d.moves.length,2);
  [status,d]=await invGet('?view=purchases');assert.equal(status,200);assert.equal(d.count,1);assert.equal(d.items[0].item_name,'CUCKOO STICK GUN');
  [status,d]=await invGet('?view=sales');assert.equal(status,200);assert.equal(d.count,1);assert.equal(d.items[0].customer_name,'Бат');

@@ -3,7 +3,7 @@ import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {canViewInventoryCost,canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
 import {z} from 'zod';
-import {unitsSchema,saveUnits} from '@/lib/serials';
+import {unitsSchema,saveUnits,duplicateUnits} from '@/lib/serials';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey,planInventoryBulkEdit} from '@/lib/inventory';
 import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
@@ -26,6 +26,16 @@ export async function GET(req:Request){try{
  const m=await member();access(m);
  const json=(value:unknown)=>Response.json(inventoryForRole(value,m.role),{headers:{'Cache-Control':'no-store'}});
  const p=new URL(req.url).searchParams,view=p.get('view')||'items';
+ if(view==='sale_requests'){
+  if(!['admin','director','manager','agent','operator'].includes(m.role))throw new Failure('Хандах эрхгүй.',403);
+  const status=z.enum(['pending','approved','rejected']).parse(p.get('status')||'pending');
+  const page=Math.max(1,Math.floor(Number(p.get('page'))||1));
+  const scoped=canManageSchedule(m.role)?'':' AND r.requester=?',args=canManageSchedule(m.role)?[status]:[status,m.email];
+  const total=await db().prepare('SELECT COUNT(*) n FROM direct_sale_requests r WHERE r.status=?'+scoped).bind(...args).first<{n:number}>();
+  const rows=await db().prepare(`SELECT r.*,m.name requester_name FROM direct_sale_requests r LEFT JOIN members m ON m.email=r.requester WHERE r.status=?${scoped} ORDER BY r.created_at DESC,r.id LIMIT 25 OFFSET ?`).bind(...args,(page-1)*25).all<{id:string;payload:string}>();
+  const items=await Promise.all(rows.results.map(async r=>{const payload=JSON.parse(r.payload);return {...r,payload,serialWarnings:status==='pending'?await duplicateUnits(db(),{source:'sale',refId:r.id},unitsSchema.parse(payload.units)):[]};}));
+  return json({items,count:total?.n||0});
+ }
  if(!canViewInventoryCost(m.role)&&p.get('sort')==='value_desc')p.set('sort','name');
  const page=Math.max(1,Math.min(10000,Math.floor(Number(p.get('page'))||1))),limit=p.get('export')==='1'?5000:50;
  const q=(p.get('q')||'').trim().slice(0,200),warehouse=p.get('warehouse_id')||'',brand=p.get('brand')||'',supplier=p.get('supplier')||'',category=p.get('category')||'';
@@ -151,7 +161,7 @@ export async function GET(req:Request){try{
  throw new Failure('Тодорхойгүй харагдац.');
 }catch(e){return error(e);}}
 
-const bodySchema=z.object({action:z.enum(['create_item','update_item','preview_bulk_items','bulk_update_items','create_warehouse','record_purchase','receive_purchase','return_purchase','record_sale','transfer','save_channel','preview_import','import_opening']),id:z.string().max(100).optional(),request_id:z.string().uuid().optional(),data:z.unknown()});
+const bodySchema=z.object({action:z.enum(['create_item','update_item','preview_bulk_items','bulk_update_items','create_warehouse','record_purchase','receive_purchase','return_purchase','record_sale','approve_sale','reject_sale','transfer','save_channel','preview_import','import_opening']),id:z.string().max(100).optional(),request_id:z.string().uuid().optional(),data:z.unknown()});
 const purchaseSchema=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,unit_cost:money.default(0),additional_cost:money.default(0),order_number:z.string().trim().max(120).default(''),status:z.enum(['ordered','received']).default('received'),ordered_at:z.string().datetime().nullish(),received_at:z.string().datetime().nullish(),payment_status:z.string().trim().max(60).default(''),note:z.string().trim().max(2000).default('')});
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -159,12 +169,29 @@ export async function POST(req:Request){try{
  if(Number(req.headers.get('content-length')||0)>5_000_000)throw new Failure('Файл хэт том.',413);
  const raw=await req.text();if(raw.length>5_000_000)throw new Failure('Файл хэт том.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
+ if(['approve_sale','reject_sale'].includes(b.action)&&!canManageSchedule(m.role))throw new Failure('Зөвхөн ахлах, админ, удирдлага шийдвэрлэнэ.',403);
+ if(b.action==='record_sale'&&!['admin','director','manager','agent','operator'].includes(m.role))throw new Failure('Борлуулалтын эрхгүй.',403);
+ if(b.action==='record_sale'&&['agent','operator'].includes(m.role)&&!b.request_id)throw new Failure('Хүсэлтийн давхардал шалгах ID шаардлагатай.');
  if(['update_item','preview_bulk_items','bulk_update_items'].includes(b.action)&&!canEditInventoryItem(m.role))throw new Failure('Барааны мэдээллийг зөвхөн админ болон ахлах засах эрхтэй.',403);
  if(['record_purchase','preview_import','import_opening'].includes(b.action)&&!canViewInventoryCost(m.role))throw new Failure('Өртөг бүртгэх эрхгүй.',403);
  const result=await db().transaction(async d=>{
-  const payload=JSON.stringify({action:b.action,id:b.id,data:b.data});
+  const payload=JSON.stringify({action:b.action,id:b.id,data:b.data,...(['record_sale','approve_sale','reject_sale'].includes(b.action)?{actor:m.email}:{})});
   if(b.request_id){const prev=await d.prepare('SELECT * FROM inventory_requests WHERE id=?').bind(b.request_id).first();if(prev){if(prev.payload!==payload)throw new Failure('Давтан хүсэлтийн өгөгдөл өөрчлөгдсөн.',409);return JSON.parse(String(prev.response));}}
+  let approvalId='',approvalNote='';
   const run=async()=>{
+   if(b.action==='approve_sale'||b.action==='reject_sale'){
+    const review=z.object({note:z.string().trim().max(2000).default('')}).parse(b.data);
+    if(!b.id)throw new Failure('Хүсэлтийн ID дутуу.');
+    const request=await d.prepare('SELECT * FROM direct_sale_requests WHERE id=?').bind(b.id).first<{id:string;status:string;payload:string;sale_id:string|null}>();
+    if(!request)throw new Failure('Борлуулалтын хүсэлт олдсонгүй.',404);
+    if(request.status!=='pending')throw new Failure('Хүсэлт аль хэдийн шийдвэрлэгдсэн.',409);
+    if(b.action==='reject_sale'){
+     if(!review.note)throw new Failure('Татгалзсан шалтгаанаа бичнэ үү.');
+     await d.prepare("UPDATE direct_sale_requests SET status='rejected',reviewed_by=?,reviewed_at=?,review_note=? WHERE id=? AND status='pending'").bind(m.email,now,review.note,request.id).run();
+     return {ok:true,id:request.id,status:'rejected'};
+    }
+    approvalId=request.id;approvalNote=review.note;b.action='record_sale';b.data=JSON.parse(request.payload);
+   }
    if(b.action==='preview_bulk_items'||b.action==='bulk_update_items'){
     const plan=await planInventoryBulkEdit(d,b.data);
     if(b.action==='preview_bulk_items')return {ok:true,preview_hash:plan.hash,count:plan.rows.length,changes:plan.changes};
@@ -232,17 +259,26 @@ export async function POST(req:Request){try{
    }
    if(b.action==='record_sale'||b.action==='transfer'){
     const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.string().email().optional(),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
-    await requireRow(d,'inventory_items',input.item_id);await requireRow(d,'inventory_warehouses',input.warehouse_id);
-    const stock=await stockAt(d,input.item_id,input.warehouse_id),cost=withdrawal(stock,input.qty),id=crypto.randomUUID();
+    const saleItem=await requireRow(d,'inventory_items',input.item_id);const saleWarehouse=await requireRow(d,'inventory_warehouses',input.warehouse_id);
+    if(b.action==='record_sale'&&!saleItem.active)throw new Failure('Идэвхтэй бараа сонгоно уу.');
+    const stock=await stockAt(d,input.item_id,input.warehouse_id),id=crypto.randomUUID();
     // Шууд борлуулалтыг ажилтны үзүүлэлтэд тооцох тул зарагчийг тодорхой хөтөлнө. Агент зөвхөн өөрийн
     // нэр дээр бүртгэнэ; Ахлах, Удирдлага, Админ өөр ажилтны өмнөөс бүртгэж болно.
     let seller='';
-    if(b.action==='record_sale'&&input.seller){
-     seller=input.seller;
+    if(b.action==='record_sale'&&(input.seller||['agent','operator'].includes(m.role))){
+     seller=input.seller||m.email;
      if(!canManageSchedule(m.role)&&seller!==m.email)throw new Failure('Зөвхөн өөрийн борлуулалтаа бүртгэнэ.',403);
      const who=await d.prepare('SELECT role FROM members WHERE email=? AND active=1').bind(seller).first<{role:string}>();
      if(!who||isIsolatedRole(who.role))throw new Failure('Идэвхтэй борлуулалтын ажилтан сонгоно уу.');
     }
+    if(b.action==='record_sale'&&['agent','operator'].includes(m.role)){
+     withdrawal(stock,input.qty);
+     safeTotal(cents(input.unit_price)*input.qty);
+     await d.prepare('INSERT INTO direct_sale_requests(id,requester,payload,created_at) VALUES(?,?,?,?)').bind(id,m.email,JSON.stringify({...input,seller,item_name:saleItem.name,item_code:saleItem.code,warehouse_name:saleWarehouse.name}),now).run();
+     return {ok:true,id,status:'pending'};
+    }
+    if(b.action==='record_sale'&&stock.value_cents<0)throw new Failure('Барааны өртгийн зөрчлийг эхлээд засна уу.',409);
+    const cost=withdrawal(stock,input.qty);
     if(b.action==='transfer'){
      if(!input.to_warehouse_id||input.to_warehouse_id===input.warehouse_id)throw new Failure('Өөр хүлээн авах агуулах сонгоно уу.');
      await requireRow(d,'inventory_warehouses',input.to_warehouse_id);
@@ -254,6 +290,7 @@ export async function POST(req:Request){try{
      await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'sale',qty:-input.qty,value:-cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:input.note});
      await saveUnits(d,{source:'sale',refId:id,itemId:input.item_id,customerPhone:input.customer_phone,actor:m.email,at:input.sold_at||now},input.units);
      if(seller)await d.prepare('UPDATE inventory_sales SET seller=? WHERE id=?').bind(seller,id).run();
+     if(approvalId)await d.prepare("UPDATE direct_sale_requests SET status='approved',sale_id=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=? AND status='pending'").bind(id,m.email,now,approvalNote,approvalId).run();
     }return {ok:true,id};
    }
    if(b.action==='preview_import'||b.action==='import_opening'){

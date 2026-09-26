@@ -1,5 +1,6 @@
 'use client';
 import {salePrice} from '@/lib/inventory-pricing';
+import DirectSaleRequests from './direct-sale-requests';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {useState} from 'react';
 import {Pagination} from 'antd';
@@ -21,12 +22,15 @@ type List={items:Row[];count:number;summary:{revenue_cents:number;profit_cents:n
 type Unit={serial:string;barcode:string;note:string};
 const todayUB=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 // Шууд борлуулалтыг бүртгэх нэгдсэн хүсэлт — жагсаалтын панел, "Шинэ хүсэлт" диалог хоёулаа үүнийг дуудна.
+let pendingSale:{payload:string;id:string}|null=null;
 export async function recordDirectSale(data:unknown){
  const form=document.activeElement?.closest('form')||null;
- const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'record_sale',data,request_id:crypto.randomUUID()})});
- const value=await r.json() as {error?:string;fieldErrors?:Record<string,string>;id?:string};
+ const payload=JSON.stringify(data);if(!pendingSale||pendingSale.payload!==payload)pendingSale={payload,id:crypto.randomUUID()};
+ const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'record_sale',data,request_id:pendingSale.id})});
+ const value=await r.json() as {error?:string;fieldErrors?:Record<string,string>;id?:string;status?:string};
  if(!r.ok){markFormError(form,value.error||'Хадгалж чадсангүй.',value.fieldErrors);throw new Error(value.error||'Хадгалж чадсангүй.');}
  markFormSaved(form);
+ pendingSale=null;
  return value;
 }
 export default function DirectSalesPanel({me,members}:{me:Member;members:Member[]}){
@@ -45,12 +49,13 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
   setBusy(true);
   try{
    const d=await recordDirectSale(data);
-   setPage(1);setRevision(v=>v+1);toast.success('Борлуулалт бүртгэгдлээ.');return d;
+   setPage(1);setRevision(v=>v+1);toast.success(d.status==='pending'?'Борлуулалтын хүсэлт илгээгдлээ.':'Борлуулалт бүртгэгдлээ.');return d;
   }catch(e){toast.error((e as Error).message);return null;}finally{setBusy(false);}
  };
  return <section className="table-panel">
+ <DirectSaleRequests me={me} revision={revision} onChange={()=>setRevision(v=>v+1)}/>
  <div className="table-toolbar"><h2>Шууд бэлэн борлуулалт<span>{list.data?.count||0}</span></h2><div className="row">
-  <Button className="primary" size="sm" onClick={()=>setOpen(true)}><Plus size={16}/>Борлуулалт бүртгэх</Button>
+  <Button className="primary" size="sm" onClick={()=>setOpen(true)}><Plus size={16}/>{canPickSeller?'Борлуулалт бүртгэх':'Борлуулалтын хүсэлт'}</Button>
  </div></div>
  {list.data?.summary&&<MobileDisclosure label="Борлуулалтын үзүүлэлт"><div className="metrics"><div className="metric"><div><span>Борлуулалт</span><ShoppingCart size={19}/></div><strong>{(list.data.count||0).toLocaleString()}</strong><small>Сонгосон хугацаанд</small></div><div className="metric metric-focus"><div><span>Нийт орлого</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.revenue_cents/100)}</strong><small>Бэлнээр гарсан</small></div>{showCost&&<div className="metric"><div><span>Ашиг</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.profit_cents/100)}</strong><small>Өртөг, шимтгэл хассан</small></div>}</div></MobileDisclosure>}
  <ResponsiveFilters active={[seller!=='__direct__'&&canPickSeller,from,to].filter(Boolean).length}>
@@ -73,7 +78,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  </TableBody></Table></div>:!list.loading&&<p className="muted chat-empty-list">Сонгосон хугацаанд шууд борлуулалт бүртгэгдээгүй байна.</p>)}
  {!!list.data?.count&&<div className="table-footer"><Pagination current={page} pageSize={50} total={list.data.count} onChange={setPage} disabled={list.loading} showSizeChanger={false} showTotal={(total,range)=>`${range[0]}–${range[1]} / ${total} борлуулалт`} responsive/></div>}
  <Dialog open={open} onOpenChange={setOpen}><DialogContent className="form-dialog">
-  <DialogHeader><DialogTitle>Шууд бэлэн борлуулалт</DialogTitle><DialogDescription>Хүсэлтээр ирээгүй, шууд ирж худалдан авсан борлуулалтыг бүртгэнэ. Агуулахын үлдэгдлээс хасагдана.</DialogDescription></DialogHeader>
+  <DialogHeader><DialogTitle>Шууд бэлэн борлуулалт</DialogTitle><DialogDescription>{canPickSeller?'Борлуулалт бүртгэгдэж, агуулахын үлдэгдлээс хасагдана.':'Ахлах, админ эсвэл удирдлага баталсны дараа борлуулалт бүртгэгдэнэ.'}</DialogDescription></DialogHeader>
   <SaleForm me={me} sellers={sellers} canPickSeller={canPickSeller} options={options.data||undefined} busy={busy} onSubmit={async v=>{if(await post(v))setOpen(false);}}/>
  </DialogContent></Dialog>
  </section>;
@@ -119,6 +124,6 @@ export function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Me
   </div>)}
  </div>}
  <Field label="Тэмдэглэл"><TextareaControl name="note" rows={2} maxLength={2000}/></Field>
- <Button type="submit" className="primary full" disabled={busy}><Users size={16}/>{busy?'Хадгалж байна…':'Борлуулалт бүртгэх'}</Button>
+ <Button type="submit" className="primary full" disabled={busy}><Users size={16}/>{busy?'Хадгалж байна…':canPickSeller?'Борлуулалт бүртгэх':'Батлуулах хүсэлт илгээх'}</Button>
  </GuardedForm>;
 }

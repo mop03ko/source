@@ -16,6 +16,11 @@ const scenario=String.raw`
  user={userId:'a1',email:'a1@example.test',displayName:'Агент Нэг'};
  let [status,d]=await stock('record_sale',sale({seller:'a1@example.test'}));
  assert.equal(status,200,JSON.stringify(d));
+ assert.equal(d.status,'pending');
+ assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM inventory_sales').get().n,0);
+ user={userId:'mg',email:'mg@example.test',displayName:'Ахлах'};
+ [status,d]=await stock('approve_sale',{},d.id);assert.equal(status,200,JSON.stringify(d));
+ user={userId:'a1',email:'a1@example.test',displayName:'Агент Нэг'};
  assert.equal(sqlite.prepare('SELECT seller FROM inventory_sales WHERE id=?').get(d.id).seller,'a1@example.test');
  // Агент бусдын нэр дээр бүртгэж чадахгүй.
  assert.equal((await stock('record_sale',sale({seller:'a2@example.test'})))[0],403);
