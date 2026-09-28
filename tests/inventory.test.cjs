@@ -13,7 +13,8 @@ deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps[
 async function crmGet(query=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()];}
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function invGet(query=''){const r=await invRoute.GET(new Request('https://crm.test/api/inventory'+query));return [r.status,await r.json()];}
-async function invPost(action,data,id,request_id=crypto.randomUUID()){const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id})}));return [r.status,await r.json()];}
+const editRevisions=new Map();
+async function invPost(action,data,id,request_id=crypto.randomUUID()){if(action==='update_item'&&!editRevisions.has(request_id))editRevisions.set(request_id,sqlite.prepare('SELECT updated_at FROM inventory_items WHERE id=?').get(id)?.updated_at);const expected_updated_at=editRevisions.get(request_id);const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id,expected_updated_at})}));return [r.status,await r.json()];}
 (async()=>{
  await crmGet(); // bootstrap owner as admin
  assert.equal((await crmPost('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);

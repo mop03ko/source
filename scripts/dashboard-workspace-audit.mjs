@@ -53,6 +53,13 @@ try{
   await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
   await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('#personal-todos input')");await pause(500);
   assert.equal(await evaluate("!!document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=reports]')"),role==='director');
+  if(role==='director'){
+   await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=reports]').click()");
+   await wait("!!document.querySelector('.dashboard-report-tabs')");
+   assert.equal(await evaluate("document.querySelector('.dashboard-report').innerText.includes('Борлуулалтын хүсэлт')"),false);
+   assert.equal(await evaluate("document.querySelector('.dashboard-report').innerText.includes('Хөрвөлт')"),false);
+   await snap('director-reports');
+  }
   await snap(role+'-desktop');
   await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=meetings]').click()");await wait("!!document.querySelector('#meetings')");
   assert.equal(await evaluate("!!document.querySelector('.lead-list-table')"),false);

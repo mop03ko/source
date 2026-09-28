@@ -1,4 +1,5 @@
 'use client';
+import {InventoryEditConflict} from './inventory-edit-conflict';
 import {InventoryCostAccess} from '@/components/inventory-cost-access';
 import {SavedViews} from '@/components/saved-views';
 import {ResponsiveTabs as Tabs} from '@/components/responsive-tabs';
@@ -78,6 +79,7 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const [today]=useState(()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10));
  const from=query.get(mode+'_from',today.slice(0,7)+'-01'),setFrom=(v:string)=>query.set(mode+'_from',v),to=query.get(mode+'_to',today),setTo=(v:string)=>query.set(mode+'_to',v);
  const [modal,setModal]=useState<Modal>(null),[detailId,setDetailId]=useState(''),[busy,setBusy]=useState(false),[exporting,setExporting]=useState(false),[channel,setChannel]=useState('');
+ const [editConflict,setEditConflict]=useState<{current:Item;draft:Partial<Item>}|null>(null);
  const busyRef=useRef(false),pending=useRef<{body:string;id:string}|null>(null),allow=useDraftGuard();
  const options=useRemote<Options>('/api/inventory?view=options&revision='+revision),opts=options.data||emptyOptions;
  const params=new URLSearchParams({view:mode,q:searchQ,warehouse_id:warehouse,page:String(page),revision:String(revision)});
@@ -100,12 +102,13 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
  const canEditItem=canEditInventoryItem(me.role);
  const post:Post=async(action,data,id)=>{
   if(busyRef.current)throw new Error('Өмнөх хүсэлт дуусахыг хүлээнэ үү.');
-  const body=JSON.stringify({action,data,id});
+  const expected_updated_at=action==='update_item'?modal?.item?.updated_at:undefined;
+  const body=JSON.stringify({action,data,id,expected_updated_at});
   if(pending.current?.body!==body)pending.current={body,id:crypto.randomUUID()};
   busyRef.current=true;setBusy(true);
   try{
-   const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id:pending.current.id})});
-   const value=await r.json();if(!r.ok)throw new Error(value.error||'Хадгалж чадсангүй.');
+   const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,data,id,expected_updated_at,request_id:pending.current.id})});
+   const value=await r.json();if(value.code==='ITEM_CONFLICT')setEditConflict({current:value.current,draft:data as Partial<Item>});if(!r.ok)throw new Error(value.error||'Хадгалж чадсангүй.');
    pending.current=null;if(!['preview_import','preview_bulk_items'].includes(action))setRevision(v=>v+1);return value;
   }finally{busyRef.current=false;setBusy(false);}
  };
@@ -222,7 +225,8 @@ export default function InventoryPanel({me,members}:{me:Member;members:Member[]}
    <h3>Сүүлийн хөдөлгөөнүүд</h3>{!detail.data.moves.length&&<p className="muted">Энэ бараанд хөдөлгөөн бүртгэгдээгүй байна.</p>}<div className="timeline">{detail.data.moves.map(m=><article key={m.id}><span className="timeline-dot"/><div className="row between"><strong>{kinds[m.kind]||m.kind} · {m.qty_delta>0?'+':''}{m.qty_delta} ш</strong><time>{dateLabel(m.occurred_at||m.created_at)}</time></div><p>{m.warehouse_name}{showCost&&<> · {cash(m.value_cents/100)}</>}</p>{m.note&&<small>{m.note}</small>}</article>)}</div>
   </>}</div></SheetContent></Sheet>
   <Dialog open={!!modal} onOpenChange={open=>{if(!open&&!busy)setModal(null);}}><DialogContent fixedFooter={modal?.kind==='item'||!!modal&&['purchase','sale','transfer'].includes(modal.kind)} className="form-dialog inventory-dialog"><DialogHeader><DialogTitle>{modal?.kind==='item'?(modal.item?'Барааны мэдээлэл засах':'Бараа нэмэх'):modal?modalTitle[modal.kind]:''}</DialogTitle><DialogDescription>{modal?.kind==='import'?'Үлдэгдлийг импортлохоос өмнө файл, огноо болон зөрчлийг шалгана.':'Мэдээллээ бөглөөд хадгална уу.'}</DialogDescription></DialogHeader>
-   {modal?.kind==='item'&&(!modal.item||canEditItem)&&<ItemForm item={modal.item||modal.template} template={!!modal.template} options={opts} busy={busy} onSave={data=>save(modal.item?'update_item':'create_item',data,modal.item?.id)}/>}
+   {modal?.kind==='item'&&modal.item&&editConflict?.current.id===modal.item.id&&<InventoryEditConflict before={modal.item} current={editConflict.current} draft={editConflict.draft} onReload={()=>{if(!busy){setModal({kind:'item',item:editConflict.current});setEditConflict(null);}}}/>}
+   {modal?.kind==='item'&&(!modal.item||canEditItem)&&<ItemForm key={modal.item?.updated_at} item={modal.item||modal.template} template={!!modal.template} options={opts} busy={busy} onSave={data=>save(modal.item?'update_item':'create_item',data,modal.item?.id)}/>}
    {modal&&['purchase','sale','transfer'].includes(modal.kind)&&<MovementForm submitLabel={modal.kind==='sale'&&['agent','operator'].includes(me.role)?'Батлуулах хүсэлт илгээх':undefined} kind={modal.kind as 'purchase'|'sale'|'transfer'} item={modal.item} options={opts} warehouse={warehouse} busy={busy} onSave={data=>save(modal.kind==='purchase'?'record_purchase':modal.kind==='sale'?'record_sale':'transfer',data)}/>}
    {modal?.kind==='warehouse'&&<GuardedForm className="form-stack" onSubmit={async e=>{await save('create_warehouse',{name:new FormData(e.currentTarget).get('name')});return true;}}><Field label="Агуулах / салбарын нэр *"><Input name="name" required maxLength={120}/></Field><Button disabled={busy}>Хадгалах</Button></GuardedForm>}
    {modal?.kind==='return'&&<GuardedForm className="form-stack" onSubmit={async e=>{const f=new FormData(e.currentTarget);await save('return_purchase',{qty:Number(f.get('qty')),note:f.get('note')},modal.purchase!.id);return true;}}><p><strong>{modal.purchase!.item_name}</strong> · {modal.purchase!.warehouse_name}</p><p>Буцаах боломжтой: {modal.purchase!.qty-modal.purchase!.returned_qty} ш. Оруулсан тоогоор агуулахын үлдэгдэл буурна.</p><Field label="Буцаах тоо *"><Input name="qty" type="number" min={1} max={modal.purchase!.qty-modal.purchase!.returned_qty} defaultValue={1} required/></Field><Field label="Буцаалтын шалтгаан *"><TextareaControl name="note" required maxLength={2000}/></Field><p className="muted">Буцаалтын өртгийг агуулахын одоогийн дундаж өртгөөр хасна.</p><Button disabled={busy} variant="destructive">Буцаалт бүртгэх</Button></GuardedForm>}

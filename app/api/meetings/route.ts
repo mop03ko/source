@@ -9,7 +9,8 @@ const input=z.discriminatedUnion('action',[
  z.object({action:z.literal('create'),id:z.string().uuid(),data:fields}).strict(),
  z.object({action:z.literal('update'),id:z.string().uuid(),version:z.number().int().positive(),data:fields}).strict(),
  z.object({action:z.literal('cancel'),id:z.string().uuid(),version:z.number().int().positive()}).strict(),
- z.object({action:z.literal('reminders')}).strict()
+ z.object({action:z.literal('reminders')}).strict(),
+ z.object({action:z.literal('ack_reminder'),id:z.string().uuid(),version:z.number().int().positive()}).strict()
 ]);
 export async function GET(req:Request){try{
  const me=await member(),p=new URL(req.url).searchParams,status=z.enum(['upcoming','past','cancelled']).parse(p.get('status')||'upcoming');
@@ -18,7 +19,8 @@ export async function GET(req:Request){try{
  const args=status==='cancelled'?[me.email]:[me.email,now];
  const where=`EXISTS(SELECT 1 FROM meeting_attendees a WHERE a.meeting_id=m.id AND a.email=?) AND ${condition}`;
  const items=await env.DB.prepare(`SELECT m.*,(SELECT name FROM members WHERE email=m.organizer) organizer_name FROM meetings m WHERE ${where} ORDER BY starts_at ${status==='upcoming'?'ASC':'DESC'},id LIMIT 20 OFFSET ?`).bind(...args,(page-1)*20).all<{id:string}>();
- const rows=await Promise.all(items.results.map(async m=>({...m,attendees:(await env.DB.prepare('SELECT a.email,mb.name FROM meeting_attendees a LEFT JOIN members mb ON mb.email=a.email WHERE a.meeting_id=? ORDER BY a.email').bind(m.id).all()).results})));
+ const attendees=items.results.length?(await env.DB.prepare(`SELECT a.meeting_id,a.email,mb.name FROM meeting_attendees a LEFT JOIN members mb ON mb.email=a.email WHERE a.meeting_id IN (${items.results.map(()=>'?').join(',')}) ORDER BY a.email`).bind(...items.results.map(m=>m.id)).all<{meeting_id:string;email:string;name:string}>()).results:[];
+ const rows=items.results.map(m=>({...m,attendees:attendees.filter(a=>a.meeting_id===m.id).map(({email,name})=>({email,name}))}));
  const count=await env.DB.prepare(`SELECT COUNT(*) n FROM meetings m WHERE ${where}`).bind(...args).first<{n:number}>();
  return json({items:rows,count:count?.n||0});
 }catch(e){return error(e);}}
@@ -27,9 +29,13 @@ export async function POST(req:Request){try{
  const me=await member(),raw=await req.text();if(raw.length>20000)throw new Failure('Мэдээлэл хэт том.',413);
  const b=input.parse(JSON.parse(raw)),now=new Date().toISOString();
  return json(await env.DB.transaction(async db=>{
+  if(b.action==='ack_reminder'){
+   await db.prepare('UPDATE meeting_reminders SET acknowledged_at=? WHERE meeting_id=? AND version=? AND recipient=? AND acknowledged_at IS NULL').bind(now,b.id,b.version,me.email).run();
+   return {ok:true};
+  }
   if(b.action==='reminders'){
-   const due=await db.prepare(`SELECT m.id,m.version,m.title,m.starts_at,m.ends_at,m.location FROM meetings m JOIN meeting_attendees a ON a.meeting_id=m.id AND a.email=? WHERE m.status='scheduled' AND m.ends_at>? AND julianday(m.starts_at)-m.reminder_minutes/1440.0<=julianday(?) AND NOT EXISTS(SELECT 1 FROM meeting_reminders r WHERE r.meeting_id=m.id AND r.version=m.version AND r.recipient=?) ORDER BY m.starts_at LIMIT 10`).bind(me.email,now,now,me.email).all<{id:string;version:number}>();
-   for(const m of due.results)await db.prepare('INSERT INTO meeting_reminders(meeting_id,version,recipient,alerted_at) VALUES(?,?,?,?)').bind(m.id,m.version,me.email,now).run();
+   const due=await db.prepare(`SELECT m.id,m.version,m.title,m.starts_at,m.ends_at,m.location FROM meetings m JOIN meeting_attendees a ON a.meeting_id=m.id AND a.email=? WHERE m.status='scheduled' AND m.ends_at>? AND julianday(m.starts_at)-m.reminder_minutes/1440.0<=julianday(?) AND NOT EXISTS(SELECT 1 FROM meeting_reminders r WHERE r.meeting_id=m.id AND r.version=m.version AND r.recipient=? AND (r.acknowledged_at IS NOT NULL OR r.alerted_at>?)) ORDER BY m.starts_at LIMIT 10`).bind(me.email,now,now,me.email,new Date(Date.now()-60000).toISOString()).all<{id:string;version:number}>();
+   for(const m of due.results)await db.prepare('INSERT INTO meeting_reminders(meeting_id,version,recipient,alerted_at) VALUES(?,?,?,?) ON CONFLICT(meeting_id,version,recipient) DO UPDATE SET alerted_at=excluded.alerted_at WHERE meeting_reminders.acknowledged_at IS NULL').bind(m.id,m.version,me.email,now).run();
    return {items:due.results};
   }
   const old=await db.prepare('SELECT organizer,version,status FROM meetings WHERE id=?').bind(b.id).first<{organizer:string;version:number;status:string}>();

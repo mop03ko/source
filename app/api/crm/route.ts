@@ -378,7 +378,7 @@ export async function GET(req: Request) {
     }
     // Тайлангийн 3 query (dist/byMember/byActivity) хямд биш тул зөвхөн "Тайлан", "Хяналтын самбар" табан дээр
     // л ажиллуулна; бусад табанд (today/all/recycle) энэ өгөгдлийг клиент ашигладаггүй тул хоосон буцаана.
-    const isReports = view === "reports" || view === "dashboard";
+    const isReports = view === "reports" || (view === "dashboard" && m.role !== "director" && url.searchParams.get("dashboard_section") === "reports");
     // "Тайлан", "Хяналтын самбар" табанд өөрийн (rfrom/rto) хугацааны хүрээ байдаг тул статистик картууд
     // үүнийг, бусад табанд жагсаалтын шүүлтүүрийг (from/to) ашиглана.
     const statsWhere = isReports ? reportWhere : baseWhere,

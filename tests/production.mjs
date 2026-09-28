@@ -17,7 +17,13 @@ async function cookie(sub,email){return `${cookieName}=`+await encode({secret,sa
 try{
  let ready=false;for(let i=0;i<100;i++){try{await fetch(base+'/login');ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}
  assert.ok(ready,'Production server did not start');
- let r=await fetch(base+'/',{redirect:'manual'});assert.equal(r.status,307);assert.ok(r.headers.get('location').endsWith('/login'));
+ const login=await fetch(base+'/login');
+ assert.equal(login.headers.get('x-frame-options'),'DENY');
+ assert.equal(login.headers.get('x-content-type-options'),'nosniff');
+ assert.equal(login.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+ assert.match(login.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+ assert.ok(login.headers.get('content-security-policy-report-only'));
+ let r=await fetch(base+'/',{redirect:'manual'});if(r.status===307||r.status===303){assert.equal(new URL(r.headers.get('location'),base).pathname,'/login');}else{assert.equal(r.status,200);const html=await r.text();const refresh=html.match(/<meta\b[^>]*http-equiv="refresh"[^>]*>/i)?.[0]||'';assert.match(refresh,/content="[01];\s*url=\/login"/i);assert.ok(!html.includes('crm-sidebar'),'Unauthenticated root must not render CRM');}
  for(const route of ['/api/crm','/api/notifications','/api/sheets']){
   r=await fetch(base+route,{headers:{'oai-authenticated-user-id':'owner','oai-authenticated-user-email':'owner@example.test'}});assert.equal(r.status,401,route+' must reject spoofed platform identity');
  }

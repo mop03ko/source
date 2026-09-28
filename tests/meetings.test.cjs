@@ -10,10 +10,21 @@ const route=load('app/api/meetings/route.ts');
  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM meetings').get().n,1);
  const list=async()=> (await json(await route.GET(new Request('https://crm.test/api/meetings'))))[1];
  assert.equal((await list()).count,1);assert.equal((await list()).items[0].attendees.length,2);
+ let attendeeQueries=0;const originalAll=Statement.prototype.all;
+ Statement.prototype.all=async function(){if(this.sql.includes('SELECT a.meeting_id,a.email'))attendeeQueries++;return originalAll.call(this);};
+ await list();assert.equal(attendeeQueries,1,'Attendees should use a single batched query');
+ Statement.prototype.all=originalAll;
  user={userId:'agent',email:'agent@example.test',displayName:'Agent'};assert.equal((await list()).count,1);
  assert.equal((await post(route,{action:'update',id,version:1,data})).status,403);
  assert.equal((await post(route,{action:'cancel',id,version:1})).status,403);
  assert.equal((await json(await post(route,{action:'reminders'})))[1].items.length,1);
+ assert.equal((await json(await post(route,{action:'reminders'})))[1].items.length,0);
+ // Lost response: an expired claim must be delivered again until this recipient acknowledges it.
+ sqlite.prepare('UPDATE meeting_reminders SET alerted_at=? WHERE meeting_id=?').run(new Date(Date.now()-61000).toISOString(),id);
+ assert.equal((await json(await post(route,{action:'reminders'})))[1].items.length,1);
+ assert.equal((await post(route,{action:'ack_reminder',id,version:1})).status,200);
+ assert.equal((await post(route,{action:'ack_reminder',id,version:1})).status,200);
+ sqlite.prepare('UPDATE meeting_reminders SET alerted_at=? WHERE meeting_id=?').run(new Date(Date.now()-61000).toISOString(),id);
  assert.equal((await json(await post(route,{action:'reminders'})))[1].items.length,0);
  for(const role of ['operator','manager','director','marketing','it','delivery']){user={userId:role,email:role+'@example.test',displayName:role};assert.equal((await list()).count,0);assert.equal((await json(await post(route,{action:'reminders'})))[1].items.length,0);assert.equal((await post(route,{action:'create',id:crypto.randomUUID(),data:{...data,attendees:[]}})).status,200);}
  user=owner;assert.equal((await list()).count,1);

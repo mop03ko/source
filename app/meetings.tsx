@@ -11,8 +11,34 @@ const local=(v:string)=>new Date(Date.parse(v)+8*3600000).toISOString().slice(0,
 async function send(body:unknown){const r=await fetch('/api/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.error||'Уулзалтыг хадгалж чадсангүй.');return d;}
 export function MeetingReminders({sound,onOpen}:{sound:string;onOpen:()=>void}){
  const callback=useRef(onOpen);useEffect(()=>{callback.current=onOpen;},[onOpen]);
- useEffect(()=>{let stopped=false,busy=false;async function poll(){if(stopped||busy||document.visibilityState!=='visible')return;busy=true;try{const d=await send({action:'reminders'});if(!stopped&&d.items.length){playNotificationSound(sound);for(const m of d.items as Meeting[])toast.info(<span><strong>{m.title}</strong><br/>{time(m.starts_at)} · УБ{m.location&&' · '+m.location}</span>,{duration:15000,action:{label:'Уулзалтууд',onClick:()=>callback.current()}});}}catch{/* Next poll retries temporary connection failures. */}finally{busy=false;}}
- void poll();const timer=setInterval(()=>void poll(),30000);const focus=()=>void poll();window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);return()=>{stopped=true;clearInterval(timer);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);};},[sound]);return null;
+ const [disconnected,setDisconnected]=useState(false),shown=useRef(new Set<string>());
+ useEffect(()=>{
+  let stopped=false,busy=false;
+  async function poll(){
+   if(stopped||busy||document.visibilityState!=='visible')return;
+   busy=true;
+   try{
+    const d=await send({action:'reminders'});
+    for(const m of d.items as Meeting[]){
+     if(stopped||document.visibilityState!=='visible')break;
+     const key=`meeting-${m.id}-${m.version}`;
+     if(!shown.current.has(key)){
+      playNotificationSound(sound);
+      toast.info(<span><strong>{m.title}</strong><br/>{time(m.starts_at)} · УБ{m.location&&' · '+m.location}</span>,{id:key,duration:15000,action:{label:'Уулзалтууд',onClick:()=>callback.current()}});
+      shown.current.add(key);
+      if(shown.current.size>200)shown.current.delete(shown.current.values().next().value!);
+     }
+     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+     if(!stopped&&document.visibilityState==='visible')await send({action:'ack_reminder',id:m.id,version:m.version});
+    }
+    if(!stopped)setDisconnected(false);
+   }catch{if(!stopped)setDisconnected(true);}finally{busy=false;}
+  }
+  void poll();const timer=setInterval(()=>void poll(),30000);const focus=()=>void poll();
+  window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);
+  return()=>{stopped=true;clearInterval(timer);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);};
+ },[sound]);
+ return disconnected?<Alert type="warning" showIcon title="Уулзалтын сануулгын холболт тасарсан. Автоматаар дахин холбогдоно."/>:null;
 }
 export default function Meetings({email,members}:{email:string;members:Person[]}){
  const [status,setStatus]=useState('upcoming'),[page,setPage]=useState(1),[open,setOpen]=useState(false),[editing,setEditing]=useState<Meeting|null>(null),[detail,setDetail]=useState<Meeting|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState('');

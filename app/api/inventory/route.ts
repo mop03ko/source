@@ -9,8 +9,10 @@ import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
 const db=()=>env.DB;
+class ItemConflict extends Failure {constructor(public current:Record<string,unknown>){super('Өөр ажилтан энэ барааг өөрчилсөн. Доорх ялгааг шалгаж, шинэ мэдээллээр дахин нээнэ үү. Таны засвар хадгалагдаагүй.',409);}}
 function access(m:Member){if(isIsolatedRole(m.role))throw new Failure('Энэ хэсэгт хандах эрхгүй.',403);}
 function error(e:unknown){
+ if(e instanceof ItemConflict)return Response.json({error:e.message,code:'ITEM_CONFLICT',current:e.current},{status:409,headers:{'Cache-Control':'no-store'}});
  if(e instanceof Failure)return Response.json({error:e.message},{status:e.status});
  if(e instanceof z.ZodError)return Response.json({error:e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ')},{status:400});
  if(e instanceof SyntaxError)return Response.json({error:'Хүсэлтийн бүтэц буруу.'},{status:400});
@@ -161,7 +163,7 @@ export async function GET(req:Request){try{
  throw new Failure('Тодорхойгүй харагдац.');
 }catch(e){return error(e);}}
 
-const bodySchema=z.object({action:z.enum(['create_item','update_item','preview_bulk_items','bulk_update_items','create_warehouse','record_purchase','receive_purchase','return_purchase','record_sale','approve_sale','reject_sale','transfer','save_channel','preview_import','import_opening']),id:z.string().max(100).optional(),request_id:z.string().uuid().optional(),data:z.unknown()});
+const bodySchema=z.object({action:z.enum(['create_item','update_item','preview_bulk_items','bulk_update_items','create_warehouse','record_purchase','receive_purchase','return_purchase','record_sale','approve_sale','reject_sale','transfer','save_channel','preview_import','import_opening']),id:z.string().max(100).optional(),request_id:z.string().uuid().optional(),expected_updated_at:z.string().max(80).optional(),data:z.unknown()});
 const purchaseSchema=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,unit_cost:money.default(0),additional_cost:money.default(0),order_number:z.string().trim().max(120).default(''),status:z.enum(['ordered','received']).default('received'),ordered_at:z.string().datetime().nullish(),received_at:z.string().datetime().nullish(),payment_status:z.string().trim().max(60).default(''),note:z.string().trim().max(2000).default('')});
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -175,7 +177,7 @@ export async function POST(req:Request){try{
  if(['update_item','preview_bulk_items','bulk_update_items'].includes(b.action)&&!canEditInventoryItem(m.role))throw new Failure('Барааны мэдээллийг зөвхөн админ болон ахлах засах эрхтэй.',403);
  if(['record_purchase','preview_import','import_opening'].includes(b.action)&&!canViewInventoryCost(m.role))throw new Failure('Өртөг бүртгэх эрхгүй.',403);
  const result=await db().transaction(async d=>{
-  const payload=JSON.stringify({action:b.action,id:b.id,data:b.data,...(['record_sale','approve_sale','reject_sale'].includes(b.action)?{actor:m.email}:{})});
+  const payload=JSON.stringify({action:b.action,id:b.id,data:b.data,expected_updated_at:b.expected_updated_at,...(['record_sale','approve_sale','reject_sale'].includes(b.action)?{actor:m.email}:{})});
   if(b.request_id){const prev=await d.prepare('SELECT * FROM inventory_requests WHERE id=?').bind(b.request_id).first();if(prev){if(prev.payload!==payload)throw new Failure('Давтан хүсэлтийн өгөгдөл өөрчлөгдсөн.',409);return JSON.parse(String(prev.response));}}
   let approvalId='',approvalNote='';
   const run=async()=>{
@@ -217,6 +219,8 @@ export async function POST(req:Request){try{
     if(input.code&&await d.prepare('SELECT 1 FROM inventory_items WHERE code=? AND id!=?').bind(input.code,id).first())throw new Failure('Барааны код давхардсан.',409);
     if(input.imei&&await d.prepare('SELECT 1 FROM inventory_items WHERE imei=? AND id!=?').bind(input.imei,id).first())throw new Failure('IMEI / сериал давхардсан.',409);
     const previous=b.action==='update_item'?await requireRow(d,'inventory_items',id):null;
+    if(previous&&(!b.expected_updated_at||previous.updated_at!==b.expected_updated_at))throw new ItemConflict(Object.fromEntries(['id','updated_at','code','brand','name','variant','imei','sale_price','capacity','color','supplier','min_stock','cash_price','category','barcode','image_url'].map(key=>[key,previous[key]])));
+    const itemUpdatedAt=previous?new Date(Math.max(Date.now(),Date.parse(String(previous.updated_at))+1)).toISOString():now;
     const categoryValue=input.category===undefined?(previous?.category??''):input.category;
     const cashPrice=input.cash_price===undefined?(previous?.cash_price??null):input.cash_price;
     if(cashPrice!==null&&Number(cashPrice)>input.sale_price)throw new Failure('Бэлэн төлөлтийн үнэ үндсэн үнээс их байж болохгүй.');
@@ -225,7 +229,7 @@ export async function POST(req:Request){try{
     const key=await productKey({...input,id});
     const values=[input.code,input.brand,input.name,input.variant,input.imei||null,input.sale_price,input.capacity,input.color,input.supplier,input.min_stock,cashPrice,categoryValue,barcode,key,imageUrl];
     if(b.action==='create_item')await d.prepare('INSERT INTO inventory_items(code,brand,name,variant,imei,sale_price,capacity,color,supplier,min_stock,cash_price,category,barcode,product_key,image_url,id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(...values,id,m.email,now,now).run();
-    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,category=?,barcode=?,product_key=?,image_url=?,updated_at=? WHERE id=?').bind(...values,now,id).run();}
+    else{await requireRow(d,'inventory_items',id);await d.prepare('UPDATE inventory_items SET code=?,brand=?,name=?,variant=?,imei=?,sale_price=?,capacity=?,color=?,supplier=?,min_stock=?,cash_price=?,category=?,barcode=?,product_key=?,image_url=?,updated_at=? WHERE id=?').bind(...values,itemUpdatedAt,id).run();}
     return {ok:true,id};
    }
    if(b.action==='save_channel'){
