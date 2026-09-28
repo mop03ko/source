@@ -11,5 +11,5 @@ export function ResponsiveTabs(props:TabsProps){
  const active=props.activeKey??local;
  if(!mobile&&!overflow)return <div ref={host}><Tabs {...props} activeKey={active} onChange={key=>{setLocal(key);props.onChange?.(key);}}/></div>;
  const item=props.items?.find(item=>item.key===active);
- return <div ref={host} className={props.className}><Select id={id} aria-label={props['aria-label']||'Хэсэг сонгох'} style={{width:'100%',marginBottom:16}} value={active} options={props.items?.map(item=>({value:item.key,label:item.label,disabled:item.disabled}))} onChange={key=>{setLocal(key);props.onChange?.(key);}}/><div role="region" aria-label={typeof item?.label==='string'?item.label:'Сонгосон хэсэг'}>{item?.children}</div></div>;
+ return <div ref={host} className={props.className}><Select className="responsive-tabs-select" id={id} aria-label={props['aria-label']||'Хэсэг сонгох'} style={{width:'100%',marginBottom:16}} value={active} options={props.items?.map(item=>({value:item.key,label:item.label,disabled:item.disabled}))} onChange={key=>{setLocal(key);props.onChange?.(key);}}/><div role="region" aria-label={typeof item?.label==='string'?item.label:'Сонгосон хэсэг'}>{item?.children}</div></div>;
 }
