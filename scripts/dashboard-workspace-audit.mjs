@@ -7,7 +7,7 @@ import {encode} from 'next-auth/jwt';
 import assert from 'node:assert/strict';
 
 // Disposable local database. Optional argv[2] exercises the supplied workbook in the browser.
-const dir=await mkdtemp(join(tmpdir(),'antmall-products-')),out=resolve('artifacts/meetings-audit');
+const dir=await mkdtemp(join(tmpdir(),'antmall-products-')),out=resolve('artifacts/dashboard-workspace-audit');
 await mkdir(out,{recursive:true});
 const base='http://127.0.0.1:34691',secret=randomBytes(32).toString('base64');
 const env={...process.env,AUTH_SECRET:secret,AUTH_URL:base,AUTH_TRUST_HOST:'true',AUTH_GOOGLE_ID:'test',AUTH_GOOGLE_SECRET:'test',CRM_OWNER_EMAIL:'owner@example.test',TURSO_DATABASE_URL:'file:'+join(dir,'test.db'),TURSO_AUTH_TOKEN:'',ANTMALL_SMS_API_KEY:'',CRM_GOOGLE_SERVICE_ACCOUNT_JSON:'',NEXT_TELEMETRY_DISABLED:'1'};delete env.VERCEL;
@@ -20,7 +20,6 @@ try{
  const token=await encode({secret,salt:'authjs.session-token',token:{sub:'google:owner',email:'owner@example.test',name:'Inventory test'},maxAge:3600});
  const headers={cookie:'authjs.session-token='+token,Origin:base,'Content-Type':'application/json'};
  assert.equal((await fetch(base+'/api/crm',{headers})).status,200);
- assert.equal((await fetch(base+'/api/crm',{method:'POST',headers,body:JSON.stringify({action:'member',data:{email:'agent@example.test',name:'Test participant',role:'agent',active:true}})})).status,200);
  chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9352','--user-data-dir='+join(dir,'chrome'),'about:blank'],{stdio:'ignore',windowsHide:true});
  let target;for(let i=0;i<50;i++){try{target=(await (await fetch('http://127.0.0.1:9352/json')).json()).find(t=>t.type==='page');if(target)break;}catch{}await pause(150);}
  if(!target)throw new Error('Chrome did not start');
@@ -38,30 +37,27 @@ try{
  await cdp('Network.setCookie',{name:'authjs.session-token',value:token,url:base,httpOnly:true,sameSite:'Lax'});
 
  await cdp('Page.navigate',{url:base+'/?view=dashboard'});
+ await wait("!!document.querySelector('#personal-todos input[maxlength=\"300\"]')");
 
- await wait("!!document.querySelector('.dashboard-workspace-tabs')");
+ await fill('#personal-todos input[maxlength="300"]','Unsaved task draft');
+ await snap('dashboard-desktop');await viewport(390);await snap('dashboard-mobile');
  await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=meetings]').click()");
- await wait("!!document.querySelector('#meetings')");
- await evaluate("document.querySelector('#meetings').scrollIntoView({block:'start'})");
- await evaluate("document.querySelector('#meetings .ant-card-head button').click()");
- await wait("!!document.querySelector('.ant-modal input[maxlength=\"200\"]')");await pause(450);
- await fill('.ant-modal input[maxlength="200"]','MEETING-BROWSER-TEST');
- await evaluate("document.querySelector('.ant-modal input[type=checkbox]').click()");
- await snap('meeting-form-desktop');await viewport(390);await snap('meeting-form-mobile');
- await evaluate("document.querySelector('.ant-modal-footer .ant-btn-primary').click()");
- await wait("document.querySelector('#meetings').innerText.includes('MEETING-BROWSER-TEST')");
- await evaluate("document.querySelector('#meetings').scrollIntoView({block:'start'})");await pause(400);await snap('meeting-mobile');
- await viewport(1440);await snap('meeting-desktop');
- const result=await (await fetch(base+'/api/meetings',{headers})).json();assert.equal(result.count,1);assert.equal(result.items[0].title,'MEETING-BROWSER-TEST');assert.equal(result.items[0].attendees.length,2);
- await evaluate("document.querySelector('#meetings .ant-card-body button').click()");
- await wait("[...document.querySelectorAll('.ant-modal-title')].some(e=>e.textContent.includes('MEETING-BROWSER-TEST'))");await pause(450);await snap('meeting-details');
-
- await cdp('Page.reload');await wait("!!document.querySelector('.dashboard-workspace-tabs')");
- const m=result.items[0];assert.equal((await fetch(base+'/api/meetings',{method:'POST',headers,body:JSON.stringify({action:'update',id:m.id,version:m.version,data:{title:m.title,starts_at:new Date(Date.now()+600000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),attendees:['agent@example.test'],reminder_minutes:15}})})).status,200);
- await evaluate("window.dispatchEvent(new Event('focus'))");
- await wait("!!document.querySelector('.ant-message')?.textContent.includes('MEETING-BROWSER-TEST')");
- assert.equal((await (await fetch(base+'/api/meetings',{method:'POST',headers,body:JSON.stringify({action:'reminders'})})).json()).items.length,0);
+ await wait("!!document.querySelector('#meetings')");await pause(300);await snap('meetings-mobile');
+ await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=day]').click()");
+ assert.equal(await evaluate("document.querySelector('#personal-todos input').value"),'Unsaved task draft');
+ await viewport(1440);await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=reports]').click()");
+ await wait("!!document.querySelector('.dashboard-range')");await pause(800);await snap('reports-desktop');
+ for(const role of ['director','agent','operator','it','delivery']){
+  assert.equal((await fetch(base+'/api/crm',{method:'POST',headers,body:JSON.stringify({action:'member',data:{email:role+'@example.test',name:role,role,active:true}})})).status,200);
+  const roleToken=await encode({secret,salt:'authjs.session-token',token:{sub:'google:'+role,email:role+'@example.test',name:role},maxAge:3600});
+  await cdp('Network.setCookie',{name:'authjs.session-token',value:roleToken,url:base,httpOnly:true,sameSite:'Lax'});
+  await cdp('Page.navigate',{url:base+'/?view=dashboard'});await wait("!!document.querySelector('#personal-todos input')");await pause(500);
+  assert.equal(await evaluate("!!document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=reports]')"),role==='director');
+  await snap(role+'-desktop');
+  await evaluate("document.querySelector('.dashboard-workspace-tabs .ant-tabs-tab[data-node-key=meetings]').click()");await wait("!!document.querySelector('#meetings')");
+  assert.equal(await evaluate("!!document.querySelector('.lead-list-table')"),false);
+ }
  assert.equal(evidence.errors.length,0,JSON.stringify(evidence.errors));
- evidence.checks={createInUI:true,persisted:true,details:true,participants:true,reminderToast:true,deduplicated:true,desktop:true,mobile:true};
- console.log('PASS: Meeting scheduling form, creation, details, desktop/mobile and no overflow.');
+ evidence.checks={desktop:true,mobile:true,tabs:true,draftPreserved:true,roleIsolation:true};
+ console.log('PASS: dashboard tabs, draft preservation, role-specific UI, desktop/mobile and overflow.');
 }finally{await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));ws?.close();chrome?.kill();server.kill();}

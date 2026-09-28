@@ -1,0 +1,47 @@
+/* Dashboard-only workspace hierarchy; module screens retain their own layout. */
+.dashboard-page .main-content{max-width:1560px;margin-inline:auto;width:100%;padding:24px 32px}
+.dashboard-page .page-head{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e3e8;align-items:center}
+.dashboard-page .page-head h1{font-size:22px!important;letter-spacing:-.4px;margin:0}
+.dashboard-page .page-head .eyebrow{font-size:11px;letter-spacing:.6px;margin-bottom:6px}
+.dashboard-page .page-head p,.dashboard-page .title-dot{display:none}
+.dashboard-welcome{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:18px}
+.dashboard-kicker{display:flex;align-items:center;gap:10px;color:#69556f;font-size:11px;letter-spacing:1px;font-weight:600}
+.dashboard-kicker .ant-tag{letter-spacing:0;background:#eee8f1;color:#583b62;border:0}
+.dashboard-welcome h2{font-size:26px;letter-spacing:-.6px;margin:8px 0 6px;color:#291932;overflow-wrap:anywhere}
+.dashboard-welcome p{margin:0;color:#6c6572;font-size:13px}
+.dashboard-shortcuts{display:flex;gap:8px;flex-shrink:0}
+.dashboard-workspace-tabs>.ant-tabs-nav{margin-bottom:20px}
+.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab{padding:14px 2px;font-weight:600}
+.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab-btn{display:flex;align-items:center;gap:8px}
+.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab-icon{display:flex;margin:0}
+.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn{color:#603b6c}
+.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-ink-bar{background:#603b6c;height:3px}
+.dashboard-day-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+.dashboard-day-grid>*,.dashboard-workspace,.dashboard-workspace .ant-tabs-content-holder{min-width:0}
+.dashboard-page #personal-todos,.dashboard-page #meetings,.dashboard-day-context .daily-work{border:1px solid #e4e1e7;border-radius:10px;box-shadow:0 2px 4px #27153403;background:#fff}
+.dashboard-page #personal-todos .ant-card-head,.dashboard-page #meetings .ant-card-head{min-height:58px;padding-inline:20px}
+.dashboard-page #personal-todos .ant-card-body,.dashboard-page #meetings .ant-card-body{padding:20px}
+.dashboard-page #personal-todos .ant-card-extra{font-size:12px}
+.dashboard-day-context .daily-work{padding:20px;margin:0 0 16px}
+.dashboard-day-context .daily-work .section-heading{display:block;margin-bottom:14px}
+.dashboard-day-context .daily-work .section-heading>button{display:none}
+.dashboard-day-context .daily-work h2{font-size:16px;margin:8px 0}
+.dashboard-day-context .daily-work .eyebrow{letter-spacing:.5px;font-size:10px}
+.dashboard-day-context .daily-work .section-heading p{font-size:12px;line-height:1.6}
+.dashboard-day-context .daily-staffing{border:0;background:#f7f5f8}
+.dashboard-day-context .daily-staffing .ant-statistic-content{font-size:32px;color:#492a55}
+.dashboard-day-context .daily-staffing p{font-size:11px;line-height:1.65;margin-top:8px}
+.dashboard-day-context .daily-metrics{gap:6px}
+.dashboard-day-context .daily-metrics .ant-card-body{padding:8px}
+.dashboard-day-context .daily-metrics .ant-statistic-title{font-size:11px}
+.dashboard-meeting-shortcut{display:flex;gap:12px;padding:18px;background:#eee9f2;border:1px solid #e4dbe9;border-radius:10px;color:#583963}
+.dashboard-meeting-shortcut>svg{flex-shrink:0;margin-top:2px}
+.dashboard-meeting-shortcut strong{font-size:13px}
+.dashboard-meeting-shortcut p{font-size:12px;line-height:1.6;margin:6px 0;color:#75637c}
+.dashboard-meeting-shortcut .ant-btn{padding:0;color:#583963;height:auto;font-size:12px}
+.dashboard-report-intro{color:#6c6572;font-size:13px;padding:0 0 4px}
+.dashboard-page .work-summary{margin-top:0}
+.dashboard-page #personal-todos .ant-empty{margin:20px 0;padding:16px 0;min-height:0}
+@media(max-width:1100px){.dashboard-day-grid{grid-template-columns:1fr}.dashboard-welcome{align-items:flex-start}.dashboard-shortcuts{flex-direction:column}.dashboard-page .main-content{padding:20px}}
+@media(max-width:600px){.dashboard-page .main-content{padding:16px 12px}.dashboard-welcome{flex-direction:column;gap:14px}.dashboard-welcome h2{font-size:22px}.dashboard-shortcuts{flex-direction:row;width:100%}.dashboard-shortcuts .ant-btn{flex:1}.dashboard-page .page-head h1{font-size:19px}.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab{font-size:12px}.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab+.ant-tabs-tab{margin-left:20px}.dashboard-page #personal-todos .ant-card-head,.dashboard-page #meetings .ant-card-head{padding-inline:14px}.dashboard-page #personal-todos .ant-card-body,.dashboard-page #meetings .ant-card-body{padding:14px}.dashboard-day-context .daily-work{padding:16px}.dashboard-page #personal-todos .ant-card-extra{font-size:10px}}
+@media(max-width:600px){.dashboard-page .page-head{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:12px;text-align:left}.dashboard-page .page-head>div:first-child{min-width:0}.dashboard-page .page-head h1{font-size:19px!important}.dashboard-page .page-head .eyebrow{font-size:9px}.dashboard-page .page-head .head-actions{width:auto!important;margin:0!important;flex-shrink:0}.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab-icon{display:none}.dashboard-workspace-tabs>.ant-tabs-nav .ant-tabs-tab+.ant-tabs-tab{margin-left:16px}.dashboard-page #personal-todos .ant-empty{padding:0;margin:12px 0}}
