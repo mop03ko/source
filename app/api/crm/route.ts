@@ -400,13 +400,13 @@ export async function GET(req: Request) {
       directory,
       directSales,
     ] = await Promise.all([
-      db()
+      view==='workspace'?empty:db()
         .prepare(
           `SELECT l.*,(SELECT COUNT(*) FROM suppressions WHERE phone=l.phone) blocked FROM leads l WHERE ${where} ORDER BY ${order} LIMIT 50 OFFSET ?`,
         )
         .bind(...args, (page - 1) * 50)
         .all(),
-      db()
+      view==='workspace'?Promise.resolve({count:0}):db()
         .prepare(`SELECT COUNT(*) count FROM leads l WHERE ${where}`)
         .bind(...args)
         .first(),

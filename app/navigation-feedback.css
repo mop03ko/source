@@ -1,0 +1,10 @@
+.page-fetch-progress{position:fixed;z-index:50;top:0;left:0;right:0;height:3px;opacity:0;pointer-events:none;background:linear-gradient(90deg,transparent,#9160a3,#b65f18,transparent);background-size:200% 100%;transition:opacity .15s}
+.page-fetch-progress.is-loading{opacity:1;animation:page-fetch-slide 1.4s linear infinite}
+@keyframes page-fetch-slide{to{background-position:-200% 0}}
+.page-loading-skeleton{padding:24px;background:white;border:1px solid #e7e2ec;border-radius:12px;min-height:420px}
+.page-loading-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:28px}
+.page-data-pending .lead-list-table{visibility:hidden}
+.page-data-pending .table-scroll{min-height:220px;background:linear-gradient(90deg,#f7f5f9,#eee9f3,#f7f5f9);background-size:200% 100%;animation:page-fetch-slide 1.4s linear infinite}
+.workspace .main-content{position:relative}
+@media(max-width:600px){.page-loading-grid{grid-template-columns:1fr}.page-loading-grid>.ant-skeleton:last-child{display:none}.page-loading-skeleton{padding:18px;min-height:340px}}
+@media(prefers-reduced-motion:reduce){.page-fetch-progress.is-loading,.page-data-pending .table-scroll{animation:none}.page-fetch-progress{transition:none}}
