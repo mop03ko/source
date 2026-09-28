@@ -1,0 +1,86 @@
+/* Mobile workspace: search and primary content precede secondary tools. */
+@media(max-width:767px){
+ :root .main-content{padding:16px 12px max(20px,env(safe-area-inset-bottom))}
+ :root .page-head{display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+ :root .page-head>div:first-child{flex:1;min-width:0}
+ :root .page-head .eyebrow,:root .page-head p{display:none}
+ :root .page-head h1{font-size:24px!important;line-height:1.25;margin:0!important;overflow-wrap:anywhere}
+ :root .page-head .head-actions{width:auto;gap:8px;margin:0;justify-content:flex-end}
+ :root .page-head .head-actions button{min-height:44px}
+ :root .ant-btn,:root .mobile-disclosure-toggle{min-height:44px}
+ :root .crm-icon-button,:root .ant-modal-close,:root .ant-drawer-close{min-width:44px;min-height:44px}
+ :root .ant-checkbox-wrapper{min-width:44px;min-height:44px;align-items:center}
+ :root .ant-input,:root .ant-input-number-input,:root .ant-select,:root .ant-picker input,:root textarea{font-size:16px}
+ :root input[type=date],:root input[type=datetime-local]{width:100%;min-width:0;min-height:44px}
+ :root .crm-mobile-tabs{margin:8px 0 16px;min-width:0;width:100%}
+ :root .crm-mobile-tabs .ant-select,:root .responsive-tabs-select{min-height:44px}
+ :root .crm-disclosure.work-summary{margin-bottom:8px}
+ :root .work-summary .ant-collapse-header{padding:8px 12px!important;min-height:44px;align-items:center!important}
+ :root .table-toolbar{padding:12px;gap:8px}
+ :root .table-toolbar h2{font-size:16px;margin:0}
+ :root .table-toolbar>.row{width:100%;justify-content:space-between;gap:8px}
+ :root .table-toolbar>.row>.mobile-disclosure{flex:1;min-width:0}
+ :root .table-toolbar .mobile-disclosure-toggle{margin:0;width:100%;font-size:12px}
+ :root .view-toggle{display:flex;gap:4px}
+ :root .view-toggle .ant-btn{padding-inline:8px;font-size:12px}
+ :root .filters{padding:8px 12px;gap:8px;flex-wrap:wrap}
+ :root .filters>.search{width:100%;max-width:none;min-width:0!important;flex:1 0 100%}
+ :root .filters>.ant-select{width:100%!important;min-width:0}
+ :root .filters .search input{font-size:16px!important;min-height:44px}
+ :root .filters>.mobile-disclosure{width:100%;min-width:0}
+ :root .filters .mobile-disclosure-toggle{width:100%;margin:0;min-height:44px}
+ :root .filters .mobile-disclosure-content{gap:8px;min-width:0}
+ :root .inventory-panel .inventory-filters{display:flex;flex-direction:column;padding:8px 0;gap:8px}
+ :root .inventory-panel .inventory-heading{padding:12px;gap:8px}
+ :root .inventory-heading>.row{flex-wrap:nowrap!important;gap:8px}
+ :root .inventory-heading button[aria-label="Агуулахын тохиргоо"]{width:44px;min-width:44px;padding:0}
+ :root .inventory-heading button[aria-label="Агуулахын тохиргоо"] span{display:none}
+ :root .inventory-panel .inventory-catalog-control,:root .inventory-panel .inventory-commandbar{padding:4px 0}
+ :root .inventory-commandbar{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap}
+ :root .inventory-catalog-toolbar{margin:8px 0;gap:8px}
+ :root .inventory-catalog-toolbar>.muted{display:none}
+ :root .bulk-selection-bar[data-empty=true]{gap:4px;padding:8px 12px}
+ :root .bulk-selection-bar[data-empty=true]>.ant-btn,:root .bulk-selection-bar[data-empty=true]>small{display:none}
+ :root .bulk-selection-bar[data-empty=true]>[role=status]{font-size:12px}
+ :root .inventory-cards{padding:4px 0}
+ :root .inventory-panel .inventory-tabs>[role=region]>.mobile-disclosure{margin:0 0 8px}
+ :root .inventory-group-control{font-size:12px}
+ :root .inventory-filter-tags{margin:4px 0}
+ :root .dashboard-welcome{gap:12px;padding:0}
+ :root .dashboard-welcome h2{font-size:21px;line-height:1.35;overflow-wrap:anywhere}
+ :root .dashboard-welcome p{margin:6px 0;font-size:13px}
+ :root .dashboard-shortcuts{gap:8px}
+ :root .dashboard-shortcuts .ant-btn{flex:1}
+ :root .schedule-primary-actions{flex-wrap:wrap;overflow:visible}
+ :root .schedule-primary-actions>.ant-btn{flex:1;white-space:normal}
+ :root .dashboard-workspace-tabs .ant-tabs-tab{padding-inline:4px;margin-inline-start:12px;font-size:12px}
+ :root .dashboard-workspace-tabs .ant-tabs-tab:first-child{margin-inline-start:0}
+ :root .ant-modal{max-width:calc(100vw - 16px);margin:8px auto;padding-bottom:0}
+ :root .ant-modal .ant-modal-container{padding:16px 12px}
+ :root .ant-modal .form-dialog{max-height:none!important;overflow:visible!important}
+ :root .ant-modal .ant-modal-body{max-height:calc(100dvh - 160px)!important;overflow-y:auto;overscroll-behavior:contain}
+ :root .ant-modal:has(.ant-modal-footer) .ant-modal-body{max-height:calc(100dvh - 210px)!important}
+ :root .ant-modal-footer{padding-bottom:env(safe-area-inset-bottom)}
+ :root .ant-drawer .ant-drawer-body{overscroll-behavior:contain}
+ :root .form-grid{grid-template-columns:minmax(0,1fr)}
+ :root .form-stack,.form-stack .field{min-width:0}
+ :root .ant-picker-dropdown{position:fixed!important;left:8px!important;right:8px!important;top:8px!important;bottom:auto!important;width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;overscroll-behavior:contain}
+ :root .ant-picker-dropdown .ant-picker-panel-container,:root .ant-picker-dropdown .ant-picker-panel-layout,:root .ant-picker-dropdown .ant-picker-panel,:root .ant-picker-dropdown .ant-picker-date-panel,:root .ant-picker-dropdown .ant-picker-content{width:100%;min-width:0}
+ :root .ant-picker-dropdown .ant-picker-datetime-panel{flex-direction:column;width:100%}
+ :root .ant-picker-dropdown .ant-picker-time-panel{width:100%;border-inline-start:0;border-top:1px solid var(--border)}
+ :root .ant-picker-dropdown .ant-picker-time-panel .ant-picker-content{height:144px}
+ :root .ant-picker-dropdown .ant-picker-time-panel-column{flex:1}
+ :root .ant-picker-dropdown .ant-picker-body{padding:8px}
+ :root .ant-picker-dropdown .ant-picker-panels{flex-direction:column}
+ :root .ant-popover{max-width:calc(100vw - 16px)}
+ :root .ant-table-content,:root .table-scroll{overscroll-behavior-x:contain}
+ :root .chat-composer-tools .ant-btn{min-width:40px;padding-inline:4px}
+ :root .chat-composer-hint{font-size:12px}
+}
+@media(max-width:359px){
+ :root .page-head .head-actions>.ant-btn:not(.crm-icon-button){padding-inline:10px;font-size:12px}
+ :root .table-toolbar>.row{align-items:stretch}
+ :root .view-toggle .ant-btn{padding-inline:6px;gap:4px}
+ :root .dashboard-workspace-tabs .ant-tabs-tab-icon{display:none}
+ :root .dashboard-workspace-tabs .ant-tabs-tab{margin-inline-start:10px}
+}
