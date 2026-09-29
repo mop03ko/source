@@ -22,7 +22,7 @@ export function mysqlSql(source:string){
  sql=sql.replace(/COLLATE NOCASE/gi,'COLLATE utf8mb4_0900_as_ci');
  sql=sql.replace(/\bAS INTEGER\b/gi,'AS SIGNED');
  // KEY is a MySQL reserved word; application columns retain their original names.
- sql=tokens(sql).map(t=>/^key$/i.test(t)?'`key`':/^LIKE$/i.test(t)?'COLLATE utf8mb4_0900_as_ci LIKE':t).join('');
+ sql=tokens(sql).map((t,i,all)=>/^key$/i.test(t)?'`key`':/^row_number$/i.test(t)&&all.slice(i+1).find(next=>next.trim())!=='('?'`row_number`':/^LIKE$/i.test(t)?'COLLATE utf8mb4_0900_as_ci LIKE':t).join('');
  const ignore=/^INSERT OR IGNORE INTO\s+(\w+)/i.exec(sql);
  if(ignore){const key:Record<string,string>={organization:'id',members:'email',notifications:'id',suppressions:'phone'};if(!key[ignore[1]])throw Error('Unreviewed ignored insert');sql=sql.replace(/^INSERT OR IGNORE/i,'INSERT')+` ON DUPLICATE KEY UPDATE ${key[ignore[1]]}=${ignore[1]}.${key[ignore[1]]}`;}
  const conflict=/\s+ON CONFLICT\([^)]*\) DO UPDATE SET\s+([\s\S]+)$/i.exec(sql);
