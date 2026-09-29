@@ -66,7 +66,7 @@ export async function toggleReaction(kind:'dm'|'team',messageId:string,emoji:str
 // Хамтрагч тус бүрийн сүүлийн мессеж, уншаагүй тоог нэг дороос гаргана (харилцан яриаг жагсаах жагсаалт).
 export async function conversations(email:string){
  const [last,unread]=await Promise.all([
- db().prepare(`SELECT peer,body,created_at,sender,CASE WHEN image IS NULL THEN NULL ELSE 'image' END image FROM (SELECT CASE WHEN sender=? THEN recipient ELSE sender END peer,body,created_at,sender,image,ROW_NUMBER() OVER (PARTITION BY CASE WHEN sender=? THEN recipient ELSE sender END ORDER BY created_at DESC) rn FROM messages WHERE sender=? OR recipient=?) WHERE rn=1 ORDER BY created_at DESC`).bind(email,email,email,email).all<{peer:string;body:string;created_at:string;sender:string;image:string|null}>(),
+ db().prepare(`SELECT peer,body,created_at,sender,CASE WHEN image IS NULL THEN NULL ELSE 'image' END image FROM (SELECT CASE WHEN sender=? THEN recipient ELSE sender END peer,body,created_at,sender,image,ROW_NUMBER() OVER (PARTITION BY CASE WHEN sender=? THEN recipient ELSE sender END ORDER BY created_at DESC) rn FROM messages WHERE sender=? OR recipient=?) AS ranked_rows WHERE rn=1 ORDER BY created_at DESC`).bind(email,email,email,email).all<{peer:string;body:string;created_at:string;sender:string;image:string|null}>(),
  db().prepare('SELECT sender peer,COUNT(*) count FROM messages WHERE recipient=? AND read_at IS NULL GROUP BY sender').bind(email).all<{peer:string;count:number}>()]);
  const unreadMap=new Map(unread.results.map(r=>[r.peer,r.count]));
  return last.results.map(r=>({peer:r.peer,body:r.body,created_at:r.created_at,mine:r.sender===email,unread:unreadMap.get(r.peer)||0,image:r.image}));

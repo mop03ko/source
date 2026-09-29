@@ -68,7 +68,7 @@ export async function GET(req:Request){try{
    const rows=await db().prepare(`SELECT id,title,due_at,status FROM it_tasks WHERE ${dayWhere} ORDER BY due_at,id LIMIT 50 OFFSET ?`).bind(...dayArgs,(page-1)*50).all();
    return Response.json({items:rows.results,total:count?.n||0},{headers:{'Cache-Control':'no-store'}});
   }
-  const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM it_tasks WHERE ${where} AND due_at>=? AND due_at<?) WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
+  const cal=await db().prepare(`SELECT id,title,due_at,status,day_count FROM (SELECT id,title,due_at,status,COUNT(*) OVER (PARTITION BY date(due_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(due_at,'+8 hours') ORDER BY due_at ASC) rn FROM it_tasks WHERE ${where} AND due_at>=? AND due_at<?) AS ranked_rows WHERE rn<=5 ORDER BY due_at ASC`).bind(...args,monthStartIso,monthEndIso).all();
   return Response.json({items:cal.results},{headers:{'Cache-Control':'no-store'}});
  }
  // Тайлан горим: сонгосон хугацаанд (rfrom/rto, ирсэн огноогоор) үндэслэсэн төлөв/систем/хариуцагчийн задаргаа.

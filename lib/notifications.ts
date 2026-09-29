@@ -16,4 +16,11 @@ export async function listNotices(email:string,page=1,unreadOnly=false){const at
  db().prepare(`SELECT COUNT(*) total FROM notifications n JOIN leads l ON l.id=n.lead_id WHERE n.recipient=? AND ${visible} ${filter}`).bind(email,at).first<{total:number}>(),
  db().prepare(`SELECT COUNT(*) total FROM notifications n JOIN leads l ON l.id=n.lead_id WHERE n.recipient=? AND n.read_at IS NULL AND ${visible}`).bind(email,at).first<{total:number}>()]);return{items:rows.results,total:count?.total||0,unread:unread?.total||0,page};}
 export async function readNotices(email:string,ids:string[]){if(!ids.length)return;await db().prepare(`UPDATE notifications SET read_at=COALESCE(read_at,?) WHERE recipient=? AND id IN (${ids.map(()=>'?').join(',')})`).bind(new Date().toISOString(),email,...ids).run();}
-export async function claimAlerts(email:string){const now=new Date().toISOString();const after=new Date(Date.now()-300000).toISOString();const r=await db().prepare(`UPDATE notifications SET alerted_at=? WHERE recipient=? AND alerted_at IS NULL AND read_at IS NULL AND id IN (SELECT n.id FROM notifications n JOIN leads l ON l.id=n.lead_id WHERE n.recipient=? AND n.alerted_at IS NULL AND n.read_at IS NULL AND n.created_at>=? AND ${visible} ORDER BY n.created_at DESC LIMIT 5) RETURNING id,kind,lead_id`).bind(now,email,email,after,now).all();return r.results;}
+export async function claimAlerts(email:string){
+ const now=new Date().toISOString(),after=new Date(Date.now()-300000).toISOString();
+ return db().transaction(async tx=>{
+  const rows=await tx.prepare(`SELECT n.id,n.kind,n.lead_id FROM notifications n JOIN leads l ON l.id=n.lead_id WHERE n.recipient=? AND n.alerted_at IS NULL AND n.read_at IS NULL AND n.created_at>=? AND ${visible} ORDER BY n.created_at DESC LIMIT 5`).bind(email,after,now).all<{id:string;kind:string;lead_id:string}>();
+  if(rows.results.length)await tx.prepare(`UPDATE notifications SET alerted_at=? WHERE recipient=? AND alerted_at IS NULL AND read_at IS NULL AND id IN (${rows.results.map(()=>'?').join(',')})`).bind(now,email,...rows.results.map(r=>r.id)).run();
+  return rows.results;
+ });
+}

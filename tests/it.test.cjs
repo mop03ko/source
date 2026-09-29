@@ -62,7 +62,7 @@ const taskData=(overrides={})=>({title:'Нэвтрэх хуудасны алда
  for(let i=0;i<6;i++)await iPost('create',taskData({title:'Skew '+i,due_at:new Date(skewDay.getTime()+i*60000).toISOString()}));
  const otherDay=new Date(Date.now()+3*86400000);
  const [, otherCreate]=await iPost('create',taskData({title:'Өдрийн тухай',due_at:otherDay.toISOString()}));
- const skewMonth=new Date(skewDayIso.slice(0,10)+'T00:00:00+08:00').toISOString().slice(0,7);
+ const skewMonth=new Date(Date.parse(skewDayIso)+8*3600000).toISOString().slice(0,7);
  const otherMonth=new Date(otherDay.getTime()+8*3600000).toISOString().slice(0,7);
  [calStatus,calData]=await iGet('?calendar=1&month='+skewMonth);
  assert.equal(calStatus,200);

@@ -181,7 +181,7 @@ export async function GET(req: Request) {
       );
       const groupCount = await db()
         .prepare(
-          "SELECT COUNT(*) n FROM (SELECT phone FROM leads WHERE deleted_at IS NULL GROUP BY phone HAVING COUNT(*)>1)",
+          "SELECT COUNT(*) n FROM (SELECT phone FROM leads WHERE deleted_at IS NULL GROUP BY phone HAVING COUNT(*)>1) AS duplicate_groups",
         )
         .first<{ n: number }>();
       const phones = await db()
@@ -322,7 +322,7 @@ export async function GET(req: Request) {
       }
       const cal = await db()
         .prepare(
-          `SELECT id,name,next_at,status,day_count FROM (SELECT id,name,next_at,status,COUNT(*) OVER (PARTITION BY date(next_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(next_at,'+8 hours') ORDER BY next_at ASC) rn FROM leads l WHERE ${calWhere}) WHERE rn<=5 ORDER BY next_at ASC`,
+          `SELECT id,name,next_at,status,day_count FROM (SELECT id,name,next_at,status,COUNT(*) OVER (PARTITION BY date(next_at,'+8 hours')) day_count,ROW_NUMBER() OVER (PARTITION BY date(next_at,'+8 hours') ORDER BY next_at ASC) rn FROM leads l WHERE ${calWhere}) AS ranked_rows WHERE rn<=5 ORDER BY next_at ASC`,
         )
         .bind(...calArgs)
         .all();

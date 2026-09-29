@@ -8,6 +8,8 @@ function load(p){const out=ts.transpileModule(fs.readFileSync(p,'utf8'),{compile
 (async()=>{
  execFileSync(process.execPath,['scripts/migrate.mjs'],{env:process.env});
  execFileSync(process.execPath,['scripts/migrate.mjs'],{env:process.env});
+ deps['./mysql-sql']=load('lib/mysql-sql.ts');deps['./mysql-client']=load('lib/mysql-client.ts');
+ deps['./migration-gate']=load('lib/migration-gate.ts');
  const database=load('lib/database.ts');const {DB}=database;
  assert.equal((await DB.prepare('SELECT count(*) n FROM crm_migrations').first()).n,fs.readdirSync('drizzle').filter(p=>p.endsWith('.sql')).length);
  await DB.prepare('CREATE TABLE probe(id TEXT PRIMARY KEY, value TEXT)').run();
@@ -40,6 +42,11 @@ function load(p){const out=ts.transpileModule(fs.readFileSync(p,'utf8'),{compile
  user={...user,userId:'google:imposter'};await assert.rejects(member,e=>e.status===403);
  user={...user,userId:'google:agent'};await DB.prepare("UPDATE members SET active=0 WHERE email='agent@example.test'").run();await assert.rejects(member,e=>e.status===403);
  user=null;await assert.rejects(member,e=>e.status===401);
+ await DB.prepare("INSERT INTO app_settings(key,value,updated_at) VALUES('migration_read_only','true','test')").run();
+ await assert.rejects(()=>DB.prepare("UPDATE probe SET value='blocked'").run(),/migration/);
+ await assert.rejects(()=>DB.batch([DB.prepare("DELETE FROM probe")]),/migration/);
+ await assert.rejects(()=>DB.transaction(async tx=>tx.prepare("DELETE FROM probe").run()),/migration/);
+ assert.ok((await DB.prepare('SELECT COUNT(*) n FROM probe').first()).n>0);
  await database.getClient().close();
  // Windows дээр sqlite файлын handle шууд суллагдахгүй байж болох тул түр хугацааны файлыг цэвэрлэж чадаагүй ч тестийн үр дүнд нөлөөлөхгүй.
  try{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}catch{}

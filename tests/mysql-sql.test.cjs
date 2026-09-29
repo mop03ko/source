@@ -1,0 +1,14 @@
+const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert/strict');
+const m={exports:{}};new Function('exports',ts.transpileModule(fs.readFileSync('lib/mysql-sql.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(m.exports);
+const {mysqlSql}=m.exports;
+assert.equal(mysqlSql("SELECT MAX(0,SUM(qty)),MIN(price),name LIKE ?, 'key LIKE MAX(1,2)' FROM items"),"SELECT GREATEST(0,SUM(qty)),MIN(price),name COLLATE utf8mb4_0900_as_ci LIKE ?, 'key LIKE MAX(1,2)' FROM items");
+assert.match(mysqlSql("SELECT date(due_at,'+8 hours')"),/INTERVAL 8 HOUR/);
+assert.match(mysqlSql("SELECT julianday('now','-14 days')"),/INTERVAL -14 DAY/);
+assert.match(mysqlSql("SELECT printf('ANT-%06d',pc.id)"),/CHAR_LENGTH/);
+assert.match(mysqlSql('SELECT CAST(ROUND(total_price*100) AS INTEGER)'),/AS SIGNED/);
+assert.equal(mysqlSql('SELECT key,value FROM app_settings WHERE key=?'),'SELECT `key`,value FROM app_settings WHERE `key`=?');
+assert.match(mysqlSql("INSERT INTO meeting_reminders(meeting_id,version,recipient,alerted_at) VALUES(?,?,?,?) ON CONFLICT(meeting_id,version,recipient) DO UPDATE SET alerted_at=excluded.alerted_at WHERE meeting_reminders.acknowledged_at IS NULL"),/alerted_at=IF\(meeting_reminders.acknowledged_at IS NULL,VALUES\(alerted_at\),alerted_at\)/);
+assert.match(mysqlSql('INSERT OR IGNORE INTO members(email,name) VALUES(?,?)'),/ON DUPLICATE KEY UPDATE email=members.email$/);
+assert.throws(()=>mysqlSql('INSERT OR IGNORE INTO unknown_table VALUES(?)'));
+assert.throws(()=>mysqlSql('UPDATE x SET y=1 RETURNING y'));
+console.log('PASS: reviewed MySQL dialect mappings, quoted literals, fractional dates, scalar aggregates, SKU padding and conditional upserts');

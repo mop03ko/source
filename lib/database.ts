@@ -1,12 +1,15 @@
 import {createClient, type Client, type InValue, type ResultSet} from '@libsql/client';
+import {createMysqlClient} from './mysql-client';
+import {withMigrationGate} from './migration-gate';
 let client:Client|undefined;
 export function getClient(){
  if(!client){
+  if(process.env.MYSQL_URL){client=createMysqlClient(process.env.MYSQL_URL);return client;}
   const url=process.env.TURSO_DATABASE_URL;
   if(!url)throw new Error('TURSO_DATABASE_URL тохируулаагүй.');
   if(process.env.VERCEL && !url.startsWith('libsql://') && !url.startsWith('https://'))throw new Error('Vercel дээр cloud өгөгдлийн сан ашиглана.');
   if(process.env.VERCEL && !process.env.TURSO_AUTH_TOKEN)throw new Error('TURSO_AUTH_TOKEN тохируулаагүй.');
-  client=createClient({url,authToken:process.env.TURSO_AUTH_TOKEN});
+  client=withMigrationGate(createClient({url,authToken:process.env.TURSO_AUTH_TOKEN}));
  }
  return client;
 }
