@@ -15,3 +15,5 @@ Initial mapping uses the live website catalog, not the September 23 CSV. `script
 Initial audit: 551 active website products and 1,549 active CRM groups; 17 exact, unambiguous links and 534 website products requiring review. No product records were merged or inventory balances changed.
 
 Storefront templates live in `deploy/storefront/*stock*`. Apply the Python patcher to a source snapshot and build before activation; preserve the live site's unrelated changes and previous `.next` build. CRM validation: `node tests/site-stock-intake.test.cjs`, typecheck and lint. Endpoint tests cover unauthorized requests, invalid IDs, inactive items, aggregate stock, zero clamping, missing/stale/disabled mappings and sanitized errors.
+
+Current presentation: the user requested hiding inventory information entirely. Product cards and product detail pages no longer render the stock panel. Internal CRM quantity checks remain in the detail cart controls. `hide-stock-display.py` removes the previously deployed panel without changing its data integration.

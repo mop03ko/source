@@ -19,12 +19,12 @@ def edit(path, replacements):
 
 # Stock information is displayed only on the detail page, not product cards.
 edit('components/product/ProductDetailClient.tsx',[
- ('import Link from "next/link";', 'import Link from "next/link";\nimport {useCrmStock, StockMessage} from "./crm-stock";'),
+ ('import Link from "next/link";', 'import Link from "next/link";\nimport {useCrmStock} from "./crm-stock";'),
  ('  const currentProduct = initialProduct;', '  const currentProduct = initialProduct;\n  const stockId = initialProduct?.has_variants ? String(selectedVariantPid ?? "") : String(initialProduct?.product?.id ?? "");\n  const crmStock = useCrmStock(stockId);'),
  ('  const currentAmount = hasVariants', '  const currentAmount = crmStock.status === "ready" ? crmStock.quantity ?? 0 : hasVariants'),
  ('  const showCartSection = !hasVariants || !hasVariantParam || currentAmount > 0;', '  const showCartSection = (hasVariants && !hasVariantParam) || currentAmount > 0;'),
  ('  const isCartDisabled = hasVariants && !hasVariantParam;', '  const isCartDisabled = (hasVariants && !hasVariantParam) || crmStock.status === "loading";'),
- ('          <CartSection', '          {stockId && <StockMessage stock={crmStock} />}\n\n          <CartSection\n            key={cartProductId}'),
+ ('          <CartSection', '          <CartSection\n            key={cartProductId}'),
  ('              amount={currentAmount}', '              amount={undefined}'),
 ])
 edit('components/product/WarningMessage.tsx',[
