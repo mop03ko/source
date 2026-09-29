@@ -1,0 +1,15 @@
+# Website stock display
+
+The Next.js storefront reads CRM inventory through its server-only `/api/crm-stock` proxy. The CRM endpoint is `GET /api/integrations/site-stock?ids=1,2` with a private `X-Token` header using `CRM_SITE_STOCK_TOKEN` (at least 32 characters). The website also requires `CRM_SITE_STOCK_URL`, set to `http://127.0.0.1:3001/api/integrations/site-stock` on the shared server. This token is separate from the existing public products API token and web loan token.
+
+Only enabled `site_stock_links` with a matching `site_catalog` code and active CRM items produce results. Quantities sum stock movements across all warehouses and clamp negative totals to zero. Missing links and outages are never interpreted as zero. Responses contain product IDs, code and quantity only; the storefront proxy additionally strips the code. Neither IMEI nor cost is returned.
+
+Cards batch requests (maximum 100 IDs). Browser results last 15 seconds and visible pages refresh every 30 seconds. Switching a variant immediately discards the previous variant's displayed count. The product detail quantity control uses the CRM count when mapped. Zero displays the requested Mongolian call-to-inquire message with a `tel:72005588` link. Nonzero counts display `Бэлэн: N ширхэг`. Unmapped detail pages offer telephone stock confirmation, while unmapped cards show no CRM count. Existing catalog inventory remains the fallback for their cart behavior.
+
+This is stock **display**, not a reservation or order synchronization system. It does not change CS-Cart's database amounts or guarantee checkout availability. The existing website checkout remains authoritative for placing orders. CRM movements must still reflect sales; adding automatic website order reservations is separate work.
+
+Initial mapping uses the live website catalog, not the September 23 CSV. `scripts/prepare-stock-links.py <export-directory>` requires `site.jsonl` and `crm.jsonl` and prepares (without executing) SQL and a CSV review report. Matching permits case/whitespace normalization only and requires a unique model/name, capacity and color on both sides, with no extra variant descriptor. Duplicates and ambiguous products stay unmapped. Before applying, take a DB backup and review the generated matches. Inserts intentionally fail instead of replacing existing links.
+
+Initial audit: 551 active website products and 1,549 active CRM groups; 17 exact, unambiguous links and 534 website products requiring review. No product records were merged or inventory balances changed.
+
+Storefront templates live in `deploy/storefront/*stock*`. Apply the Python patcher to a source snapshot and build before activation; preserve the live site's unrelated changes and previous `.next` build. CRM validation: `node tests/site-stock-intake.test.cjs`, typecheck and lint. Endpoint tests cover unauthorized requests, invalid IDs, inactive items, aggregate stock, zero clamping, missing/stale/disabled mappings and sanitized errors.

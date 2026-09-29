@@ -1,0 +1,30 @@
+import "server-only";
+
+export const runtime = "nodejs";
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const ids = params.get("ids")?.split(",") ?? [];
+  const headers = { "Cache-Control": "private, no-store" };
+  if (params.getAll("ids").length !== 1 || [...params.keys()].some(k => k !== "ids") || !ids.length || ids.length > 100 || ids.some(id => !/^[1-9]\d{0,14}$/.test(id))) {
+    return Response.json({error: "INVALID_IDS"}, {status: 400, headers});
+  }
+  const token = process.env.CRM_SITE_STOCK_TOKEN;
+  const base = process.env.CRM_SITE_STOCK_URL;
+  if (!token || !base) return Response.json({error: "STOCK_UNAVAILABLE"}, {status: 503, headers});
+  try {
+    const url = new URL(base);
+    url.searchParams.set("ids", [...new Set(ids)].join(","));
+    const response = await fetch(url, {headers: {"X-Token": token}, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(4000)});
+    if (!response.ok) throw new Error("Stock unavailable");
+    const body = await response.json();
+    if (!Array.isArray(body.data)) throw new Error("Invalid stock response");
+    const allowed = new Set(ids);
+    const data = body.data.map((row: {product_id: string; quantity: number}) => {
+      if (!allowed.has(String(row.product_id)) || !Number.isFinite(row.quantity) || row.quantity < 0) throw new Error("Invalid stock row");
+      return {product_id: String(row.product_id), quantity: row.quantity};
+    });
+    return Response.json({data, as_of: body.as_of}, {headers});
+  } catch {
+    return Response.json({error: "STOCK_UNAVAILABLE"}, {status: 503, headers});
+  }
+}
