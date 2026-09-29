@@ -23,6 +23,9 @@ export function existingRow(rows,lead){
  return rows.findIndex((row,index)=>index>0&&!row[26]&&timestampKey(row[0])!==null&&Math.abs(timestampKey(row[0])-stamp)<=1&&[lead.phone,lead.registration,lead.product,lead.name].every((value,i)=>String(row[i+1]??'').trim()===String(value).trim()));
 }
 export function sheetValues(lead){const row=Array(27).fill('');row.splice(0,5,sheetTimestamp(lead.received_at),lead.phone,lead.registration,lead.product,lead.name);row[26]=lead.id;return row;}
+export function columnName(number){let name='';for(;number>0;number=Math.floor((number-1)/26))name=String.fromCharCode(65+(number-1)%26)+name;return name;}
+export function occupiedRow(row){return (row.values||[]).some(cell=>Boolean(cell.note)||Object.values(cell.userEnteredValue||{}).some(value=>value!==''&&value!==null&&value!==undefined));}
+export function firstEmptyRow(occupied,rowCount){for(let row=2;row<=rowCount;row++)if(!occupied.has(row))return row;return null;}
 async function googleToken(){
  const email=process.env.WEB_LOAN_SHEET_CLIENT_EMAIL,key=process.env.WEB_LOAN_SHEET_PRIVATE_KEY_BASE64?Buffer.from(process.env.WEB_LOAN_SHEET_PRIVATE_KEY_BASE64,'base64').toString():process.env.WEB_LOAN_SHEET_PRIVATE_KEY;
  if(!email||!key)throw Error('Mirror credentials missing');
@@ -45,7 +48,7 @@ export async function runMirror(){
   if(!leads.length){console.log('Sheet mirror: no pending requests');return;}
   const token=await googleToken(),headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
   const read=async url=>{const r=await fetch(url,{headers,signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Google read HTTP '+r.status);return r.json();};
-  const metadata=await read(root+'?fields=sheets(properties(sheetId,title,gridProperties(columnCount)))');
+  const metadata=await read(root+'?fields=sheets(properties(sheetId,title,gridProperties(columnCount,rowCount)))');
   const tab=metadata.sheets.find(s=>s.properties.sheetId===sheetGid)?.properties;
   if(!tab||tab.gridProperties.columnCount<27)throw Error('Sheet tab or marker column unavailable');
   const range="'"+tab.title.replaceAll("'","''")+"'!";
@@ -57,6 +60,16 @@ export async function runMirror(){
    const r=await fetch(urlRange('AA1')+'?valueInputOption=RAW',{method:'PUT',headers,body:JSON.stringify({values:[[markerHeader]]}),signal:AbortSignal.timeout(15000)});
    if(!r.ok)throw Error('Marker header HTTP '+r.status);
   }
+  // userEnteredValue preserves formulas even when their displayed result is empty.
+  // Notes and values in every allocated column also protect a row from reuse.
+  let rowCount=tab.gridProperties.rowCount;
+  const lastColumn=columnName(tab.gridProperties.columnCount),occupied=new Set([1]);
+  const inspectRows=async(start,end)=>{
+   const data=await read(root+'?ranges='+encodeURIComponent(range+`A${start}:${lastColumn}${end}`)+'&fields=sheets(data(startRow,rowData(values(userEnteredValue,note))))');
+   for(const sheet of data.sheets||[])for(const grid of sheet.data||[])for(const [offset,row] of (grid.rowData||[]).entries())if(occupiedRow(row))occupied.add((grid.startRow||0)+offset+1);
+  };
+  const chunk=Math.max(1,Math.floor(40000/tab.gridProperties.columnCount));
+  for(let start=2;start<=rowCount;start+=chunk)await inspectRows(start,Math.min(rowCount,start+chunk-1));
   let mirrored=0,reconciled=0,uncertain=0,failed=0;const started=Date.now();
   const record=async(lead,kind,note)=>db.execute("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,'AntMall Sheet',?) ON DUPLICATE KEY UPDATE kind=VALUES(kind),note=VALUES(note)",['sheet-'+lead.id,lead.id,lead.phone,kind,note,new Date().toISOString()]);
   for(const lead of leads){
@@ -68,20 +81,32 @@ export async function runMirror(){
    }
    if(['sheet_sending','sheet_uncertain'].includes(lead.mirror_state)){uncertain++;continue;}
    if(mirrored+failed>=40)break;
-   // Claim before append: a timeout must never cause a blind duplicate append.
+   let target;
+   while(true){
+    target=firstEmptyRow(occupied,rowCount);
+    if(target===null){
+     // Extend capacity only at the bottom; never insert or shift existing rows.
+     const extension=await fetch(root+':batchUpdate',{method:'POST',headers,body:JSON.stringify({requests:[{appendDimension:{sheetId:sheetGid,dimension:'ROWS',length:100}}]}),signal:AbortSignal.timeout(20000)});
+     if(!extension.ok)throw Error('Sheet capacity HTTP '+extension.status);
+     rowCount+=100;continue;
+    }
+    await inspectRows(target,target);
+    if(!occupied.has(target))break;
+   }
+   occupied.add(target); // Never reuse a target after an uncertain response in this run.
    await record(lead,'sheet_sending','Google Sheet-д давхар бүртгэж байна.');
+   const targetRange=`A${target}:AA${target}`,values=sheetValues(lead);
    let response;
-   // Search only the original A:E table. Including isolated AA markers can
-   // make Sheets detect a different table and start an append at column AA.
-   try{response=await fetch(urlRange('A:E')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{method:'POST',headers,body:JSON.stringify({values:[sheetValues(lead)]}),signal:AbortSignal.timeout(20000)});}
+   try{response=await fetch(urlRange(targetRange)+'?valueInputOption=RAW',{method:'PUT',headers,body:JSON.stringify({values:[values]}),signal:AbortSignal.timeout(20000)});}
    catch{await record(lead,'sheet_uncertain','Google Sheet-ийн хариу тодорхойгүй. Давхар бичихээс өмнө хүсэлтийн ID-аар тулгана.');uncertain++;continue;}
    if(!response.ok){const kind=response.status>=500?'sheet_uncertain':'sheet_pending';await record(lead,kind,'Google Sheet бичилт HTTP '+response.status);failed++;continue;}
    let result;try{result=await response.json();}catch{await record(lead,'sheet_uncertain','Google Sheet-ийн хариуг тулгаж шалгах шаардлагатай.');uncertain++;continue;}
-   if(result.updates?.updatedRows!==1||!/!A\d+:AA\d+$/.test(result.updates?.updatedRange||'')){await record(lead,'sheet_uncertain','Google Sheet-ийн бичилтийн багана, мөрийг тулгаж шалгах шаардлагатай.');uncertain++;continue;}
+   if(result.updatedRows!==1||!result.updatedRange?.endsWith('!'+targetRange)){await record(lead,'sheet_uncertain','Google Sheet-ийн бичилтийн багана, мөрийг тулгаж шалгах шаардлагатай.');uncertain++;continue;}
    // Read back the request marker before calling this export complete.
-   const written=await read(root+'/values/'+encodeURIComponent(result.updates.updatedRange)+'?valueRenderOption=UNFORMATTED_VALUE');
-   if(written.values?.[0]?.[26]!==lead.id){await record(lead,'sheet_uncertain','Google Sheet-ийн хүсэлтийн ID баталгаажаагүй.');uncertain++;continue;}
-   rows.push(sheetValues(lead));await record(lead,'note','Google Sheet-д давхар бүртгэгдсэн.');mirrored++;
+   const written=await read(root+'/values/'+encodeURIComponent(result.updatedRange)+'?valueRenderOption=UNFORMATTED_VALUE');
+   if(![0,1,2,3,4,26].every(index=>written.values?.[0]?.[index]===values[index])){await record(lead,'sheet_uncertain','Google Sheet-ийн хүсэлтийн ID баталгаажаагүй.');uncertain++;continue;}
+   while(rows.length<target)rows.push([]);
+   rows[target-1]=values;await record(lead,'note','Google Sheet-д давхар бүртгэгдсэн.');mirrored++;
   }
   console.log(JSON.stringify({mirrored,reconciled,uncertain,failed}));
  }finally{if(locked)await db.query("SELECT RELEASE_LOCK('antmall_web_loan_sheet_mirror')");await db.end();}
