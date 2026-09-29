@@ -17,10 +17,7 @@ def edit(path, replacements):
         text=text.replace(before,after)
     p.write_text(text,encoding='utf8')
 
-edit('components/product/ProductGridCard.tsx',[
- ('import Link from "next/link";', 'import Link from "next/link";\nimport {CrmStock} from "./crm-stock";'),
- ('        <CardSaleCountdown', '        <div className="px-3.5 pb-3"><CrmStock id={String(product.product_id)} /></div>\n        <CardSaleCountdown'),
-])
+# Stock information is displayed only on the detail page, not product cards.
 edit('components/product/ProductDetailClient.tsx',[
  ('import Link from "next/link";', 'import Link from "next/link";\nimport {useCrmStock, StockMessage} from "./crm-stock";'),
  ('  const currentProduct = initialProduct;', '  const currentProduct = initialProduct;\n  const stockId = initialProduct?.has_variants ? String(selectedVariantPid ?? "") : String(initialProduct?.product?.id ?? "");\n  const crmStock = useCrmStock(stockId);'),
