@@ -14,8 +14,8 @@ type Connection={id:number;config:string;credential:string|null;email:string|nul
 // Two independent Sheets sources can run side by side (e.g. two different intake tabs).
 // Each has its own row in sheet_connection, keyed by a small fixed id; sheet_links/leads
 // stay a shared, source-agnostic dedupe space keyed by content (date+phone), not by id.
-export const CONNECTION_IDS=[1,2] as const;
-export type ConnectionId=typeof CONNECTION_IDS[number];
+export type ConnectionId=1|2;
+export const CONNECTION_IDS:readonly ConnectionId[]=process.env.CRM_DIRECT_WEB_LOANS==='true'?[1]:[1,2];
 export async function connection(id:ConnectionId=1){return await db().prepare('SELECT * FROM sheet_connection WHERE id=?').bind(id).first<Connection>();}
 export async function publicConnection(id:ConnectionId=1){const c=await connection(id);return {id,config:c?configSchema.parse(JSON.parse(c.config)):defaults,email:c?.email||null,hasCredential:!!c?.credential,enabled:!!c?.enabled,checked:!!c?.checked,lastAt:c?.last_at||null,lastError:c?.last_error||null,lastResult:c?.last_result?JSON.parse(c.last_result):null};}
 export async function saveConnection(id:ConnectionId,raw:unknown,credential?:unknown){const config=configSchema.parse(raw);if(new Set(Object.values(config.columns)).size!==6)throw new Error('Баганууд давхцахгүй байна.');const names=Object.keys(config.aliases).map(label);if(new Set(names).size!==names.length)throw new Error('Ажилтны нэр давхардсан байна.');const stageNames=Object.keys(config.statusMap).map(label);if(new Set(stageNames).size!==stageNames.length)throw new Error('Төлөвийн нэр давхардсан байна.');for(const email of Object.values(config.aliases)){if(!await db().prepare("SELECT email FROM members WHERE lower(email)=? AND active=1 AND role IN ('admin','manager','agent')").bind(email.toLowerCase()).first())throw new Error('Идэвхтэй CRM ажилтантай нэрийг холбоно уу.');}
