@@ -6,6 +6,7 @@ const allowed=new Set(['path','systemroot','windir','comspec','pathext','temp','
 const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>allowed.has(key.toLowerCase())));
 env.NODE_ENV='test';env.NEXT_TELEMETRY_DISABLED='1';
 const suites=[
+ 'source-fence.test.mjs',
  'origin-proxy.test.cjs','login-config.test.cjs','mysql-sql.test.cjs','crm.test.cjs','it.test.cjs','marketing.test.cjs','messages.test.cjs','sheets.test.cjs',
  'sms-rules.test.cjs','sms.test.cjs','inventory-counts.test.cjs','inventory.test.cjs',
  'inventory-workflows.test.cjs','lead-purchases.test.cjs','deliveries.test.cjs','schedule.test.cjs',
