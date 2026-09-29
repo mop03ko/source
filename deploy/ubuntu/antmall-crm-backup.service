@@ -1,0 +1,7 @@
+[Unit]
+Description=AntMall CRM MySQL consistent backup
+After=mysql.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/antmall-crm-backup antmall_crm_production
+UMask=0077

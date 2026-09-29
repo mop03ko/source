@@ -2,7 +2,21 @@
 
 Target: existing Ubuntu host 202.131.1.134. CRM runs separately on localhost:3001 under `antmall-crm`; existing sites and port 3000 remain independent. Apache terminates TLS. Node runtime is installed at `/opt/antmall-crm-node/bin/node`.
 
-## Current status — 2026-09-29
+## Live cutover — 2026-09-29
+
+The user changed crm.antmall.mn to 202.131.1.134. All four authoritative nameservers confirmed the new A record. An HTTP webroot certificate was issued and renewal dry-run passed; the earlier manual DNS challenge was canceled.
+
+At 04:23:34 UTC the source was frozen with database triggers. A raw legacy-client write was rejected. The final import matched all 46 tables, including 29,931 leads, 38,838 activities, 3,164 inventory registrations, 3,019 deliveries and 39 migration records. Private snapshot/report: `/srv/antmall-crm/backups/production-cutover`; SHA-256: `c7102753e3e59078712453c75eeb6daca7392296e7de83f1502dbf5c4523d72b`.
+
+`antmall-crm.service` now runs release `7964481` on localhost:3001 with `/srv/antmall-crm/shared/production.env` and `antmall_crm_production`. The public Apache virtual host is enabled. The MySQL-only post-import adjustments disabled automatic SMS, cleared Sheet leases and removed the source migration flag. The original source remains frozen. No live SMS was sent during validation.
+
+HTTPS login and authenticated CRM, inventory, balance, dashboard, meetings, todos, settings, messages and auth-provider reads passed. Meeting reminder POST returned 200 for the correct origin and 403 for an untrusted origin. The two Sheet credentials were independently verified against Google before import. Real-user Google login and SMS delivery were not exercised by the agent.
+
+crm3 now redirects to crm.antmall.mn (302); the preview service is stopped and disabled. Daily backup timer is enabled for 18:00 UTC (02:00 Ulaanbaatar), with up to five minutes jitter. The first production SQL backup completed under `/srv/antmall-crm/backups/mysql`. Backup/restore was verified in rehearsal. Backup files remain on this server; off-server disaster recovery is not configured.
+
+At validation, Cloudflare and Google recursive DNS still cached 76.76.21.21 with the previous 7200-second TTL. Such users may temporarily reach the fenced Vercel copy. Do not unfreeze Turso: MySQL is now authoritative. Recheck DNS propagation before removing old hosting. This live status supersedes the preparation history below.
+
+## Preparation history — 2026-09-29
 
 Public CRM remains on Vercel/Turso; the source is not frozen. The original crm.antmall.mn DNS/certificate cutover remains postponed. The canceled DNS challenge must not be reused. Port 3001 is a loopback-only preparation instance of the original release using Turso. The synthetic MySQL stage service is stopped after validation.
 
