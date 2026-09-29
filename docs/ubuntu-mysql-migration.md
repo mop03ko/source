@@ -24,10 +24,12 @@ MySQL schema is generated from the reviewed SQLite migration schema. Monetary co
 
 ## Cutover order
 
+Cutover preparation resumed with user authorization: release `7964481` is staged, `antmall_crm_production` exists empty, and `/srv/antmall-crm/shared/production.env` holds the dedicated CRUD account, original auth/encryption settings and updated SMS key. Both encrypted Sheet connections successfully authenticated and read metadata from Google. The daily backup service/timer are installed but not enabled. The unused Turso-backed loopback service on port 3001 is stopped. Production source writes remain enabled while the crm certificate DNS challenge is pending; no final import or DNS cutover has occurred.
+
 1. Verify the release against an isolated MySQL copy. Stage has synthetic authentication and disabled SMS/Sheet writes.
 2. Obtain the CRM certificate, install the Apache virtual host and check HTTPS using an explicit DNS override before changing public DNS.
-3. Deploy the migration gate to every Turso-backed production instance. Confirm the deployed revision before freezing.
-4. Freeze Turso using `node --env-file=... scripts/migration-source.mjs freeze`. This is an atomic setting change serialized with writes. Existing older deployments without the gate must be retired or blocked before cutover.
+3. Verify the migration release and backup readiness before freezing. The application gate is supplemented by database triggers so older deployments are also fenced.
+4. Freeze Turso using `node --env-file=... scripts/migration-source.mjs freeze`. It atomically installs write-blocking triggers on every application table and sets the freeze flag. This blocks legacy clients as well as the new application gate. The migration flag itself remains administratively adjustable for controlled rollback; never release it after MySQL production writes without reconciliation.
 5. Import into a **new empty** `antmall_crm_production` database with `scripts/mysql-import.mjs`. Supply MYSQL_URL, Turso credentials, CRM_BACKUP_DIR and, for schema/trigger administration, MYSQL_ADMIN_SOCKET. The script saves a private source snapshot, SHA-256 and metadata, and compares every imported row.
 6. Switch the server release/env to MySQL. Preserve Google credentials, encryption key, public API token digest and business settings. Set AUTH_URL=https://crm.antmall.mn. Restart only the CRM service and verify HTTPS/API behavior.
 7. Point Datacom's crm A record to 202.131.1.134; remove conflicting crm CNAME/AAAA entries if present. Preserve unrelated DNS records. Keep Turso fenced while DNS caches expire.
