@@ -4,7 +4,13 @@ Target: existing Ubuntu host 202.131.1.134. CRM runs separately on localhost:300
 
 ## Current status — 2026-09-29
 
-The user postponed DNS/certificate work. Public CRM remains on Vercel/Turso; the source is not frozen. No CRM Apache virtual host is enabled and no CRM certificate was issued. The canceled DNS challenge must not be reused. Port 3001 is a loopback-only preparation instance of the original release using Turso. The isolated MySQL stage on port 3002 is stopped after validation.
+Public CRM remains on Vercel/Turso; the source is not frozen. The original crm.antmall.mn DNS/certificate cutover remains postponed. The canceled DNS challenge must not be reused. Port 3001 is a loopback-only preparation instance of the original release using Turso. The synthetic MySQL stage service is stopped after validation.
+
+The user created crm3.antmall.mn pointing to 202.131.1.134 and explicitly chose preview-only use. HTTPS is enabled with a webroot-issued certificate. `antmall-crm-preview.service` serves the reviewed MySQL build on loopback port 3002, using `antmall_crm_test_rehearsal` and a dedicated CRUD-only DB account. Its private configuration is `/srv/antmall-crm/shared/crm3.env`. The database is an independent snapshot, not synchronized with production. SMS credentials and Google Sheet credentials/encryption key are absent; copied Sheet connection records were removed and SMS rules disabled. Production OAuth credentials are reused only for login, with a separate session secret and AUTH_URL.
+
+The user added `https://crm3.antmall.mn/api/auth/callback/google` to the existing client's authorized redirect URIs. Rechecking confirmed that redirect_uri_mismatch disappeared and Google serves its sign-in page. A real user's completed Google login remains to be exercised. HTTPS login, unauthenticated API protection, and authenticated CRM/inventory/dashboard/todo/meeting reads were verified. Never enter real transactions in the preview expecting them to appear in production.
+
+Certificate renewal uses the retained webroot and `/etc/letsencrypt/renewal-hooks/deploy/crm3-apache-reload` to reload Apache after renewal. The preview virtual host template is `deploy/ubuntu/crm3.antmall.mn.conf`.
 
 The migration branch is preparation only. Do not promote the stage or rehearsal databases: stage contains test mutations, and rehearsal is an unfrozen historical snapshot. Final cutover requires a fresh, frozen-source import and HTTPS/DNS validation.
 
