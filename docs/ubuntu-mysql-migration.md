@@ -12,6 +12,8 @@ The user added `https://crm3.antmall.mn/api/auth/callback/google` to the existin
 
 Certificate renewal uses the retained webroot and `/etc/letsencrypt/renewal-hooks/deploy/crm3-apache-reload` to reload Apache after renewal. The preview virtual host template is `deploy/ubuntu/crm3.antmall.mn.conf`.
 
+Subsequent preview update: the user supplied a new Unitel SMS key, installed only in the private CRM3 environment. Manual SMS is now configured; automatic SMS rules remain disabled. No live message was sent during setup, so provider acceptance/delivery remains unverified. Google Sheet credentials remain absent. This supersedes the initial SMS-credentials-absent state above.
+
 The migration branch is preparation only. Do not promote the stage or rehearsal databases: stage contains test mutations, and rehearsal is an unfrozen historical snapshot. Final cutover requires a fresh, frozen-source import and HTTPS/DNS validation.
 
 ## Storage compatibility
