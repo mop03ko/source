@@ -17,7 +17,7 @@ const get=(ids,auth=token)=>moduleObject.exports.GET(new Request('https://crm.te
  assert.equal((await get('ids=1','bad')).status,401);assert.equal(calls,0);
  for(const q of ['ids=0','ids=1&ids=2','ids=1&x=2','ids='+Array(101).fill('1').join(','),'ids=1%27'])assert.equal((await get(q)).status,400);
  const res=await get('ids=1,2,3,4,5');assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'private, no-store');
- assert.deepEqual((await res.json()).data,[{product_id:'1',product_code:'a',quantity:9},{product_id:'2',product_code:'b',quantity:0}]);
+ const data=(await res.json()).data; assert.deepEqual(data[0].branches,[{name:'Olympic Galleria',quantity:4},{name:'Go.To Market',quantity:2},{name:'Tumen Mall',quantity:3}]); assert.deepEqual(data.map(({branches,...row})=>row),[{product_id:'1',product_code:'a',quantity:9},{product_id:'2',product_code:'b',quantity:0}]);
  // Stock only in excluded warehouses still returns a mapped zero, not unknown.
  sqlite.exec("DELETE FROM inventory_stock_moves WHERE item_id='d'; INSERT INTO inventory_stock_moves VALUES('d',50,'union');");
  assert.equal((await (await get('ids=2')).json()).data[0].quantity,0);

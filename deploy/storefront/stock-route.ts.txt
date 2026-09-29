@@ -19,9 +19,15 @@ export async function GET(request: Request) {
     const body = await response.json();
     if (!Array.isArray(body.data)) throw new Error("Invalid stock response");
     const allowed = new Set(ids);
-    const data = body.data.map((row: {product_id: string; quantity: number}) => {
+    const data = body.data.map((row: {product_id: string; quantity: number; branches?: {name: string; quantity: number}[]}) => {
       if (!allowed.has(String(row.product_id)) || !Number.isFinite(row.quantity) || row.quantity < 0) throw new Error("Invalid stock row");
-      return {product_id: String(row.product_id), quantity: row.quantity};
+      const names = ["Olympic Galleria", "Go.To Market", "Tumen Mall"];
+      const branches = row.branches?.map(branch => {
+        if (!names.includes(branch.name) || !Number.isFinite(branch.quantity) || branch.quantity < 0) throw new Error("Invalid branch");
+        return {name: branch.name, quantity: branch.quantity};
+      });
+      if (branches && (branches.length !== 3 || new Set(branches.map(b => b.name)).size !== 3 || Math.abs(branches.reduce((sum, b) => sum + b.quantity, 0) - row.quantity) > 0.000001)) throw new Error("Invalid branch total");
+      return {product_id: String(row.product_id), quantity: row.quantity, ...(branches ? {branches} : {})};
     });
     return Response.json({data, as_of: body.as_of}, {headers});
   } catch {
