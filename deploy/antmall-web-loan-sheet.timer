@@ -1,0 +1,11 @@
+[Unit]
+Description=Check new web loan requests for Google Sheet mirror
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+AccuracySec=2s
+Unit=antmall-web-loan-sheet.service
+
+[Install]
+WantedBy=timers.target

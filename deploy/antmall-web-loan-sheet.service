@@ -1,0 +1,17 @@
+[Unit]
+Description=Mirror direct AntMall web loan requests to Google Sheet
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=antmall-crm
+Group=antmall-crm
+WorkingDirectory=/srv/antmall-crm/integrations/web-sheet
+ExecStart=/opt/antmall-crm-node/bin/node --env-file=/srv/antmall-crm/shared/production.env --env-file=/srv/antmall-crm/shared/web-sheet.env /srv/antmall-crm/integrations/web-sheet/mirror.mjs
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
