@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
+const exportsForTest={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/access.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:exportsForTest,URL,process:{env:{AUTH_URL:'https://crm3.example.test'}},require(){return {};}});
+const check=(origin,host='crm3.example.test',extra={})=>exportsForTest.isSameOrigin(new Request('http://localhost:3002/api/meetings',{headers:{origin,host,...extra}}));
+assert.equal(check('https://crm3.example.test'),true,'TLS-terminated same-origin request');
+assert.equal(check('https://evil.example.test'),false);
+assert.equal(check('https://evil.example.test','crm3.example.test',{'x-forwarded-host':'evil.example.test','x-forwarded-proto':'https'}),false);
+assert.equal(check('https://crm3.example.test','evil.example.test'),false);
+assert.equal(check('http://crm3.example.test'),false,'Public HTTPS scheme is required');
+assert.equal(check('null'),false);
+assert.equal(check('https://crm3.example.test/path'),false);
+assert.equal(check('https://crm3.example.test','crm3.example.test,evil.example.test'),false);
+assert.equal(exportsForTest.isSameOrigin(new Request('http://localhost:3002/api/meetings')),false);
+console.log('PASS: reverse proxy origin validation and cross-origin rejection');

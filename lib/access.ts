@@ -8,7 +8,10 @@ export function isSameOrigin(req:Request){
  try{
   const origin=req.headers.get('origin');if(!origin||origin==='null')return false;
   const target=new URL(req.url),host=req.headers.get('host');
-  if(host){if(/[\s,/@#?\\]/.test(host))return false;target.host=host;if(target.host.toLowerCase()!==host.toLowerCase())return false;}
+  if(host){if(/[\s,/@#?\\]/.test(host))return false;target.port='';target.host=host;if(target.host.toLowerCase()!==host.toLowerCase())return false;}
+  // TLS ends at Apache; the internal request may be HTTP. Use the configured
+  // public scheme only for its exact host, never a client-supplied proxy header.
+  if(process.env.AUTH_URL){const publicUrl=new URL(process.env.AUTH_URL);if(host&&target.host===publicUrl.host)target.protocol=publicUrl.protocol;}
   return new URL(origin).origin===origin&&origin===target.origin;
  }catch{return false;}
 }
