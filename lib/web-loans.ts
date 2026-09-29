@@ -20,6 +20,8 @@ export async function acceptWebLoan(raw:unknown){
   await tx.prepare('INSERT INTO web_loan_requests(request_id,payload_hash,lead_id,received_at) VALUES(?,?,?,?)').bind(data.request_id,hash,id,at).run();
   await tx.prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,'web_request','antmall.mn маягтаас шууд хүлээн авсан','Вэбсайт',?)").bind(op,id,data.phone,at).run();
   if(!suppressed)await tx.batch([assignmentNotice(id,op,at),newLeadNotice(id,op,at)]);
+  const smsRule=!suppressed?await tx.prepare("SELECT message FROM sms_rules WHERE status='new' AND enabled=1").first<{message:string}>():null;
+  if(smsRule)await tx.prepare("INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,'sms_pending',?,'AntMall SMS',?)").bind('sms-'+id,id,data.phone,smsRule.message,at).run();
   return {id,duplicate:false};
  });
 }

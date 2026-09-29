@@ -1,5 +1,9 @@
 const fs=require('node:fs');const source=fs.readFileSync('tests/serials.test.cjs','utf8');
 eval(source.slice(0,source.indexOf('\n(async()=>{'))+String.raw`
+const afterTasks=[];let smsCount=0,smsFails=false;
+deps['next/server']={after:fn=>afterTasks.push(fn)};
+deps['./sms']={SmsError:sms.SmsError,sendSms:async()=>{smsCount++;if(smsFails)throw new sms.SmsError('Test timeout','TIMEOUT');}};
+deps['@/lib/web-loan-sms']=load('lib/web-loan-sms.ts');
 deps['@/lib/web-loans']=load('lib/web-loans.ts');
 const route=load('app/api/integrations/web-loans/route.ts');
 const call=(body,token=process.env.CRM_WEB_LOAN_TOKEN)=>route.POST(new Request('https://crm.test/api/integrations/web-loans',{method:'POST',headers:{'Content-Type':'application/json','x-web-loan-token':token||''},body:JSON.stringify(body)}));
@@ -26,6 +30,18 @@ const call=(body,token=process.env.CRM_WEB_LOAN_TOKEN)=>route.POST(new Request('
  const suppressed=await (await call({...data,request_id:crypto.randomUUID(),phone:'99112234'})).json();
  assert.equal(sqlite.prepare('SELECT next_at FROM leads WHERE id=?').get(suppressed.id).next_at,null);
  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM notifications WHERE lead_id=?').get(suppressed.id).n,0);
+ await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,0);
+ sqlite.prepare("INSERT INTO sms_rules(id,status,message,enabled,created_at,updated_at) VALUES('test-new','new','Request received',1,'now','now') ON CONFLICT(status) DO UPDATE SET enabled=1,message='Request received'").run();
+ const smsData={...data,request_id:crypto.randomUUID()};
+ const smsLead=await (await call(smsData)).json();await call(smsData);
+ assert.equal(sqlite.prepare("SELECT kind FROM activities WHERE id=?").get('sms-'+smsLead.id).kind,'sms_pending');
+ await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
+ assert.ok(sqlite.prepare('SELECT note FROM activities WHERE id=?').get('sms-'+smsLead.id).note.includes('Unitel'));
+ await call(smsData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
+ await call({...data,request_id:crypto.randomUUID(),phone:'99112234'});await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
+ smsFails=true;const failedData={...data,request_id:crypto.randomUUID()};await call(failedData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
+ await call(failedData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
+ const disabledData={...data,request_id:crypto.randomUUID()};await call(disabledData);sqlite.prepare("UPDATE sms_rules SET enabled=0 WHERE status='new'").run();await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
  console.log('PASS: web intake auth, strict validation, concurrent retry dedup, conflicts, source, audit and suppression');
 })().catch(e=>{console.error(e);process.exit(1)});
 `);
