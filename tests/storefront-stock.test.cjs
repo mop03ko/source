@@ -8,6 +8,11 @@ const get=query=>m.exports.GET(new Request('https://www.antmall.mn/api/crm-stock
  global.fetch=async(url,options)=>{calls++;assert.equal(options.headers['X-Token'],'private-test-token');assert.equal(new URL(url).hostname,'127.0.0.1');return Response.json({data:[{product_id:'1',quantity:0,imei:'secret',cost:123}],as_of:'now'});};
  assert.equal((await get('ids=1&ids=2')).status,400);assert.equal(calls,0);
  let r=await get('ids=1');assert.deepEqual((await r.json()).data,[{product_id:'1',quantity:0}]);
+ const branches=[{name:'Olympic Galleria',quantity:0},{name:'Go.To Market',quantity:2},{name:'Tumen Mall',quantity:0}];
+ global.fetch=async()=>Response.json({data:[{product_id:'1',quantity:2,branches:branches.map(b=>({...b,private_id:'secret'}))}]});
+ assert.deepEqual((await (await get('ids=1')).json()).data,[{product_id:'1',quantity:2,branches}]);
+ global.fetch=async()=>Response.json({data:[{product_id:'1',quantity:9,branches}]});assert.equal((await get('ids=1')).status,503);
+ global.fetch=async()=>Response.json({data:[{product_id:'1',quantity:2,branches:[...branches.slice(0,2),{name:'Union',quantity:0}]}]});assert.equal((await get('ids=1')).status,503);
  global.fetch=async()=>Response.json({data:[]});assert.deepEqual((await (await get('ids=2')).json()).data,[]);
  global.fetch=async()=>Response.json({data:[{product_id:'9',quantity:3}]});assert.equal((await get('ids=1')).status,503);
  global.fetch=async()=>{throw Error('private-key');};r=await get('ids=1');assert.equal(r.status,503);assert.ok(!(await r.text()).includes('private-key'));
