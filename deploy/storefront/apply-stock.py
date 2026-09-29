@@ -19,8 +19,7 @@ def edit(path, replacements):
 
 edit('components/product/ProductGridCard.tsx',[
  ('import Link from "next/link";', 'import Link from "next/link";\nimport {CrmStock} from "./crm-stock";'),
- ('{/* Wishlist */}', '{/* Wishlist */}'),
- ('{/* Зураг */}', '<div className="px-3 pt-3"><CrmStock id={String(product.product_id)} /></div>\n        {/* Зураг */}'),
+ ('        <CardSaleCountdown', '        <div className="px-3.5 pb-3"><CrmStock id={String(product.product_id)} /></div>\n        <CardSaleCountdown'),
 ])
 edit('components/product/ProductDetailClient.tsx',[
  ('import Link from "next/link";', 'import Link from "next/link";\nimport {useCrmStock, StockMessage} from "./crm-stock";'),

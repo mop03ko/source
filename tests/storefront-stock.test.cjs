@@ -1,0 +1,15 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript');
+const m={exports:{}};
+new Function('require','module','exports',ts.transpileModule(fs.readFileSync('deploy/storefront/stock-route.ts.txt','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id=>id==='server-only'?{}:require(id),m,m.exports);
+process.env.CRM_SITE_STOCK_TOKEN='private-test-token';process.env.CRM_SITE_STOCK_URL='http://127.0.0.1:3001/api/integrations/site-stock';
+const get=query=>m.exports.GET(new Request('https://www.antmall.mn/api/crm-stock?'+query));
+(async()=>{
+ let calls=0;
+ global.fetch=async(url,options)=>{calls++;assert.equal(options.headers['X-Token'],'private-test-token');assert.equal(new URL(url).hostname,'127.0.0.1');return Response.json({data:[{product_id:'1',quantity:0,imei:'secret',cost:123}],as_of:'now'});};
+ assert.equal((await get('ids=1&ids=2')).status,400);assert.equal(calls,0);
+ let r=await get('ids=1');assert.deepEqual((await r.json()).data,[{product_id:'1',quantity:0}]);
+ global.fetch=async()=>Response.json({data:[]});assert.deepEqual((await (await get('ids=2')).json()).data,[]);
+ global.fetch=async()=>Response.json({data:[{product_id:'9',quantity:3}]});assert.equal((await get('ids=1')).status,503);
+ global.fetch=async()=>{throw Error('private-key');};r=await get('ids=1');assert.equal(r.status,503);assert.ok(!(await r.text()).includes('private-key'));
+ console.log('Storefront stock proxy: validation, token isolation, zero, unmapped, malformed response and outage passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});
