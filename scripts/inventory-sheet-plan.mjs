@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {unionSpreadsheetId} from './inventory-sheet-source.mjs';
 const clean=v=>String(v??'').normalize('NFKC').trim().replace(/\s+/g,' ').toUpperCase();
-const aliases={'АРЫН АГУУЛАХ':'OLYMPIC GALLERIA','ЗААЛ':'ҮЗҮҮЛЭН','УРД АГУУЛАХ':'СОНСГОЛОН АГУУЛАХ'};
+export const aliases={'АРЫН АГУУЛАХ':'OLYMPIC GALLERIA','ЗААЛ':'ҮЗҮҮЛЭН','УРД АГУУЛАХ':'СОНСГОЛОН АГУУЛАХ'};
 export function planBalance(source,crm){
  const union=source.spreadsheetId===unionSpreadsheetId;
  const end=source.values[0]?.[17];

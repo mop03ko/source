@@ -3,7 +3,8 @@ import {createDecipheriv,createSign} from 'node:crypto';
 export const spreadsheetId='1p3zkBMJ9AE6qJP9BvN0ax5Fl8cL7pc1txgnlE_q2QmY';
 export const unionSpreadsheetId='1TULrtL9lmS93FskMiJ30_V7FSHXQr7fZCnZxUNTV-ds';
 export const serviceEmail='zeeliin-huselt@zeeliin-huselt.iam.gserviceaccount.com';
-export async function readInventorySheet(db,sourceId=spreadsheetId){
+// Service account-аар зөвхөн унших эрхтэй Sheets API client үүсгэнэ (түлхүүр CRM-д шифрлэгдсэн хадгалагдана).
+async function sheetReader(db,sourceId){
  if(![spreadsheetId,unionSpreadsheetId].includes(sourceId))throw Error('Unknown inventory source');
  const result=await db.execute({sql:'SELECT credential FROM sheet_connection WHERE email=? AND credential IS NOT NULL ORDER BY id LIMIT 1',args:[serviceEmail]});
  if(!result.rows.length)throw Error('Inventory service account credential unavailable');
@@ -18,11 +19,29 @@ export async function readInventorySheet(db,sourceId=spreadsheetId){
  const auth=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),signal:AbortSignal.timeout(15000)});
  if(!auth.ok)throw Error('Google authentication failed: '+auth.status);
  const {access_token}=await auth.json();
- const read=async path=>{const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+sourceId+path,{headers:{Authorization:'Bearer '+access_token},signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('Google Sheet read failed: '+r.status);return r.json();};
+ return async path=>{const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+sourceId+path,{headers:{Authorization:'Bearer '+access_token},signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('Google Sheet read failed: '+r.status);return r.json();};
+}
+export async function readInventorySheet(db,sourceId=spreadsheetId){
+ const read=await sheetReader(db,sourceId);
  const meta=await read('?fields=properties(title),sheets(properties(title,gridProperties(rowCount,columnCount)))');
  const sheet=meta.sheets.find(s=>s.properties.title==='Balance')?.properties;
  if(!sheet||sheet.gridProperties.rowCount>20000||sheet.gridProperties.columnCount<23)throw Error('Unexpected Balance sheet dimensions');
  const end=sheet.gridProperties.columnCount>=24?'X':'W';
  const values=await read('/values/'+encodeURIComponent("'Balance'!A1:"+end+sheet.gridProperties.rowCount)+'?valueRenderOption=UNFORMATTED_VALUE');
  return {spreadsheetId:sourceId,title:meta.properties.title,readAt:new Date().toISOString(),values:values.values||[]};
+}
+// Тулгалтад Balance, Purchase, Sales табыг нэг агшинд (batchGet) уншина. Эх сурвалжид байхгүй табыг хоосон буцаана.
+export const workbookTabs={Balance:'X',Purchase:'R',Sales:'U'};
+export async function readInventoryWorkbook(db,sourceId=spreadsheetId){
+ const read=await sheetReader(db,sourceId);
+ const meta=await read('?fields=properties(title),sheets(properties(title,gridProperties(rowCount,columnCount)))');
+ const present=Object.keys(workbookTabs).map(tab=>({tab,props:meta.sheets.find(s=>s.properties.title===tab)?.properties})).filter(t=>t.props);
+ if(!present.some(t=>t.tab==='Balance'))throw Error('Unexpected Balance sheet dimensions');
+ if(present.some(t=>t.props.gridProperties.rowCount>20000))throw Error('Inventory workbook too large');
+ const ranges=present.map(t=>"ranges="+encodeURIComponent(`'${t.tab}'!A1:${workbookTabs[t.tab]}${t.props.gridProperties.rowCount}`)).join('&');
+ const batch=await read('/values:batchGet?'+ranges+'&valueRenderOption=UNFORMATTED_VALUE');
+ /** @type {{Balance:unknown[][],Purchase:unknown[][],Sales:unknown[][]}} */
+ const tabs={Balance:[],Purchase:[],Sales:[]};
+ present.forEach((t,i)=>{tabs[/** @type {keyof typeof tabs} */(t.tab)]=batch.valueRanges?.[i]?.values||[];});
+ return {spreadsheetId:sourceId,title:meta.properties.title,readAt:new Date().toISOString(),tabs};
 }

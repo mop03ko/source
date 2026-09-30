@@ -10,6 +10,7 @@ const suites=[
  'direct-sale-gifts.test.cjs',
  'purchase-fulfillment.test.cjs',
  'web-loan-sheet-mirror.test.mjs',
+ 'inventory-reconcile.test.mjs',
  'storefront-loans.test.cjs',
  'web-loans.test.cjs',
  'source-fence.test.mjs',

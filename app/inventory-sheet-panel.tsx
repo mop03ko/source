@@ -2,6 +2,7 @@
 import {useState} from 'react';
 import {Alert,Button,Card,Descriptions,Space,Tag,Table,Statistic,Row,Col,Popconfirm,Segmented} from 'antd';
 import {useRemote} from '@/hooks/use-remote';
+import InventoryReconcileCard from './inventory-reconcile-card';
 type Change={row:number;code:string;warehouse:string;before:number;after:number;delta:number};
 type Issue={row:number;code:string;name:string;quantity:number;reason:string};
 type Preview={digest:string;planDigest:string;matched:number;unchanged:number;changes:Change[];issues:Issue[];alreadyApplied:boolean;readAt:string};
@@ -41,6 +42,7 @@ export default function InventorySheetPanel({onSynced}:{onSynced:()=>void}){
     <Table<Issue> caption="Шинэчлэхгүй зөрчилтэй мөрүүд" size="small" rowKey="row" dataSource={preview.issues} pagination={{pageSize:10,showSizeChanger:false}} scroll={{x:700}} columns={[{title:'Мөр',dataIndex:'row'},{title:'Код',dataIndex:'code'},{title:'Бараа',dataIndex:'name'},{title:'Шалтгаан',dataIndex:'reason'}]}/>
    </Space>
   </Card>}
+  {remote.data?.connected&&<InventoryReconcileCard key={source} source={source}/>}
   <Card title="Сүүлийн шинэчлэлтүүд"><Table size="small" rowKey={r=>r.at+r.sourceId} loading={remote.loading} dataSource={remote.data?.history.filter(r=>r.sourceId===config?.spreadsheetId)||[]} pagination={{pageSize:5,showSizeChanger:false}} scroll={{x:650}} columns={[{title:'Цаг · УБ',dataIndex:'at',render:date},{title:'Ажилтан',dataIndex:'actor'},{title:'Шинэчилсэн',dataIndex:'changed'},{title:'Ижил',dataIndex:'unchanged'},{title:'Зөрчил',dataIndex:'issueCount'}]}/></Card>
  </Space>;
 }

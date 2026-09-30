@@ -1,13 +1,14 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript');
 class Failure extends Error{constructor(message,status=400){super(message);this.status=status;}}
-let role='admin',calls=0,applyCalls=0;
-const db={execute:async()=>({rows:[]})};
+let role='admin',calls=0,applyCalls=0,reconcileCalls=0,lastRange=null,writes=0;
+const db={execute:async q=>{if(/^\s*(INSERT|UPDATE|DELETE)/i.test(typeof q==='string'?q:q.sql))writes++;return {rows:[]};}};
 const deps={
  'zod':require('zod'),
  '@/lib/access':{Failure,member:async()=>({role,email:'tester@example.test'}),isSameOrigin:r=>r.headers.get('origin')==='https://crm.example.test'},
  '@/lib/crm':{canViewInventoryCost:r=>['admin','director','manager'].includes(r)},
  '@/lib/database':{getClient:()=>db},
- '@/scripts/inventory-sheet-source.mjs':{spreadsheetId:'main-sheet',unionSpreadsheetId:'union-sheet',serviceEmail:'service@example.test',readInventorySheet:async(_,id)=>{calls++;return {spreadsheetId:id,title:'Stock',readAt:'now'};}},
+ '@/scripts/inventory-sheet-source.mjs':{spreadsheetId:'main-sheet',unionSpreadsheetId:'union-sheet',serviceEmail:'service@example.test',readInventorySheet:async(_,id)=>{calls++;return {spreadsheetId:id,title:'Stock',readAt:'now'};},readInventoryWorkbook:async(_,id)=>{calls++;return {spreadsheetId:id,title:'Stock',readAt:'now',tabs:{Balance:[],Purchase:[],Sales:[]}};}},
+ '@/scripts/inventory-reconcile.mjs':{reconcileWorkbook:(_w,_c,_m,range)=>{reconcileCalls++;lastRange=range;return {summary:{},range};}},
  '@/scripts/inventory-sheet-plan.mjs':{planBalance:()=>({digest:'a'.repeat(64),planDigest:'b'.repeat(64),targets:[],changes:[],issues:[]})},
  '@/scripts/sync-inventory-sheet.mjs':{inventorySnapshot:async()=>({}),applyBalance:async(...args)=>{applyCalls++;assert.equal(args[4],'tester@example.test');return {state:'applied'};}}
 };
@@ -23,5 +24,16 @@ const request=(body,origin='https://crm.example.test')=>new Request('https://crm
  assert.equal((await route.POST(request({action:'preview',source:'arbitrary-url'}))).status,400);
  for(role of ['admin','director','manager']){const r=await route.POST(request({action:'preview',source:'union'}));assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');assert.equal((await r.json()).targets,undefined);}
  assert.equal((await route.POST(request({action:'apply',source:'main',digest:'a'.repeat(64),planDigest:'b'.repeat(64)}))).status,200);assert.equal(applyCalls,1);
- console.log('PASS: Sheet sync role boundaries, CSRF, source allowlist, preview requirement, no-store, actor attribution.');
+ // Бүх табын тулгалт: эрх/CSRF нь синктэй ижил, огнооны хязгаар, юу ч бичихгүй.
+ for(role of ['agent','operator','delivery','marketing','it'])assert.equal((await route.POST(request({action:'reconcile',source:'main'}))).status,403);
+ role='admin';assert.equal((await route.POST(request({action:'reconcile',source:'main'},'https://other.test'))).status,403);
+ assert.equal(reconcileCalls,0);
+ const rec=await route.POST(request({action:'reconcile',source:'main',from:'2026-09-01',to:'2026-09-30'}));
+ assert.equal(rec.status,200);assert.equal(rec.headers.get('cache-control'),'no-store');assert.deepEqual(lastRange,{from:'2026-09-01',to:'2026-09-30'});
+ assert.match(JSON.stringify((await route.POST(request({action:'reconcile',source:'main'}))).status),/200/);assert.match(lastRange.from,/^\d{4}-\d{2}-\d{2}$/);
+ assert.equal((await route.POST(request({action:'reconcile',source:'main',from:'2026-09-30',to:'2026-09-01'}))).status,400);
+ assert.equal((await route.POST(request({action:'reconcile',source:'main',from:'2026-01-01',to:'2026-09-30'}))).status,400);
+ assert.equal((await route.POST(request({action:'reconcile',source:'main',from:'1 OR 1'}))).status,400);
+ assert.equal(writes,0,'тулгалт өгөгдлийн санд бичихгүй');
+ console.log('PASS: Sheet sync role boundaries, CSRF, source allowlist, preview requirement, no-store, actor attribution, read-only reconcile.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
