@@ -36,7 +36,7 @@ export async function GET(req:Request){try{
  await leadFor(db(),id,m);
  const purchase=await db().prepare('SELECT s.id,s.lead_id,s.item_id,s.warehouse_id,s.qty,s.unit_price,s.total_price,s.sold_at,s.created_by,s.platform,s.bill_number,i.name item_name,i.code item_code,i.imei,w.name warehouse_name FROM inventory_sales s JOIN inventory_items i ON i.id=s.item_id JOIN inventory_warehouses w ON w.id=s.warehouse_id WHERE s.lead_id=?').bind(id).first();
  const lines=await db().prepare('SELECT p.kind,p.qty,p.unit_price,i.name,i.code,i.imei,w.name warehouse_name FROM lead_purchase_lines p JOIN inventory_items i ON i.id=p.item_id JOIN inventory_warehouses w ON w.id=p.warehouse_id WHERE p.lead_id=? ORDER BY p.created_at,p.id').bind(id).all();
- const fulfillment=await db().prepare('SELECT f.method,f.delivery_id,d.courier_name FROM lead_purchase_fulfillment f LEFT JOIN deliveries d ON d.id=f.delivery_id WHERE f.lead_id=?').bind(id).first();
+ const fulfillment=await db().prepare('SELECT f.method,f.delivery_id,f.has_accessories,d.courier_name FROM lead_purchase_fulfillment f LEFT JOIN deliveries d ON d.id=f.delivery_id WHERE f.lead_id=?').bind(id).first();
  const units=purchase?await db().prepare("SELECT * FROM inventory_units WHERE source='lead_purchase' AND ref_id=? ORDER BY created_at").bind((purchase as {id:string}).id).all():null;
  return Response.json({purchase,lines:lines.results,fulfillment,units:units?.results||[]},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return error(e);}}

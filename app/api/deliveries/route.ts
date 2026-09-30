@@ -83,7 +83,8 @@ export async function GET(req:Request){try{
   if(isCourierOnly(m.role)&&!(row.courier_email===m.email||(!row.courier_email&&row.courier_name===m.name)))throw new Failure('Энэ хүргэлтийг харах эрхгүй.',403);
   const units=await db().prepare("SELECT * FROM inventory_units WHERE source='delivery' AND ref_id=? ORDER BY created_at").bind(id).all();
   const lines=row.lead_id?await db().prepare('SELECT p.kind,p.qty,i.name,i.code,i.imei,w.name warehouse_name FROM lead_purchase_lines p JOIN inventory_items i ON i.id=p.item_id JOIN inventory_warehouses w ON w.id=p.warehouse_id WHERE p.lead_id=? ORDER BY p.created_at,p.id').bind(row.lead_id).all():null;
-  return Response.json({delivery:row,lines:lines?.results||[],units:units.results},{headers:{'Cache-Control':'no-store'}});
+  const fulfillment=row.lead_id?await db().prepare('SELECT has_accessories FROM lead_purchase_fulfillment WHERE lead_id=?').bind(row.lead_id).first():null;
+  return Response.json({delivery:row,fulfillment,lines:lines?.results||[],units:units.results},{headers:{'Cache-Control':'no-store'}});
  }
  if(url.searchParams.get('report')==='1'){
   const {from:rfrom,to:rto}=ubWeek();
