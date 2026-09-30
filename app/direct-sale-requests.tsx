@@ -1,15 +1,17 @@
 'use client';
 import {useState} from 'react';
+import SaleHistoryEditor from './sale-history-editor';
 import {Alert,Button,Card,Descriptions,Input,Modal,Segmented,Space,Table,Tag} from 'antd';
 import {useRemote} from '@/hooks/use-remote';
 import {canManageSchedule,dateLabel,type Member} from '@/lib/crm';
 import {cash} from './inventory-forms';
 import {GiftSummary,type SavedGift} from './direct-sale-extras';
-type RequestRow={id:string;serialWarnings:string[];requester:string;requester_name:string;status:string;created_at:string;reviewed_by:string;reviewed_at:string;review_note:string;payload:{has_accessories?:boolean;gift_name?:string;gifts?:SavedGift[];item_name:string;item_code:string;warehouse_name:string;qty:number;unit_price:number;customer_name:string;customer_phone:string;platform:string;bill_number:string;note:string;units:{serial:string;barcode:string}[]}};
-export default function DirectSaleRequests({me,revision,onChange}:{me:Member;revision:number;onChange:()=>void}){
+type RequestRow={id:string;sale_id:string|null;serialWarnings:string[];requester:string;requester_name:string;status:string;created_at:string;reviewed_by:string;reviewed_at:string;review_note:string;payload:{has_accessories?:boolean;gift_name?:string;gifts?:SavedGift[];item_name:string;item_code:string;warehouse_name:string;qty:number;unit_price:number;customer_name:string;customer_phone:string;platform:string;bill_number:string;note:string;units:{serial:string;barcode:string}[]}};
+export default function DirectSaleRequests({me,revision,onChange,onEdit}:{me:Member;revision:number;onChange:()=>void;onEdit?:(id:string)=>void}){
  const [status,setStatus]=useState('pending'),[page,setPage]=useState(1),[selected,setSelected]=useState<RequestRow|null>(null),[note,setNote]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
  const list=useRemote<{items:RequestRow[];count:number}>(`/api/inventory?view=sale_requests&status=${status}&page=${page}&revision=${revision}`);
  const manage=canManageSchedule(me.role);
+ const [editId,setEditId]=useState('');
  async function review(action:'approve_sale'|'reject_sale'){
   if(!selected)return;setBusy(action);setError('');
   try{const r=await fetch('/api/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id:selected.id,data:{note},request_id:crypto.randomUUID()})});const data=await r.json();if(!r.ok)throw Error(data.error||'Хадгалж чадсангүй.');setSelected(null);list.retry();onChange();}catch(e){setError((e as Error).message);}finally{setBusy('');}
@@ -23,7 +25,7 @@ export default function DirectSaleRequests({me,revision,onChange}:{me:Member;rev
     {title:'Илгээсэн',dataIndex:'created_at',render:dateLabel},{title:'Бараа',render:(_,r)=><>{r.payload.item_name}<br/><small>{r.payload.item_code}</small></>},{title:'Ажилтан',render:(_,r)=>r.requester_name||r.requester},{title:'Тоо',render:(_,r)=>r.payload.qty},{title:'Дүн',render:(_,r)=>cash(r.payload.qty*r.payload.unit_price)},{title:'Үйлдэл',render:(_,r)=><Button onClick={()=>{setSelected(r);setNote('');setError('');}}>{manage&&r.status==='pending'?'Хянах':'Дэлгэрэнгүй'}</Button>}
    ]}/>
   </Space>
-  <Modal open={!!selected} title="Борлуулалтын хүсэлт" width={720} onCancel={()=>{if(!busy)setSelected(null);}} footer={selected?.status==='pending'&&manage?<Space wrap><Button disabled={!!busy||!note.trim()} danger loading={busy==='reject_sale'} onClick={()=>void review('reject_sale')}>Татгалзах</Button><Button type="primary" disabled={!!busy} loading={busy==='approve_sale'} onClick={()=>void review('approve_sale')}>Баталж борлуулалт бүртгэх</Button></Space>:null}>
+  <Modal open={!!selected} title="Борлуулалтын хүсэлт" width={720} onCancel={()=>{if(!busy)setSelected(null);}} footer={selected?.status==='approved'&&selected.sale_id&&manage?<Button onClick={()=>{(onEdit||setEditId)(selected.sale_id!);setSelected(null);}}>Засах / устгах</Button>:selected?.status==='pending'&&manage?<Space wrap><Button disabled={!!busy||!note.trim()} danger loading={busy==='reject_sale'} onClick={()=>void review('reject_sale')}>Татгалзах</Button><Button type="primary" disabled={!!busy} loading={busy==='approve_sale'} onClick={()=>void review('approve_sale')}>Баталж борлуулалт бүртгэх</Button></Space>:null}>
    {selected&&<Space orientation="vertical" size="middle" style={{width:'100%'}}>
     {!!selected.serialWarnings?.length&&<Alert type="warning" showIcon title="Өмнө нь гарсан дугаар байна" description={selected.serialWarnings.join(', ')}/>}
     <Tag>{({pending:'Шийдвэр хүлээж байна',approved:'Баталсан',rejected:'Татгалзсан'})[selected.status]}</Tag>
@@ -34,5 +36,6 @@ export default function DirectSaleRequests({me,revision,onChange}:{me:Member;rev
     {error&&<Alert type="error" showIcon title={error}/>}
    </Space>}
   </Modal>
+  {editId&&<SaleHistoryEditor id={editId} onClose={()=>setEditId('')} onSaved={()=>{setEditId('');list.retry();onChange();}}/>}
  </Card>;
 }

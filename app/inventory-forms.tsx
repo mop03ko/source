@@ -150,27 +150,28 @@ export function ImportForm({post,busy,onDone}:{post:Post;busy:boolean;onDone:()=
  </div>;
 }
 
-export function Branch({line,onChange}:{line:{item:Item|null;qty:number;warehouse:string};onChange:(warehouse:string)=>void}){
+export type SaleCredit={item_id:string;warehouse_id:string;qty:number};
+export function Branch({line,onChange,credits=[]}:{line:{item:Item|null;qty:number;warehouse:string};onChange:(warehouse:string)=>void;credits?:SaleCredit[]}){
  const detail=useRemote<Detail>(line.item?'/api/inventory?view=items&id='+encodeURIComponent(line.item.id):null);
  if(!line.item)return null;
  if(detail.error)return <Alert type="error" title="Салбарын үлдэгдлийг уншиж чадсангүй" action={<Button type="button" onClick={detail.retry}>Дахин оролдох</Button>}/>;
  if(!detail.data)return <p role="status">Үлдэгдэл шалгаж байна…</p>;
- const branches=detail.data.byWarehouse.filter(w=>w.qty>=line.qty);
+ const branches=detail.data.byWarehouse.map(w=>({...w,qty:w.qty+credits.filter(c=>c.item_id===line.item!.id&&c.warehouse_id===w.warehouse_id).reduce((n,c)=>n+c.qty,0)})).filter(w=>w.qty>=line.qty);
  if(branches.length===1)return <p className="form-help">Авах салбар: <strong>{branches[0].warehouse_name}</strong> · {branches[0].qty} ш бэлэн</p>;
  if(!branches.length)return <Alert type="warning" title="Тоо ширхэгт хүрэлцэх үлдэгдэлтэй салбар алга."/>;
  return <Field label="Авах салбар *"><SelectControl required value={line.warehouse} onChange={e=>onChange(e.target.value)}><option value="">Салбар сонгох</option>{branches.map(w=><option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name} · {w.qty} ш</option>)}</SelectControl></Field>;
 }
 export type SaleGift={key:string;item:Item|null;qty:number;warehouse:string};
-export function DirectSaleExtras({gifts,onChange,enabled,onEnabled}:{gifts:SaleGift[];onChange:(v:SaleGift[])=>void;enabled:boolean;onEnabled:(v:boolean)=>void}){
+export function DirectSaleExtras({gifts,onChange,enabled,onEnabled,initialName='',credits=[]}:{initialName?:string;credits?:SaleCredit[];gifts:SaleGift[];onChange:(v:SaleGift[])=>void;enabled:boolean;onEnabled:(v:boolean)=>void}){
  const add=()=>onChange([...gifts,{key:crypto.randomUUID(),item:null,qty:1,warehouse:''}]);
  const change=(key:string,patch:Partial<SaleGift>)=>onChange(gifts.map(g=>g.key===key?{...g,...patch}:g));
  return <div className="form-stack">
   <Checkbox checked={enabled} onChange={e=>{onEnabled(e.target.checked);if(e.target.checked&&!gifts.length)add();}}>Бэлэгтэй</Checkbox>
-  {enabled&&<><Field label="Бэлгийн нэр / урамшуулал"><Input name="gift_name" maxLength={120}/></Field>
+  {enabled&&<><Field label="Бэлгийн нэр / урамшуулал"><Input name="gift_name" maxLength={120} defaultValue={initialName}/></Field>
    {gifts.map((g,i)=><section key={g.key} className="next-box"><div className="form-stack" style={{width:'100%'}}>
     <strong>Бэлэг {i+1}</strong><ItemPicker inStockOnly warehouse="" value={g.item} onChange={item=>change(g.key,{item,warehouse:''})} label="Бэлгийн код, нэрээр хайх *"/>
     <Field label="Бэлгийн тоо ширхэг"><Input type="number" required min={1} max={1000000} step={1} value={g.qty} onChange={e=>change(g.key,{qty:Number(e.target.value)||1,warehouse:''})}/></Field>
-    <Branch line={g} onChange={warehouse=>change(g.key,{warehouse})}/>
+    <Branch line={g} credits={credits} onChange={warehouse=>change(g.key,{warehouse})}/>
     <Button type="button" variant="ghost" onClick={()=>{const rest=gifts.filter(row=>row.key!==g.key);onChange(rest);if(!rest.length)onEnabled(false);}}>Бэлгийг хасах</Button>
    </div></section>)}
    <Button type="button" variant="outline" disabled={gifts.length>=20} onClick={add}>Бэлэг нэмэх</Button>
