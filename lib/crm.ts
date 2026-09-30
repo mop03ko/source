@@ -69,6 +69,7 @@ export const shiftIsWork=(a:string)=>!shiftOff.includes(a);
 // тул хоёр модулийг холбохдоо нормчилсон түлхүүрээр тулгана.
 export const personKey=(v:string)=>String(v||'').toLowerCase().replace(/^[а-яёөү]\.\s*/u,'').replace(/[\s-]/g,'');
 export const canManageSchedule=(role:string)=>role==='admin'||role==='director'||role==='manager';
+export const canApproveSale=(role:string)=>role==='admin'||role==='manager';
 export const shiftRequestKinds:Record<string,string>={leave:'Чөлөө авах',move:'Өдөр шилжүүлэх'};
 export const shiftRequestStatuses:Record<string,string>={pending:'Хүлээгдэж буй',approved:'Батлагдсан',rejected:'Татгалзсан'};
 export const kinds:Record<string,string>={sheet_update:'Sheet мэдээлэл шинэчлэгдсэн',sheet_import:'Google Sheets импорт',sheet_assignment:'Sheet хуваарилалт шинэчлэгдсэн',connected:'Холбогдсон дуудлага',no_answer:'Дуудлагад хариулаагүй',message:'SMS / Messenger бүртгэх',note:'Тэмдэглэл',update:'Мэдээлэл шинэчилсэн',recycle:'Дахин холбогдох эхлүүлсэн',optout:'Дахин холбогдохгүй',assign:'Гараар хуваарилсан',auto_assign:'Ухаалгаар хуваарилсан',delete:'Устгасан',restore:'Сэргээсэн'};

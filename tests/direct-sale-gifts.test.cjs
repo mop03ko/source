@@ -23,13 +23,13 @@ eval(source.slice(0,source.indexOf('\n(async()=>{'))+String.raw`
  assert.equal((await stock('approve_sale',{},pending.id))[0],409);assert.equal(qty(gift1),3);
  const receipt=crypto.randomUUID();
  const sendOnce=async()=>json(await post(stockRoute,{action:'record_sale',request_id:receipt,data:{...sale,units:[]}}));
- const first=await sendOnce(),again=await sendOnce();assert.equal(first[0],200);assert.equal(first[1].id,again[1].id);assert.equal(qty(gift1),2);
+ const first=await sendOnce(),again=await sendOnce();assert.equal(first[0],200);assert.equal(first[1].id,again[1].id);assert.equal(first[1].status,'pending');assert.equal(qty(gift1),3);assert.equal((await stock('approve_sale',{},first[1].id))[0],200);assert.equal(qty(gift1),2);
  const before=qty(main);
  assert.equal((await stock('record_sale',{...sale,gifts:[{item_id:main,warehouse_id:wh,qty:before}]}))[0],409,'main + same gift quantity aggregated');assert.equal(qty(main),before);
  as('operator');const [,short]=await stock('record_sale',{...sale,gifts:[{item_id:gift1,qty:2}]});assert.equal(short.status,'pending');
- as('manager');assert.equal((await stock('record_sale',{item_id:gift1,warehouse_id:wh,qty:2,unit_price:0}))[0],200);
+ as('manager');assert.equal((await confirmedSale({item_id:gift1,warehouse_id:wh,qty:2,unit_price:0}))[0],200);
  assert.equal((await stock('approve_sale',{},short.id))[0],409);assert.equal(qty(main),before);assert.equal(sqlite.prepare('SELECT status FROM direct_sale_requests WHERE id=?').get(short.id).status,'pending');
- assert.equal((await stock('record_sale',{...sale,gifts:[],has_accessories:true}))[0],200);assert.equal(qty(main),before-1);
+ assert.equal((await confirmedSale({...sale,gifts:[],has_accessories:true}))[0],200);assert.equal(qty(main),before-1);
  as('operator');const [code,list]=await json(await stockRoute.GET(new Request('https://crm.test/api/inventory?view=sales')));assert.equal(code,200);assert.ok(list.items.every(r=>!('cost_cents' in r)&&!('profit_cents' in r)));assert.ok(list.items.every(r=>!r.gifts.includes('cost')));
  console.log('PASS: direct gifts approval, no early stock deduction, atomic shortages, main/gift aggregate quantity, retry safety, one sale, correct gift cost, serial preservation, accessory-only flag, role cost privacy.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

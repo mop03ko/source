@@ -238,7 +238,7 @@ export default function CRM({initialNow,initialQuery={}}:{initialNow:number;init
  {view==='guide'&&<Guide/>}
  </>}
  <footer className="app-footer"><span>AntMall CRM <span>·</span> Хүсэлтээс харилцаа руу.</span><span>Цагийн бүс: Улаанбаатар (UTC+8)</span></footer></div></SidebarInset>
- <Dialog open={create} onOpenChange={setCreate}><DialogContent className="form-dialog"><DialogHeader><DialogTitle>Шинэ бүртгэл</DialogTitle><DialogDescription>{createKind==='lead'?'Зээлийн хүсэлт: хариуцагч болон дараагийн алхмаа хамт төлөвлөөрэй.':'Шууд борлуулалт: ажилтан, операторын илгээсэн хүсэлтийг ахлах, админ эсвэл удирдлага баталсны дараа үлдэгдэл хасагдана.'}</DialogDescription></DialogHeader>
+ <Dialog open={create} onOpenChange={setCreate}><DialogContent className="form-dialog"><DialogHeader><DialogTitle>Шинэ бүртгэл</DialogTitle><DialogDescription>{createKind==='lead'?'Зээлийн хүсэлт: хариуцагч болон дараагийн алхмаа хамт төлөвлөөрэй.':'Шууд борлуулалт: бүх шинэ бүртгэл батлах хүсэлт болно. Админ эсвэл ахлах баталсны дараа үлдэгдэл хасагдана.'}</DialogDescription></DialogHeader>
   <div className="view-toggle" role="tablist" aria-label="Бүртгэлийн төрөл" style={{marginBottom:14}}>
    <Button role="tab" aria-selected={createKind==='lead'} variant={createKind==='lead'?'default':'outline'} className={createKind==='lead'?'primary':''} onClick={()=>setCreateKind('lead')}>Зээлийн хүсэлт</Button>
    <Button role="tab" aria-selected={createKind==='direct'} variant={createKind==='direct'?'default':'outline'} className={createKind==='direct'?'primary':''} onClick={()=>setCreateKind('direct')}>Шууд борлуулалт</Button>

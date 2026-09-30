@@ -13,6 +13,7 @@ deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps[
 const post=(route,body)=>route.POST(new Request('https://crm.test/api',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify(route===leadBuy?{fulfillment:{method:'pickup'},...body}:body)}));
 const json=async(r)=>[r.status,await r.json()];
 async function stock(action,data,id){return json(await post(stockRoute,{action,data,id,request_id:crypto.randomUUID()}));}
+async function confirmedSale(data){const result=await stock('record_sale',data);if(result[0]!==200)return result;assert.equal(result[1].status,'pending');return stock('approve_sale',{},result[1].id);}
 async function deliv(action,data,id,version){return json(await post(delivRoute,{action,data,id,version}));}
 async function search(q){const r=await lookup.GET(new Request('https://crm.test/api/serials?q='+encodeURIComponent(q)));return json(r);}
 const UNITS=(...u)=>u.map(x=>typeof x==='string'?{serial:x,barcode:'',note:''}:x);
@@ -26,13 +27,13 @@ const UNITS=(...u)=>u.map(x=>typeof x==='string'?{serial:x,barcode:'',note:''}:x
  assert.equal((await stock('record_purchase',{item_id:item,warehouse_id:wh,qty:5,unit_cost:4000000,payment_status:'Төлөгдсөн'}))[0],200);
 
  // 1) Агуулахын борлуулалтад сериал бүртгэнэ.
- let [status,d]=await stock('record_sale',{item_id:item,warehouse_id:wh,qty:2,unit_price:5000000,customer_phone:'99112233',units:UNITS('351111111111111','352222222222222')});
+ let [status,d]=await confirmedSale({item_id:item,warehouse_id:wh,qty:2,unit_price:5000000,customer_phone:'99112233',units:UNITS('351111111111111','352222222222222')});
  assert.equal(status,200);const saleId=d.id;
  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM inventory_units WHERE source='sale' AND ref_id=?").get(saleId).n,2);
  // Сериал, баркод хоёулаа хоосон бол татгалзана.
- assert.equal((await stock('record_sale',{item_id:item,warehouse_id:wh,qty:1,unit_price:5000000,units:[{serial:'',barcode:'',note:'хоосон'}]}))[0],400);
+ assert.equal((await confirmedSale({item_id:item,warehouse_id:wh,qty:1,unit_price:5000000,units:[{serial:'',barcode:'',note:'хоосон'}]}))[0],400);
  // Сериалгүй бараанд баркодоор бүртгэж болно.
- [status,d]=await stock('record_sale',{item_id:item,warehouse_id:wh,qty:1,unit_price:5000000,units:[{serial:'',barcode:'BC-0001',note:'сериалгүй'}]});
+ [status,d]=await confirmedSale({item_id:item,warehouse_id:wh,qty:1,unit_price:5000000,units:[{serial:'',barcode:'BC-0001',note:'сериалгүй'}]});
  assert.equal(status,200);
  assert.equal(sqlite.prepare("SELECT barcode FROM inventory_units WHERE source='sale' AND ref_id=?").get(d.id).barcode,'BC-0001');
 

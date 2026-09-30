@@ -15,6 +15,9 @@ async function crmPost(action,data){const r=await crmRoute.POST(new Request('htt
 async function invGet(query=''){const r=await invRoute.GET(new Request('https://crm.test/api/inventory'+query));return [r.status,await r.json()];}
 const editRevisions=new Map();
 async function invPost(action,data,id,request_id=crypto.randomUUID()){if(action==='update_item'&&!editRevisions.has(request_id))editRevisions.set(request_id,sqlite.prepare('SELECT updated_at FROM inventory_items WHERE id=?').get(id)?.updated_at);const expected_updated_at=editRevisions.get(request_id);const r=await invRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,request_id,expected_updated_at})}));return [r.status,await r.json()];}
+const fixtureApprovals=new Map();
+async function invConfirmedSale(data,id,request_id){const result=await invPost('record_sale',data,id,request_id);if(result[0]!==200)return result;assert.equal(result[1].status,'pending');if(!fixtureApprovals.has(result[1].id))fixtureApprovals.set(result[1].id,crypto.randomUUID());return invPost('approve_sale',{},result[1].id,fixtureApprovals.get(result[1].id));}
+
 (async()=>{
  await crmGet(); // bootstrap owner as admin
  assert.equal((await crmPost('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
@@ -35,7 +38,7 @@ async function invPost(action,data,id,request_id=crypto.randomUUID()){if(action=
  assert.equal(status,200);const itemId=d.id;
  [status,d]=await invGet('?view=items&q=CUCKOO');assert.equal(status,200);assert.equal(d.count,1);assert.equal(d.items[0].id,itemId);assert.equal(d.items[0].stock,0);
  // Зарлага: үлдэгдэлгүй үед зарж болохгүй.
- assert.equal((await invPost('record_sale',{item_id:itemId,warehouse_id:whId,qty:1,unit_price:900000}))[0],409);
+ assert.equal((await invConfirmedSale({item_id:itemId,warehouse_id:whId,qty:1,unit_price:900000}))[0],409);
  // Орлого бүртгэхэд үлдэгдэл нэмэгдэнэ.
  user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
  [status,d]=await invPost('record_purchase',{item_id:itemId,warehouse_id:whId,qty:5,unit_cost:800000,payment_status:'Төлөгдсөн'});
@@ -44,7 +47,7 @@ async function invPost(action,data,id,request_id=crypto.randomUUID()){if(action=
  assert.equal(d.byWarehouse.find(w=>w.warehouse_id===whId).qty,5);assert.equal(d.moves.length,1);assert.equal(d.moves[0].qty_delta,5);
  // Одоо зарж болно, гэхдээ үлдэгдлээс их тоог зарж болохгүй.
  user={userId:'a',email:'agent@example.test',displayName:'Agent'};
- assert.equal((await invPost('record_sale',{item_id:itemId,warehouse_id:whId,qty:6,unit_price:1000000}))[0],409);
+ assert.equal((await invConfirmedSale({item_id:itemId,warehouse_id:whId,qty:6,unit_price:1000000}))[0],409);
  [status,d]=await invPost('record_sale',{item_id:itemId,warehouse_id:whId,qty:2,unit_price:1000000,customer_name:'Бат',customer_phone:'99001122'});
  assert.equal(status,200);
  assert.equal(d.status,'pending');
@@ -84,7 +87,7 @@ async function invPost(action,data,id,request_id=crypto.randomUUID()){if(action=
   const created=await invPost('create_item',{code:'REPORT-'+i,name:'Report item '+i,brand:i%2?'Brand B':'Brand A',supplier:'Report Vendor',category:i%2?'Чихэвч':'Гар утас'});
   assert.equal(created[0],200);
   assert.equal((await invPost('record_purchase',{item_id:created[1].id,warehouse_id:whId,qty:2,unit_cost:10,status:'received',received_at:'2026-09-21T01:00:00.000Z'}))[0],200);
-  if(i===0)assert.equal((await invPost('record_sale',{item_id:created[1].id,warehouse_id:whId,qty:1,unit_price:20,sold_at:'2026-09-21T02:00:00.000Z'}))[0],200);
+  if(i===0)assert.equal((await invConfirmedSale({item_id:created[1].id,warehouse_id:whId,qty:1,unit_price:20,sold_at:'2026-09-21T02:00:00.000Z'}))[0],200);
  }
  const vendor='supplier=Report%20Vendor';
  [status,d]=await invGet('?view=items&'+vendor);assert.equal(status,200);assert.equal(d.items.length,50);assert.equal(d.count,51);

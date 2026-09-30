@@ -56,7 +56,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  return <section className="table-panel">
  <DirectSaleRequests me={me} revision={revision} onChange={()=>setRevision(v=>v+1)}/>
  <div className="table-toolbar"><h2>Шууд бэлэн борлуулалт<span>{list.data?.count||0}</span></h2><div className="row">
-  <Button className="primary" size="sm" onClick={()=>setOpen(true)}><Plus size={16}/>{canPickSeller?'Борлуулалт бүртгэх':'Борлуулалтын хүсэлт'}</Button>
+  <Button className="primary" size="sm" onClick={()=>setOpen(true)}><Plus size={16}/>Борлуулалтын хүсэлт</Button>
  </div></div>
  {list.data?.summary&&<MobileDisclosure label="Борлуулалтын үзүүлэлт"><div className="metrics"><div className="metric"><div><span>Борлуулалт</span><ShoppingCart size={19}/></div><strong>{(list.data.count||0).toLocaleString()}</strong><small>Сонгосон хугацаанд</small></div><div className="metric metric-focus"><div><span>Нийт орлого</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.revenue_cents/100)}</strong><small>Бэлнээр гарсан</small></div>{showCost&&<div className="metric"><div><span>Ашиг</span><CircleDollarSign size={19}/></div><strong>{cash(list.data.summary.profit_cents/100)}</strong><small>Өртөг, шимтгэл хассан</small></div>}</div></MobileDisclosure>}
  <ResponsiveFilters active={[seller!=='__direct__'&&canPickSeller,from,to].filter(Boolean).length}>
@@ -79,7 +79,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  </TableBody></Table></div>:!list.loading&&<p className="muted chat-empty-list">Сонгосон хугацаанд шууд борлуулалт бүртгэгдээгүй байна.</p>)}
  {!!list.data?.count&&<div className="table-footer"><Pagination current={page} pageSize={50} total={list.data.count} onChange={setPage} disabled={list.loading} showSizeChanger={false} showTotal={(total,range)=>`${range[0]}–${range[1]} / ${total} борлуулалт`} responsive/></div>}
  <Dialog open={open} onOpenChange={setOpen}><DialogContent className="form-dialog">
-  <DialogHeader><DialogTitle>Шууд бэлэн борлуулалт</DialogTitle><DialogDescription>{canPickSeller?'Борлуулалт бүртгэгдэж, агуулахын үлдэгдлээс хасагдана.':'Ахлах, админ эсвэл удирдлага баталсны дараа борлуулалт бүртгэгдэнэ.'}</DialogDescription></DialogHeader>
+  <DialogHeader><DialogTitle>Шууд бэлэн борлуулалт</DialogTitle><DialogDescription>Бүх шинэ борлуулалтыг админ эсвэл ахлах хянаж батална. Батлах хүртэл үлдэгдэл хасагдахгүй.</DialogDescription></DialogHeader>
   <SaleForm me={me} sellers={sellers} canPickSeller={canPickSeller} options={options.data||undefined} busy={busy} onSubmit={async v=>{if(await post(v))setOpen(false);}}/>
  </DialogContent></Dialog>
  </section>;
@@ -129,6 +129,6 @@ export function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Me
  <Checkbox checked={hasAccessories} onChange={e=>setAccessories(e.target.checked)}>Дагалдах бараатай</Checkbox>
  <DirectSaleExtras gifts={gifts} onChange={setGifts} enabled={hasGift} onEnabled={setHasGift}/>
  <Field label="Тэмдэглэл"><TextareaControl name="note" rows={2} maxLength={2000}/></Field>
- <Button type="submit" className="primary full" disabled={busy}><Users size={16}/>{busy?'Хадгалж байна…':canPickSeller?'Борлуулалт бүртгэх':'Батлуулах хүсэлт илгээх'}</Button>
+ <Button type="submit" className="primary full" disabled={busy}><Users size={16}/>{busy?'Хадгалж байна…':'Батлуулах хүсэлт илгээх'}</Button>
  </GuardedForm>;
 }

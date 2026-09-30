@@ -26,14 +26,34 @@ eval(bootstrap+String.raw`
  assert.deepEqual(approvals.map(r=>r[0]).sort(),[200,409]);assert.equal(qty(),1);assert.equal(count('inventory_sales'),1);
  assert.equal(sqlite.prepare('SELECT seller FROM inventory_sales').get().seller,'operator@example.test');
  assert.equal(sqlite.prepare('SELECT reviewed_by FROM direct_sale_requests WHERE id=?').get(pending.id).reviewed_by,'manager@example.test');
- as('director');assert.equal((await stock('reject_sale',{},other.id))[0],400);
+ as('director');assert.equal((await stock('reject_sale',{note:'Not allowed'},other.id))[0],403);assert.equal((await stock('approve_sale',{},other.id))[0],403);
+ as('manager');assert.equal((await stock('reject_sale',{},other.id))[0],400);
  assert.equal((await stock('reject_sale',{note:'Incorrect details'},other.id))[0],200);assert.equal(qty(),1);
  assert.equal((await stock('approve_sale',{},other.id))[0],409);
  as('operator');const [,short]=await stock('record_sale',sale);
- as('manager');await stock('record_sale',sale);assert.equal(qty(),0);
+ as('manager');await confirmedSale(sale);assert.equal(qty(),0);
  assert.equal((await stock('approve_sale',{},short.id))[0],409);
  assert.equal(sqlite.prepare('SELECT status FROM direct_sale_requests WHERE id=?').get(short.id).status,'pending');
  assert.equal(qty(),0);assert.equal(count('inventory_sales'),2);
- console.log('PASS: operator/agent pending only, no stock/serial/sale before approval, own-list scope, manager approval race, director rejection, seller attribution, duplicate submission, insufficient-stock rollback.');
+ as('manager');await stock('record_purchase',{item_id:item,warehouse_id:wh,qty:2,unit_cost:100});
+ as('director');const directorReceipt=crypto.randomUUID(),directorSend=()=>post(stockRoute,{action:'record_sale',data:sale,request_id:directorReceipt});
+ const [directorStatus,directorPending]=await json(await directorSend());assert.equal(directorStatus,200);assert.equal(directorPending.status,'pending');assert.equal(qty(),2);assert.equal(count('inventory_sales'),2);
+ assert.equal((await json(await directorSend()))[1].id,directorPending.id);
+ assert.equal((await stock('approve_sale',{},directorPending.id))[0],403);
+ assert.equal((await stock('reject_sale',{note:'Forbidden'},directorPending.id))[0],403);
+ user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
+ const [,directorApproved]=await stock('approve_sale',{},directorPending.id);assert.equal(qty(),1);
+ assert.equal(sqlite.prepare('SELECT seller FROM inventory_sales WHERE id=?').get(directorApproved.id).seller,'director@example.test');
+ assert.equal(sqlite.prepare('SELECT reviewed_by FROM direct_sale_requests WHERE id=?').get(directorPending.id).reviewed_by,'owner@example.test');
+ as('director');assert.equal((await stock('update_sale',{revision:1,reason:'Correct note',sale:{...sale,seller:'director@example.test',note:'Corrected'}},directorApproved.id))[0],403);assert.equal(qty(),1,'director cannot bypass review by editing an approved sale');
+ as('manager');await stock('record_purchase',{item_id:item,warehouse_id:wh,qty:2,unit_cost:100});
+ for(const role of ['admin','manager']){
+  if(role==='admin')user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};else as(role);
+  const beforeQty=qty(),beforeSales=count('inventory_sales'),beforeUnits=count('inventory_units');
+  const [code,draft]=await stock('record_sale',sale);assert.equal(code,200);assert.equal(draft.status,'pending');
+  assert.equal(qty(),beforeQty,role+' submission must not withdraw stock');assert.equal(count('inventory_sales'),beforeSales);assert.equal(count('inventory_units'),beforeUnits);
+  assert.equal((await stock('approve_sale',{},draft.id))[0],200);assert.equal(qty(),beforeQty-1);assert.equal(count('inventory_sales'),beforeSales+1);
+ }
+ console.log('PASS: operator/agent pending only, no stock/serial/sale before approval, own-list scope, manager approval race, director approval/rejection denied, manager rejection, seller attribution, duplicate submission, insufficient-stock rollback.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 `);

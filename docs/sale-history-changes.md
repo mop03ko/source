@@ -1,6 +1,6 @@
 # Approved direct-sale editing and deletion
 
-Admin, manager and director roles can open **Засах / устгах** from the warehouse sales table or the approved request detail. Agent/operator/courier roles cannot edit or delete confirmed sales.
+Admin and manager roles can open **Засах / устгах** from the warehouse sales table or the approved request detail. Director/agent/operator/courier roles cannot edit or delete confirmed sales.
 
 The editor supports the item, branch, quantity, unit price, customer, bill/contract, sale date, payment channel, note, accessories and gifts. A reason is mandatory. Deletion requires an explicit confirmation showing the sale and explaining stock restoration.
 

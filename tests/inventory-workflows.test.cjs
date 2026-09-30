@@ -7,7 +7,7 @@ const scenario=String.raw`
  await crmGet();
  deps['@/lib/access']={...access,member:async()=>({email:'owner@example.test',name:'Owner',role:'admin',active:1,user_id:'owner-test'})};
  const inventory=(deps['@/lib/inventory-visibility']=load('lib/inventory-visibility.ts'),load('app/api/inventory/route.ts')),counts=load('app/api/inventory-counts/route.ts');
- async function post(route,action,data,id,version,request_id){const r=await route.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version,request_id})}));return [r.status,await r.json()];}
+ async function post(route,action,data,id,version,request_id=crypto.randomUUID()){const r=await route.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version,request_id})}));return [r.status,await r.json()];}
  async function get(route,q=''){const r=await route.GET(new Request('https://crm.test/api/inventory'+q));return [r.status,await r.json()];}
  const inv=(...args)=>post(inventory,...args),cnt=(...args)=>post(counts,...args);
  const warehouse=(await inv('create_warehouse',{name:'Test warehouse'}))[1].id,other=(await inv('create_warehouse',{name:'Other'}))[1].id;
@@ -27,12 +27,16 @@ const scenario=String.raw`
  const sale=await inv('record_sale',saleData,undefined,undefined,request);assert.equal(sale[0],200);
  const retry=await inv('record_sale',saleData,undefined,undefined,request);assert.equal(retry[1].id,sale[1].id);
  assert.equal((await inv('record_sale',{...saleData,unit_price:200},undefined,undefined,request))[0],409);
+ assert.equal(sale[1].status,'pending');assert.equal((await get(inventory,'?view=sales'))[1].count,0);
+ assert.equal((await inv('approve_sale',{},sale[1].id))[0],200);
  const saleRow=(await get(inventory,'?view=sales'))[1].items[0];
  assert.equal(saleRow.cost_cents,10359);assert.equal(saleRow.commission_cents,1600);assert.equal(saleRow.tax_cents,235);assert.equal(saleRow.profit_cents,7805);assert.equal(saleRow.account,'BHD');
  assert.equal((await inv('return_purchase',{qty:1,note:'Damaged'},purchase))[0],200);
  assert.equal((await stock())[1].item.stock,1);
  // Two sales of the final unit: only one succeeds, and the balance stays nonnegative.
- const race=await Promise.all([inv('record_sale',{item_id:item,warehouse_id:warehouse,qty:1,unit_price:200}),inv('record_sale',{item_id:item,warehouse_id:warehouse,qty:1,unit_price:200})]);
+ const drafts=await Promise.all([inv('record_sale',{item_id:item,warehouse_id:warehouse,qty:1,unit_price:200}),inv('record_sale',{item_id:item,warehouse_id:warehouse,qty:1,unit_price:200})]);
+ assert.ok(drafts.every(r=>r[0]===200&&r[1].status==='pending'));
+ const race=await Promise.all(drafts.map(r=>inv('approve_sale',{},r[1].id)));
  assert.deepEqual(race.map(r=>r[0]).sort(),[200,409]);detail=(await stock())[1];assert.equal(detail.item.stock,0);assert.equal(detail.item.value_cents,0);
  assert.equal((await inv('return_purchase',{qty:1,note:'No stock'},purchase))[0],409);
  assert.equal((await inv('transfer',{item_id:item,warehouse_id:warehouse,to_warehouse_id:warehouse,qty:1}))[0],409);

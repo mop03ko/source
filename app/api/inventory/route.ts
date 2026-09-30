@@ -1,7 +1,7 @@
 import {inventoryForRole} from '@/lib/inventory-visibility';
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
-import {canViewInventoryCost,canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
+import {canViewInventoryCost,canEditInventoryItem,isIsolatedRole,canManageSchedule,canApproveSale,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {unitsSchema,saveUnits,duplicateUnits} from '@/lib/serials';
 import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey,planInventoryBulkEdit,saleGiftsSchema,planSaleGifts} from '@/lib/inventory';
@@ -29,7 +29,7 @@ export async function GET(req:Request){try{
  const json=(value:unknown)=>Response.json(inventoryForRole(value,m.role),{headers:{'Cache-Control':'no-store'}});
  const p=new URL(req.url).searchParams,view=p.get('view')||'items';
  if(view==='sale_detail'){
-  if(!canManageSchedule(m.role))throw new Failure('Борлуулалт засах эрхгүй.',403);
+  if(!canApproveSale(m.role))throw new Failure('Борлуулалт засах эрхгүй.',403);
   const sale=await db().prepare('SELECT * FROM inventory_sales WHERE id=?').bind(p.get('id')||'').first();
   if(!sale)throw new Failure('Борлуулалт олдсонгүй.',404);
   if(sale.lead_id||await db().prepare('SELECT id FROM lead_purchase_lines WHERE sale_id=?').bind(sale.id).first())throw new Failure('Зээлийн худалдан авалтыг энэ хэсгээс засахгүй.',409);
@@ -184,9 +184,10 @@ export async function POST(req:Request){try{
  if(Number(req.headers.get('content-length')||0)>5_000_000)throw new Failure('Файл хэт том.',413);
  const raw=await req.text();if(raw.length>5_000_000)throw new Failure('Файл хэт том.',413);
  const b=bodySchema.parse(JSON.parse(raw)),now=new Date().toISOString();
- if(['approve_sale','reject_sale','update_sale','delete_sale'].includes(b.action)&&!canManageSchedule(m.role))throw new Failure('Зөвхөн ахлах, админ, удирдлага шийдвэрлэнэ.',403);
+ if(['approve_sale','reject_sale'].includes(b.action)&&!canApproveSale(m.role))throw new Failure('Борлуулалтыг зөвхөн админ, ахлах хянаж батална.',403);
+ if(['update_sale','delete_sale'].includes(b.action)&&!canApproveSale(m.role))throw new Failure('Борлуулалт засах эрхгүй.',403);
  if(b.action==='record_sale'&&!['admin','director','manager','agent','operator'].includes(m.role))throw new Failure('Борлуулалтын эрхгүй.',403);
- if(b.action==='record_sale'&&['agent','operator'].includes(m.role)&&!b.request_id)throw new Failure('Хүсэлтийн давхардал шалгах ID шаардлагатай.');
+ if(b.action==='record_sale'&&!b.request_id)throw new Failure('Хүсэлтийн давхардал шалгах ID шаардлагатай.');
  if(['update_item','preview_bulk_items','bulk_update_items'].includes(b.action)&&!canEditInventoryItem(m.role))throw new Failure('Барааны мэдээллийг зөвхөн админ болон ахлах засах эрхтэй.',403);
  if(['record_purchase','preview_import','import_opening'].includes(b.action)&&!canViewInventoryCost(m.role))throw new Failure('Өртөг бүртгэх эрхгүй.',403);
  const result=await db().transaction(async d=>{
@@ -316,21 +317,21 @@ export async function POST(req:Request){try{
     }return {ok:true,id:b.id};
    }
    if(b.action==='record_sale'||b.action==='transfer'){
-    const input=z.object({has_accessories:z.boolean().default(false),gift_name:z.string().trim().max(120).default(''),gifts:saleGiftsSchema,item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.string().email().optional(),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
+    const input=z.object({has_accessories:z.boolean().default(false),gift_name:z.string().trim().max(120).default(''),gifts:saleGiftsSchema,item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.preprocess(value=>value===''?undefined:value,z.string().email().optional()),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
     const saleItem=await requireRow(d,'inventory_items',input.item_id);const saleWarehouse=await requireRow(d,'inventory_warehouses',input.warehouse_id);
     if(b.action==='record_sale'&&!saleItem.active)throw new Failure('Идэвхтэй бараа сонгоно уу.');
     const stock=await stockAt(d,input.item_id,input.warehouse_id),id=editedSale?String(editedSale.id):crypto.randomUUID();
     // Шууд борлуулалтыг ажилтны үзүүлэлтэд тооцох тул зарагчийг тодорхой хөтөлнө. Агент зөвхөн өөрийн
     // нэр дээр бүртгэнэ; Ахлах, Удирдлага, Админ өөр ажилтны өмнөөс бүртгэж болно.
     let seller='';
-    if(b.action==='record_sale'&&(input.seller||['agent','operator'].includes(m.role))){
+    if(b.action==='record_sale'&&(input.seller||!canApproveSale(m.role))){
      seller=input.seller||m.email;
      if(!canManageSchedule(m.role)&&seller!==m.email)throw new Failure('Зөвхөн өөрийн борлуулалтаа бүртгэнэ.',403);
      const who=await d.prepare('SELECT role FROM members WHERE email=? AND active=1').bind(seller).first<{role:string}>();
      if(!who||isIsolatedRole(who.role))throw new Failure('Идэвхтэй борлуулалтын ажилтан сонгоно уу.');
     }
     const gifts=b.action==='record_sale'?await planSaleGifts(d,input,input.gifts):[];
-    if(b.action==='record_sale'&&['agent','operator'].includes(m.role)){
+    if(b.action==='record_sale'&&!approvalId&&!editedSale){
      withdrawal(stock,input.qty);
      safeTotal(cents(input.unit_price)*input.qty);
      await d.prepare('INSERT INTO direct_sale_requests(id,requester,payload,created_at) VALUES(?,?,?,?)').bind(id,m.email,JSON.stringify({...input,gifts,seller,item_name:saleItem.name,item_code:saleItem.code,warehouse_name:saleWarehouse.name}),now).run();

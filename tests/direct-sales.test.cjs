@@ -29,7 +29,7 @@ const scenario=String.raw`
 
  // Ахлах бусад ажилтны өмнөөс бүртгэж болно.
  user={userId:'mg',email:'mg@example.test',displayName:'Ахлах'};
- [status,d]=await stock('record_sale',sale({seller:'a2@example.test',qty:2,unit_price:3000000}));
+ [status,d]=await confirmedSale(sale({seller:'a2@example.test',qty:2,unit_price:3000000}));
  assert.equal(status,200);
  const onBehalf=sqlite.prepare('SELECT seller,created_by,qty FROM inventory_sales WHERE id=?').get(d.id);
  assert.equal(onBehalf.seller,'a2@example.test');      // үзүүлэлт зарсан хүнд
@@ -37,7 +37,7 @@ const scenario=String.raw`
  assert.equal(onBehalf.qty,2);
 
  // Зарагчгүй (агуулахын ердийн) борлуулалт хэний ч үзүүлэлтэд орохгүй.
- [status,d]=await stock('record_sale',sale({qty:1}));
+ [status,d]=await confirmedSale(sale({qty:1}));
  assert.equal(status,200);
  assert.equal(sqlite.prepare('SELECT seller FROM inventory_sales WHERE id=?').get(d.id).seller,'');
 

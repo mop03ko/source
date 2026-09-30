@@ -24,7 +24,7 @@ const scenario=String.raw`
  [status,d]=await invGet('?view=products&warehouse_id=missing');assert.equal(d.summary.units,0);
  [status,d]=await invGet('?view=products&stock=positive');assert.equal(d.count,1);
  for(const view of ['products','items']){[status,d]=await invGet('?view='+view+'&stock=nonzero');assert.equal(status,200);assert.ok(d.items.length>0);assert.ok(d.items.every(i=>i.stock!==0));[status,d]=await invGet('?view='+view+'&stock=nonzero&warehouse_id=missing');assert.equal(d.count,0);}
- assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100,units:[{serial:'222222222222222',barcode:'HISTORICAL-B',note:''}]}))[0],200);
+ assert.equal((await invConfirmedSale({item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100,units:[{serial:'222222222222222',barcode:'HISTORICAL-B',note:''}]}))[0],200);
  [status,d]=await invGet(productUrl);assert.equal(d.product.stock,1);assert.equal(d.history[0].item_id,second);assert.equal(d.items.find(i=>i.id===first).stock,1);assert.equal(d.items.find(i=>i.id===second).stock,0);
  const available=(await invGet(productUrl+'&available_only=1'))[1];assert.equal(available.count,1);assert.equal(available.items[0].id,first);
  assert.equal((await invGet('?view=products&available_only=1&q=UNIT-B'))[1].count,0);
@@ -32,7 +32,7 @@ const scenario=String.raw`
  assert.equal((await invGet('?view=products&available_only=1'))[1].summary.unit_count,1);
  assert.equal(d.product.website_stock,1);assert.equal(d.product.sku,product.sku);assert.ok(d.items.every(i=>i.sku===product.sku));
  [status,d]=await invGet(productUrl+'&unit_q=HISTORICAL-B');assert.equal(d.count,1);assert.equal(d.items[0].id,second);
- assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100}))[0],409,'Sold unit cannot be sold twice');
+ assert.equal((await invConfirmedSale({item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100}))[0],409,'Sold unit cannot be sold twice');
  assert.equal((await invPost('update_item',{...input,code:'UNIT-A',imei:'111111111111111'},first))[0],200);
  [status,d]=await invGet('?view=items&id='+first);assert.equal(d.item.barcode,'8800000000001','Older clients preserve barcode');assert.equal(d.item.product_key,product.id);
  assert.equal((await invPost('update_item',{...input,code:'UNIT-A',imei:'111111111111111',color:'Black'},first))[0],200);
