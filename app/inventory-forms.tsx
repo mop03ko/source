@@ -5,7 +5,7 @@ import {productCategories} from '@/lib/product-categories';
 import {salePrice} from '@/lib/inventory-pricing';
 import {ChoiceInput} from '@/components/ui/choice-input';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
-import {Alert,AutoComplete,InputNumber,Pagination,Steps} from 'antd';
+import {Alert,Checkbox,AutoComplete,InputNumber,Pagination,Steps} from 'antd';
 import {useDebouncedValue} from '@/hooks/use-debounced-value';
 import {toCsv} from '@/lib/inventory-csv';
 import {OverlayFooter} from '@/components/ui/overlay';
@@ -79,6 +79,7 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
  const showCost=useInventoryCost();
  const formId=useId();
  const [destination,setDestination]=useState('');
+ const [hasAccessories,setAccessories]=useState(false),[hasGift,setHasGift]=useState(false),[gifts,setGifts]=useState<SaleGift[]>([]);
  const [picked,setPicked]=useState<Item|null>(item||null),[source,setSource]=useState(warehouse),[channel,setChannel]=useState(''),[qty,setQty]=useState(1),[purchaseStatus,setPurchaseStatus]=useState('received');
  const [unit,setUnit]=useState(kind==='sale'?salePrice(item,creditOnly?'credit':'cash'):0),[extra,setExtra]=useState(0);
  const stock=useRemote<Detail>(picked?'/api/inventory?view=items&id='+encodeURIComponent(picked.id):null);
@@ -88,8 +89,9 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
  const blocked=kind!=='purchase'&&(!available||available.qty<qty);
  return <GuardedForm focusError id={formId} className="form-stack" onSubmit={async e=>{
   if(!picked||!source)throw new Error('Бараа болон агуулах сонгоно уу.');
+  if(kind==='sale'&&hasGift&&(!gifts.length||gifts.some(g=>!g.item)))throw new Error('Бэлгийн бараагаа сонгоно уу.');
   const f=new FormData(e.currentTarget),data={...Object.fromEntries(f),item_id:picked.id,warehouse_id:source,qty,unit_cost:unit,unit_price:unit,additional_cost:extra,commission_rate:numeric(f,'commission_rate'),tax_amount:numeric(f,'tax_amount'),vat_issued:f.get('vat_issued')==='on',ordered_at:fromInput(String(f.get('ordered_at')||'')),received_at:fromInput(String(f.get('received_at')||'')),sold_at:fromInput(String(f.get('sold_at')||''))};
-  await onSave({...data,...(kind==='sale'&&qty===1&&(picked.imei||picked.barcode)?{units:[{serial:picked.imei||'',barcode:picked.barcode||'',note:''}]}:{})});return true;
+  await onSave({...data,...(kind==='sale'?{has_accessories:hasAccessories,gift_name:hasGift?f.get('gift_name')||'':'',gifts:hasGift?gifts.map(g=>({item_id:g.item!.id,warehouse_id:g.warehouse,qty:g.qty})):[]}:{}),...(kind==='sale'&&qty===1&&(picked.imei||picked.barcode)?{units:[{serial:picked.imei||'',barcode:picked.barcode||'',note:''}]}:{})});return true;
  }}>
   <ItemPicker value={picked} onChange={chooseItem} warehouse={source} inStockOnly={kind!=='purchase'}/>
   <Field label={kind==='purchase'?'Хүлээн авах агуулах *':'Зарлагадах агуулах *'}><SelectControl name="warehouse_id" value={source} onChange={e=>{setSource(e.target.value);if(destination===e.target.value)setDestination('');}} required><option value="">Сонгох…</option>{options.warehouses.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}</SelectControl></Field>
@@ -103,6 +105,8 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
    <p className="inventory-stock-note">Нийт өртөг: <strong>{cash(unit*qty+extra)}</strong> · Нэгжид {cash(qty?(unit*qty+extra)/qty:0)}{purchaseStatus==='ordered'&&<small>Хүлээн авах хүртэл агуулахын үлдэгдэл нэмэгдэхгүй.</small>}</p>
   </>}
   {kind==='sale'&&<>
+   <Checkbox checked={hasAccessories} onChange={e=>setAccessories(e.target.checked)}>Дагалдах бараатай</Checkbox>
+   <DirectSaleExtras gifts={gifts} onChange={setGifts} enabled={hasGift} onEnabled={setHasGift}/>
    {picked&&<p className="inventory-stock-note">Үндсэн / зээл: {cash(picked.sale_price)} · Бэлэн: {cash(picked.cash_price??picked.sale_price)}</p>}
    <p className="form-help" aria-live="polite">{creditOnly||channel?'Үндсэн үнэ сонгогдсон.':'Бэлэн төлөлтийн үнэ сонгогдсон; хямдралгүй бол үндсэн үнэ хэрэглэнэ.'} Төлбөрийн хэлбэр солиход нэгжийн үнэ шинэчлэгдэнэ.</p>
    <div className="form-grid"><Field label="Билл дугаар"><Input name="bill_number" maxLength={120}/></Field><Field label="Борлуулсан огноо"><Input name="sold_at" type="datetime-local"/></Field></div>
@@ -143,5 +147,34 @@ export function ImportForm({post,busy,onDone}:{post:Post;busy:boolean;onDone:()=
    {preview&&<><p className="inventory-stock-note">{preview.rows} бараа · {preview.units} ширхэг · {preview.warehouses} агуулах</p>{preview.issue_count>0?<div className="error-box" role="alert"><strong>{preview.issue_count} зөрчил байна</strong><ul>{preview.issues.slice(0,10).map((v,i)=><li key={i}>{v}</li>)}</ul><Button variant="outline" onClick={downloadIssues}>Зөрчлийн CSV татах</Button></div>:<Button disabled={busy} onClick={async()=>{setError('');try{await post('import_opening',{rows:file.rows,as_of:fromInput(asOf)});setCompleted(preview);setFile(null);}catch(e){setError((e as Error).message);}}}>{busy?'Импортолж байна…':`${preview.rows} бараа импортлох`}</Button>}</>}
   </>}
   {error&&<p className="error-box" role="alert">{error}</p>}</>}
+ </div>;
+}
+
+export function Branch({line,onChange}:{line:{item:Item|null;qty:number;warehouse:string};onChange:(warehouse:string)=>void}){
+ const detail=useRemote<Detail>(line.item?'/api/inventory?view=items&id='+encodeURIComponent(line.item.id):null);
+ if(!line.item)return null;
+ if(detail.error)return <Alert type="error" title="Салбарын үлдэгдлийг уншиж чадсангүй" action={<Button type="button" onClick={detail.retry}>Дахин оролдох</Button>}/>;
+ if(!detail.data)return <p role="status">Үлдэгдэл шалгаж байна…</p>;
+ const branches=detail.data.byWarehouse.filter(w=>w.qty>=line.qty);
+ if(branches.length===1)return <p className="form-help">Авах салбар: <strong>{branches[0].warehouse_name}</strong> · {branches[0].qty} ш бэлэн</p>;
+ if(!branches.length)return <Alert type="warning" title="Тоо ширхэгт хүрэлцэх үлдэгдэлтэй салбар алга."/>;
+ return <Field label="Авах салбар *"><SelectControl required value={line.warehouse} onChange={e=>onChange(e.target.value)}><option value="">Салбар сонгох</option>{branches.map(w=><option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name} · {w.qty} ш</option>)}</SelectControl></Field>;
+}
+export type SaleGift={key:string;item:Item|null;qty:number;warehouse:string};
+export function DirectSaleExtras({gifts,onChange,enabled,onEnabled}:{gifts:SaleGift[];onChange:(v:SaleGift[])=>void;enabled:boolean;onEnabled:(v:boolean)=>void}){
+ const add=()=>onChange([...gifts,{key:crypto.randomUUID(),item:null,qty:1,warehouse:''}]);
+ const change=(key:string,patch:Partial<SaleGift>)=>onChange(gifts.map(g=>g.key===key?{...g,...patch}:g));
+ return <div className="form-stack">
+  <Checkbox checked={enabled} onChange={e=>{onEnabled(e.target.checked);if(e.target.checked&&!gifts.length)add();}}>Бэлэгтэй</Checkbox>
+  {enabled&&<><Field label="Бэлгийн нэр / урамшуулал"><Input name="gift_name" maxLength={120}/></Field>
+   {gifts.map((g,i)=><section key={g.key} className="next-box"><div className="form-stack" style={{width:'100%'}}>
+    <strong>Бэлэг {i+1}</strong><ItemPicker inStockOnly warehouse="" value={g.item} onChange={item=>change(g.key,{item,warehouse:''})} label="Бэлгийн код, нэрээр хайх *"/>
+    <Field label="Бэлгийн тоо ширхэг"><Input type="number" required min={1} max={1000000} step={1} value={g.qty} onChange={e=>change(g.key,{qty:Number(e.target.value)||1,warehouse:''})}/></Field>
+    <Branch line={g} onChange={warehouse=>change(g.key,{warehouse})}/>
+    <Button type="button" variant="ghost" onClick={()=>{const rest=gifts.filter(row=>row.key!==g.key);onChange(rest);if(!rest.length)onEnabled(false);}}>Бэлгийг хасах</Button>
+   </div></section>)}
+   <Button type="button" variant="outline" disabled={gifts.length>=20} onClick={add}>Бэлэг нэмэх</Button>
+   <p className="form-help">Бэлэг төлбөргүй. Батлагдсаны дараа сонгосон салбарын үлдэгдлээс хасагдана.</p>
+  </>}
  </div>;
 }

@@ -1,0 +1,36 @@
+const fs=require('node:fs');
+const source=fs.readFileSync('tests/serials.test.cjs','utf8');
+eval(source.slice(0,source.indexOf('\n(async()=>{'))+String.raw`
+(async()=>{
+ await crmRoute.GET(new Request('https://crm.test/api/crm'));
+ for(const role of ['operator','manager'])await post(crmRoute,{action:'member',data:{email:role+'@example.test',name:role,role,active:true}});
+ const wh=(await stock('create_warehouse',{name:'Gift test'}))[1].id;
+ const create=async(code,cost,qty)=>{const id=(await stock('create_item',{code,name:code,barcode:code}))[1].id;assert.equal((await stock('record_purchase',{item_id:id,warehouse_id:wh,qty,unit_cost:cost}))[0],200);return id;};
+ const main=await create('MAIN',100,8),gift1=await create('GIFT1',10,4),gift2=await create('GIFT2',20,4);
+ const qty=id=>sqlite.prepare('SELECT SUM(qty_delta) n FROM inventory_stock_moves WHERE item_id=?').get(id).n;
+ const as=role=>{user={userId:role,email:role+'@example.test',displayName:role};};
+ const sale={item_id:main,warehouse_id:wh,qty:1,unit_price:200,has_accessories:true,gift_name:'Promotion',gifts:[{item_id:gift1,qty:1},{item_id:gift2,qty:1}],units:[{serial:'MAIN-serial',barcode:'',note:''}]};
+ as('operator');const [,pending]=await stock('record_sale',sale);assert.equal(pending.status,'pending');
+ assert.equal(qty(main),8);assert.equal(qty(gift1),4);assert.equal(qty(gift2),4);
+ const stored=JSON.parse(sqlite.prepare('SELECT payload FROM direct_sale_requests WHERE id=?').get(pending.id).payload);
+ assert.equal(stored.gifts.length,2);assert.equal(stored.gifts[0].warehouse_id,wh);assert.equal(stored.has_accessories,true);
+ as('manager');let [status,result]=await stock('approve_sale',{},pending.id);assert.equal(status,200,JSON.stringify(result));
+ assert.equal(qty(main),7);assert.equal(qty(gift1),3);assert.equal(qty(gift2),3);
+ const recorded=sqlite.prepare('SELECT * FROM inventory_sales WHERE id=?').get(result.id);
+ assert.equal(recorded.cost_cents,13000);assert.equal(recorded.total_price,200);assert.equal(recorded.has_accessories,1);assert.equal(JSON.parse(recorded.gifts).length,2);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM inventory_sales').get().n,1);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM inventory_units WHERE ref_id=?').get(result.id).n,3,'main serial must survive gift additions');
+ assert.equal((await stock('approve_sale',{},pending.id))[0],409);assert.equal(qty(gift1),3);
+ const receipt=crypto.randomUUID();
+ const sendOnce=async()=>json(await post(stockRoute,{action:'record_sale',request_id:receipt,data:{...sale,units:[]}}));
+ const first=await sendOnce(),again=await sendOnce();assert.equal(first[0],200);assert.equal(first[1].id,again[1].id);assert.equal(qty(gift1),2);
+ const before=qty(main);
+ assert.equal((await stock('record_sale',{...sale,gifts:[{item_id:main,warehouse_id:wh,qty:before}]}))[0],409,'main + same gift quantity aggregated');assert.equal(qty(main),before);
+ as('operator');const [,short]=await stock('record_sale',{...sale,gifts:[{item_id:gift1,qty:2}]});assert.equal(short.status,'pending');
+ as('manager');assert.equal((await stock('record_sale',{item_id:gift1,warehouse_id:wh,qty:2,unit_price:0}))[0],200);
+ assert.equal((await stock('approve_sale',{},short.id))[0],409);assert.equal(qty(main),before);assert.equal(sqlite.prepare('SELECT status FROM direct_sale_requests WHERE id=?').get(short.id).status,'pending');
+ assert.equal((await stock('record_sale',{...sale,gifts:[],has_accessories:true}))[0],200);assert.equal(qty(main),before-1);
+ as('operator');const [code,list]=await json(await stockRoute.GET(new Request('https://crm.test/api/inventory?view=sales')));assert.equal(code,200);assert.ok(list.items.every(r=>!('cost_cents' in r)&&!('profit_cents' in r)));assert.ok(list.items.every(r=>!r.gifts.includes('cost')));
+ console.log('PASS: direct gifts approval, no early stock deduction, atomic shortages, main/gift aggregate quantity, retry safety, one sale, correct gift cost, serial preservation, accessory-only flag, role cost privacy.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
+`);

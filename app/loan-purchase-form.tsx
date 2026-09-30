@@ -1,24 +1,13 @@
 'use client';
 import {useState} from 'react';
 import {Alert,Checkbox,Radio,InputNumber} from 'antd';
-import {ItemPicker,cash,type Item,type Options,type Detail} from './inventory-forms';
-import {useRemote} from '@/hooks/use-remote';
+import {ItemPicker,cash,type Item,type Options,Branch} from './inventory-forms';
 import {GuardedForm} from '@/components/draft-guard';
 import {Field} from '@/components/form-field';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {SelectControl,TextareaControl} from '@/components/ui/form-controls';
 type Line={key:string;item:Item|null;qty:number;price:number;warehouse:string;kind:'gift'|'main'};
-function Branch({line,onChange}:{line:Line;onChange:(warehouse:string)=>void}){
- const detail=useRemote<Detail>(line.item?'/api/inventory?view=items&id='+encodeURIComponent(line.item.id):null);
- if(!line.item)return null;
- if(detail.error)return <Alert type="error" title="Салбарын үлдэгдлийг уншиж чадсангүй" action={<Button type="button" onClick={detail.retry}>Дахин оролдох</Button>}/>;
- if(!detail.data)return <p role="status">Үлдэгдэл шалгаж байна…</p>;
- const branches=detail.data.byWarehouse.filter(w=>w.qty>=line.qty);
- if(branches.length===1)return <p className="form-help">Авах салбар: <strong>{branches[0].warehouse_name}</strong> · {branches[0].qty} ш бэлэн</p>;
- if(!branches.length)return <Alert type="warning" title="Тоо ширхэгт хүрэлцэх үлдэгдэлтэй салбар алга."/>;
- return <Field label="Авах салбар *"><SelectControl required value={line.warehouse} onChange={e=>onChange(e.target.value)}><option value="">Салбар сонгох</option>{branches.map(w=><option key={w.warehouse_id} value={w.warehouse_id}>{w.warehouse_name} · {w.qty} ш</option>)}</SelectControl></Field>;
-}
 export default function LoanPurchaseForm({options,busy,onSave}:{options:Options;busy:boolean;onSave:(data:unknown)=>Promise<void>}){
  const empty=(kind:Line['kind']):Line=>({key:crypto.randomUUID(),item:null,qty:1,price:0,warehouse:'',kind});
  const [main,setMain]=useState<Line>({key:'main',item:null,qty:1,price:0,warehouse:'',kind:'main'}),[extras,setExtras]=useState<Line[]>([]);

@@ -4,7 +4,7 @@ import {member,Failure,isSameOrigin} from '@/lib/access';
 import {canViewInventoryCost,canEditInventoryItem,isIsolatedRole,canManageSchedule,type Member} from '@/lib/crm';
 import {z} from 'zod';
 import {unitsSchema,saveUnits,duplicateUnits} from '@/lib/serials';
-import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey,planInventoryBulkEdit} from '@/lib/inventory';
+import {cents,safeTotal,stockAt,withdrawal,movement,itemSchema,openingSchema,money,quantity,dayBounds,productKey,planInventoryBulkEdit,saleGiftsSchema,planSaleGifts} from '@/lib/inventory';
 import type {DatabaseSession} from '@/lib/database';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -264,7 +264,7 @@ export async function POST(req:Request){try{
     }return {ok:true,id:b.id};
    }
    if(b.action==='record_sale'||b.action==='transfer'){
-    const input=z.object({item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.string().email().optional(),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
+    const input=z.object({has_accessories:z.boolean().default(false),gift_name:z.string().trim().max(120).default(''),gifts:saleGiftsSchema,item_id:z.string().min(1),warehouse_id:z.string().min(1),qty:quantity,units:unitsSchema,seller:z.string().email().optional(),unit_price:money.default(0),to_warehouse_id:z.string().optional(),customer_name:z.string().trim().max(160).default(''),customer_phone:z.string().trim().max(40).default(''),platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),commission_rate:z.number().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default('')}).parse(b.data);
     const saleItem=await requireRow(d,'inventory_items',input.item_id);const saleWarehouse=await requireRow(d,'inventory_warehouses',input.warehouse_id);
     if(b.action==='record_sale'&&!saleItem.active)throw new Failure('Идэвхтэй бараа сонгоно уу.');
     const stock=await stockAt(d,input.item_id,input.warehouse_id),id=crypto.randomUUID();
@@ -277,10 +277,11 @@ export async function POST(req:Request){try{
      const who=await d.prepare('SELECT role FROM members WHERE email=? AND active=1').bind(seller).first<{role:string}>();
      if(!who||isIsolatedRole(who.role))throw new Failure('Идэвхтэй борлуулалтын ажилтан сонгоно уу.');
     }
+    const gifts=b.action==='record_sale'?await planSaleGifts(d,input,input.gifts):[];
     if(b.action==='record_sale'&&['agent','operator'].includes(m.role)){
      withdrawal(stock,input.qty);
      safeTotal(cents(input.unit_price)*input.qty);
-     await d.prepare('INSERT INTO direct_sale_requests(id,requester,payload,created_at) VALUES(?,?,?,?)').bind(id,m.email,JSON.stringify({...input,seller,item_name:saleItem.name,item_code:saleItem.code,warehouse_name:saleWarehouse.name}),now).run();
+     await d.prepare('INSERT INTO direct_sale_requests(id,requester,payload,created_at) VALUES(?,?,?,?)').bind(id,m.email,JSON.stringify({...input,gifts,seller,item_name:saleItem.name,item_code:saleItem.code,warehouse_name:saleWarehouse.name}),now).run();
      return {ok:true,id,status:'pending'};
     }
     if(b.action==='record_sale'&&stock.value_cents<0)throw new Failure('Барааны өртгийн зөрчлийг эхлээд засна уу.',409);
@@ -295,6 +296,14 @@ export async function POST(req:Request){try{
      await d.prepare('INSERT INTO inventory_sales(id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at,bill_number,account,commission_rate,commission_cents,tax_cents,cost_cents,cost_estimated,vat_issued) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,input.item_id,input.warehouse_id,input.qty,input.unit_price,total/100,input.customer_name,input.customer_phone,input.platform,input.sold_at||now,input.note,m.email,now,input.bill_number,input.account||String(channel?.account||''),rate,commission,tax,cost,stock.cost_estimated,input.vat_issued?1:0).run();
      await movement(d,{item:input.item_id,warehouse:input.warehouse_id,kind:'sale',qty:-input.qty,value:-cost,estimated:stock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:input.note});
      await saveUnits(d,{source:'sale',refId:id,itemId:input.item_id,customerPhone:input.customer_phone,actor:m.email,at:input.sold_at||now},input.units);
+     let giftCost=0,giftEstimated=stock.cost_estimated;
+     for(const gift of gifts){
+      const giftStock=await stockAt(d,gift.item_id,gift.warehouse_id),value=withdrawal(giftStock,gift.qty);
+      giftCost=safeTotal(giftCost+value);giftEstimated=Math.max(giftEstimated,giftStock.cost_estimated);
+      await movement(d,{item:gift.item_id,warehouse:gift.warehouse_id,kind:'sale',qty:-gift.qty,value:-value,estimated:giftStock.cost_estimated,ref:id,actor:m.email,at:input.sold_at||now,note:'Бэлэг: '+input.gift_name});
+      if(gift.qty===1&&(gift.imei||gift.barcode))await d.prepare('INSERT INTO inventory_units(id,item_id,serial,barcode,source,ref_id,customer_phone,note,actor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),gift.item_id,gift.imei,gift.barcode,'sale',id,input.customer_phone,'Бэлэг',m.email,input.sold_at||now).run();
+     }
+     await d.prepare('UPDATE inventory_sales SET has_accessories=?,gift_name=?,gifts=?,cost_cents=?,cost_estimated=? WHERE id=?').bind(input.has_accessories?1:0,gifts.length?input.gift_name:'',JSON.stringify(gifts),safeTotal(cost+giftCost),giftEstimated,id).run();
      if(seller)await d.prepare('UPDATE inventory_sales SET seller=? WHERE id=?').bind(seller,id).run();
      if(approvalId)await d.prepare("UPDATE direct_sale_requests SET status='approved',sale_id=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=? AND status='pending'").bind(id,m.email,now,approvalNote,approvalId).run();
     }return {ok:true,id};

@@ -3,7 +3,8 @@ import {salePrice} from '@/lib/inventory-pricing';
 import DirectSaleRequests from './direct-sale-requests';
 import {MobileDisclosure,ResponsiveFilters} from '@/components/mobile-disclosure';
 import {useState} from 'react';
-import {Pagination} from 'antd';
+import {Pagination,Checkbox} from 'antd';
+import {GiftSummary} from './direct-sale-extras';
 import {ShoppingCart,Plus,Search,Users,CircleDollarSign} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -15,9 +16,9 @@ import {GuardedForm,markFormSaved,markFormError} from '@/components/draft-guard'
 import {AsyncStatus} from '@/components/async-status';
 import {useRemote} from '@/hooks/use-remote';
 import {toast} from '@/components/ui/sonner';
-import {ItemPicker,cash,type Item,type Options} from './inventory-forms';
+import {DirectSaleExtras,type SaleGift,ItemPicker,cash,type Item,type Options} from './inventory-forms';
 import {canViewInventoryCost,dateLabel,canManageSchedule,isIsolatedRole,type Member} from '@/lib/crm';
-type Row={id:string;item_name:string;item_code:string;warehouse_name:string;qty:number;unit_price:number;total_price:number;seller:string;seller_name:string|null;customer_name:string;customer_phone:string;platform:string;sold_at:string|null;created_at:string;profit_cents:number};
+type Row={has_accessories:number;gift_name:string;gifts:string;id:string;item_name:string;item_code:string;warehouse_name:string;qty:number;unit_price:number;total_price:number;seller:string;seller_name:string|null;customer_name:string;customer_phone:string;platform:string;sold_at:string|null;created_at:string;profit_cents:number};
 type List={items:Row[];count:number;summary:{revenue_cents:number;profit_cents:number}};
 type Unit={serial:string;barcode:string;note:string};
 const todayUB=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -67,7 +68,7 @@ export default function DirectSalesPanel({me,members}:{me:Member;members:Member[
  {!list.error&&(rows.length?<div className="table-scroll"><Table><TableHeader><TableRow><TableHead>ОГНОО</TableHead><TableHead>БАРАА</TableHead><TableHead>АГУУЛАХ</TableHead><TableHead>ТОО</TableHead><TableHead>ДҮН</TableHead>{showCost&&<TableHead>АШИГ</TableHead>}<TableHead>ЗАРСАН</TableHead><TableHead>ХАРИЛЦАГЧ</TableHead></TableRow></TableHeader><TableBody>
   {rows.map(r=><TableRow key={r.id}>
    <TableCell>{dateLabel(r.sold_at||r.created_at)}</TableCell>
-   <TableCell><strong>{r.item_name}</strong><small>{r.item_code}</small></TableCell>
+   <TableCell><strong>{r.item_name}</strong><small>{r.item_code}</small><GiftSummary gifts={r.gifts} hasAccessories={!!r.has_accessories} name={r.gift_name}/></TableCell>
    <TableCell>{r.warehouse_name}</TableCell>
    <TableCell>{r.qty}</TableCell>
    <TableCell>{cash(r.total_price)}</TableCell>
@@ -87,15 +88,17 @@ export function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Me
  const [item,setItem]=useState<Item|null>(null),[warehouse,setWarehouse]=useState('');
  const [qty,setQty]=useState(1),[price,setPrice]=useState(0),[platform,setPlatform]=useState('');
  const [units,setUnits]=useState<Unit[]>([]);
+ const [hasAccessories,setAccessories]=useState(false),[gifts,setGifts]=useState<SaleGift[]>([]),[hasGift,setHasGift]=useState(false);
  const stock=useRemote<{byWarehouse:{warehouse_id:string;qty:number}[]}>(item?'/api/inventory?view=items&id='+encodeURIComponent(item.id):null);
  const available=stock.data?.byWarehouse.find(w=>w.warehouse_id===warehouse)?.qty??null;
  const choose=(it:Item|null)=>{setItem(it);setQty(1);setUnits(it&&(it.imei||it.barcode)?[{serial:it.imei||'',barcode:it.barcode||'',note:''}]:[]);setPrice(salePrice(it,platform?'credit':'cash'));};
  return <GuardedForm className="form-stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);
   if(!item||!warehouse){toast.error('Бараа болон агуулах сонгоно уу.');return;}
-  onSubmit({item_id:item.id,warehouse_id:warehouse,qty,unit_price:price,seller:canPickSeller?f.get('seller'):me.email,
+  if(hasGift&&(!gifts.length||gifts.some(g=>!g.item))){toast.error('Бэлгийн бараагаа сонгоно уу.');return;}
+  onSubmit({has_accessories:hasAccessories,gift_name:hasGift?f.get('gift_name')||'':'',gifts:hasGift?gifts.map(g=>({item_id:g.item!.id,warehouse_id:g.warehouse,qty:g.qty})):[],item_id:item.id,warehouse_id:warehouse,qty,unit_price:price,seller:canPickSeller?f.get('seller'):me.email,
    customer_name:f.get('customer_name'),customer_phone:f.get('customer_phone'),platform:f.get('platform'),bill_number:f.get('bill_number'),
    sold_at:null,note:f.get('note'),units:units.filter(u=>u.serial.trim()||u.barcode.trim())});}}>
- <ItemPicker value={item} onChange={choose} warehouse={warehouse} label="Бараа сонгох *"/>
+ <ItemPicker inStockOnly value={item} onChange={choose} warehouse={warehouse} label="Бараа сонгох *"/>
  <div className="form-grid">
   <Field label="Агуулах *"><SelectControl name="warehouse_id" required value={warehouse} onChange={e=>setWarehouse(e.target.value)}>{[<option key="" value="" disabled>Сонгох…</option>,...(options?.warehouses||[]).map(w=><option key={w.id} value={w.id}>{w.name}</option>)]}</SelectControl></Field>
   <Field label="Зарсан ажилтан *">{canPickSeller?<SelectControl name="seller" required defaultValue={me.email}>{sellers.map(m=><option key={m.email} value={m.email}>{m.name}</option>)}</SelectControl>:<Input value={me.name} disabled/>}</Field>
@@ -123,6 +126,8 @@ export function SaleForm({me,sellers,canPickSeller,options,busy,onSubmit}:{me:Me
    <Button type="button" variant="ghost" size="sm" onClick={()=>setUnits(l=>l.filter((_,j)=>j!==i))}>Хасах</Button>
   </div>)}
  </div>}
+ <Checkbox checked={hasAccessories} onChange={e=>setAccessories(e.target.checked)}>Дагалдах бараатай</Checkbox>
+ <DirectSaleExtras gifts={gifts} onChange={setGifts} enabled={hasGift} onEnabled={setHasGift}/>
  <Field label="Тэмдэглэл"><TextareaControl name="note" rows={2} maxLength={2000}/></Field>
  <Button type="submit" className="primary full" disabled={busy}><Users size={16}/>{busy?'Хадгалж байна…':canPickSeller?'Борлуулалт бүртгэх':'Батлуулах хүсэлт илгээх'}</Button>
  </GuardedForm>;

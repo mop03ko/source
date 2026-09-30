@@ -4,6 +4,28 @@ import type {DatabaseSession} from '@/lib/database';
 
 export const money=z.number().finite().min(0).max(1_000_000_000).refine(n=>Math.abs(n*100-Math.round(n*100))<0.0001,'Хоёр орны нарийвчлалтай дүн оруулна уу.');
 export const quantity=z.number().int().min(1).max(1_000_000);
+export const saleGiftsSchema=z.array(z.object({item_id:z.string().min(1).max(100),warehouse_id:z.string().max(100).default(''),qty:quantity})).max(20).default([]);
+export async function planSaleGifts(db:DatabaseSession,main:{item_id:string;warehouse_id:string;qty:number},gifts:z.infer<typeof saleGiftsSchema>){
+ const totals=new Map<string,{item:string;warehouse:string;qty:number}>();
+ const add=(item:string,warehouse:string,qty:number)=>{const key=JSON.stringify([item,warehouse]);const prev=totals.get(key);totals.set(key,{item,warehouse,qty:(prev?.qty||0)+qty});};
+ add(main.item_id,main.warehouse_id,main.qty);
+ const result=[];
+ for(const gift of gifts){
+  const item=await db.prepare('SELECT id,name,code,imei,barcode FROM inventory_items WHERE id=? AND active=1').bind(gift.item_id).first<{id:string;name:string;code:string;imei:string|null;barcode:string}>();
+  if(!item)throw new Failure('Бэлгийн идэвхтэй бараа сонгоно уу.',409);
+  const branches=(await db.prepare('SELECT w.id,w.name FROM inventory_warehouses w JOIN inventory_stock_moves s ON s.warehouse_id=w.id WHERE s.item_id=? GROUP BY w.id,w.name HAVING SUM(s.qty_delta)>=?').bind(item.id,gift.qty).all<{id:string;name:string}>()).results;
+  const branch=gift.warehouse_id?branches.find(w=>w.id===gift.warehouse_id):branches.length===1?branches[0]:null;
+  if(!branch)throw new Failure(`${item.name}: үлдэгдэлтэй салбараа сонгоно уу.`,409);
+  add(item.id,branch.id,gift.qty);
+  result.push({item_id:item.id,item_name:item.name,item_code:item.code,warehouse_id:branch.id,warehouse_name:branch.name,qty:gift.qty,imei:item.imei||'',barcode:item.barcode||''});
+ }
+ for(const row of totals.values()){
+  const stock=await stockAt(db,row.item,row.warehouse);
+  if(stock.value_cents<0)throw new Failure('Барааны өртгийн зөрчлийг эхлээд засна уу.',409);
+  withdrawal(stock,row.qty);
+ }
+ return result;
+}
 export const cents=(value:number)=>{const n=Math.round(value*100);if(!Number.isSafeInteger(n))throw new Failure('Мөнгөн дүн хэт их.');return n;};
 export const safeTotal=(n:number)=>{if(!Number.isSafeInteger(n)||Math.abs(n)>9_000_000_000_000)throw new Failure('Нийт дүн зөвшөөрөгдөх хэмжээнээс их.');return n;};
 export type Stock={qty:number;value_cents:number;cost_estimated:number};
