@@ -400,6 +400,7 @@ export async function GET(req: Request) {
       myToday,
       directory,
       directSales,
+      daily,
     ] = await Promise.all([
       view==='workspace'?empty:db()
         .prepare(
@@ -515,6 +516,16 @@ export async function GET(req: Request) {
             .bind(...[reportFromIso, reportToIso].filter(Boolean))
             .all<{ seller: string; sales: number; amount_cents: number }>()
         : Promise.resolve({ results: [] as { seller: string; sales: number; amount_cents: number }[] }),
+      // Өдөр тутмын ирсэн хүсэлтийн тоо: created_at нь UTC тул УБ цагаар (+8) өдөрт хуваана.
+      // date(...,'+8 hours') нь SQLite-д шууд, MySQL-д mysqlSql()-ээр DATE_FORMAT(DATE_ADD(...))-д хөрвөнө.
+      isReports
+        ? db()
+            .prepare(
+              `SELECT date(l.created_at,'+8 hours') day,COUNT(*) count FROM leads l WHERE ${reportWhere} GROUP BY date(l.created_at,'+8 hours') ORDER BY day`,
+            )
+            .bind(...reportArgs)
+            .all<{ day: string; count: number }>()
+        : Promise.resolve({ results: [] as { day: string; count: number }[] }),
     ]);
     // Идэвхтэй гишүүн бүрийг тусад нь харуулна; тухайн хугацаанд хуваарилагдсан хүсэлтгүй байсан ч мөр нь гарч ирнэ.
     const byMemberMap = new Map(
@@ -586,6 +597,7 @@ export async function GET(req: Request) {
         stats,
         members: team.results,
         distribution: dist.results,
+        daily: daily.results.map((r) => ({ day: String(r.day), count: Number(r.count) })),
         byMember: reportMembers,
         settings,
         candidateGroups: candidateGroups.results,
