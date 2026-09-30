@@ -59,11 +59,11 @@ export function ItemForm({item,busy,onSave,options,template=false}:{item?:Item;o
  </GuardedForm>;
 }
 
-export function ItemPicker({value,onChange,warehouse,label='Бараа сонгох *'}:{value:Item|null;onChange:(item:Item|null)=>void;warehouse:string;label?:string}){
+export function ItemPicker({value,onChange,warehouse,inStockOnly=false,label='Бараа сонгох *'}:{value:Item|null;onChange:(item:Item|null)=>void;warehouse:string;inStockOnly?:boolean;label?:string}){
  const [q,setQ]=useState(''),[product,setProduct]=useState<Item|null>(null),[page,setPage]=useState(1),[selecting,setSelecting]=useState(false),[selectionError,setSelectionError]=useState('');
  const searchQ=useDebouncedValue(q);
- const search=useRemote<{items:Item[];count:number}>(!value&&q.trim()&&!product?'/api/inventory?'+new URLSearchParams({view:'products',q:searchQ,warehouse_id:warehouse,page:String(page)}):null);
- const units=useRemote<{items:Item[];count:number}>(!value&&product?'/api/inventory?'+new URLSearchParams({view:'products',id:product.id,q:searchQ,warehouse_id:warehouse,page:String(page)}):null);
+ const search=useRemote<{items:Item[];count:number}>(!value&&q.trim()&&!product?'/api/inventory?'+new URLSearchParams({view:'products',q:searchQ,warehouse_id:warehouse,available_only:inStockOnly?'1':'0',page:String(page)}):null);
+ const units=useRemote<{items:Item[];count:number}>(!value&&product?'/api/inventory?'+new URLSearchParams({view:'products',id:product.id,q:searchQ,warehouse_id:warehouse,available_only:inStockOnly?'1':'0',page:String(page)}):null);
  const choose=async(it:Item)=>{
   setSelectionError('');
   if(!it.single_item_id){setProduct(it);setPage(1);return;}
@@ -91,7 +91,7 @@ export function MovementForm({kind,item,options,warehouse,busy,onSave,customer,s
   const f=new FormData(e.currentTarget),data={...Object.fromEntries(f),item_id:picked.id,warehouse_id:source,qty,unit_cost:unit,unit_price:unit,additional_cost:extra,commission_rate:numeric(f,'commission_rate'),tax_amount:numeric(f,'tax_amount'),vat_issued:f.get('vat_issued')==='on',ordered_at:fromInput(String(f.get('ordered_at')||'')),received_at:fromInput(String(f.get('received_at')||'')),sold_at:fromInput(String(f.get('sold_at')||''))};
   await onSave({...data,...(kind==='sale'&&qty===1&&(picked.imei||picked.barcode)?{units:[{serial:picked.imei||'',barcode:picked.barcode||'',note:''}]}:{})});return true;
  }}>
-  <ItemPicker value={picked} onChange={chooseItem} warehouse={source}/>
+  <ItemPicker value={picked} onChange={chooseItem} warehouse={source} inStockOnly={kind!=='purchase'}/>
   <Field label={kind==='purchase'?'Хүлээн авах агуулах *':'Зарлагадах агуулах *'}><SelectControl name="warehouse_id" value={source} onChange={e=>{setSource(e.target.value);if(destination===e.target.value)setDestination('');}} required><option value="">Сонгох…</option>{options.warehouses.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}</SelectControl></Field>
   {picked&&source&&<><AsyncStatus error={stock.error} loading={stock.loading} retry={stock.retry}/>{available&&<p className="inventory-stock-note">Энэ агуулахад <strong>{available.qty} ш</strong>{showCost&&<> · Өртөг {cash(available.value_cents/100)}</>}</p>}</>}
   {kind==='transfer'&&<Field label="Очих агуулах *"><SelectControl name="to_warehouse_id" required value={destination} onChange={e=>setDestination(e.target.value)}><option value="">Сонгох…</option>{options.warehouses.filter(w=>w.id!==source).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</SelectControl></Field>}

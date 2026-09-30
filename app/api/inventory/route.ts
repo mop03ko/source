@@ -49,6 +49,8 @@ export async function GET(req:Request){try{
  }
  if(view==='products'){
   const args:unknown[]=[];let where='1=1';
+  // Apply before grouping and pagination so sold-out serials cannot appear in a purchase picker.
+  if(p.get('available_only')==='1')where+=' AND it.stock>0 AND it.active=1';
   const productId=p.get('id');
   if(productId){where+=' AND it.group_id=?';args.push(productId);}
   if(q){if(p.get('match')==='exact'){where+=' AND (it.code=? COLLATE NOCASE OR it.imei=? COLLATE NOCASE OR it.barcode=? COLLATE NOCASE OR it.name=? COLLATE NOCASE OR it.sku=? COLLATE NOCASE)';args.push(...Array(5).fill(q));}else{where+=' AND (it.name LIKE ? OR it.code LIKE ? OR it.imei LIKE ? OR it.barcode LIKE ? OR it.brand LIKE ? OR it.supplier LIKE ? OR it.sku LIKE ? OR EXISTS(SELECT 1 FROM inventory_units u WHERE u.item_id=it.id AND (u.serial LIKE ? OR u.barcode LIKE ?)))';args.push(...Array(9).fill('%'+q+'%'));}}

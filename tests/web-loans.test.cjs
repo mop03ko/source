@@ -24,7 +24,8 @@ const call=(body,token=process.env.CRM_WEB_LOAN_TOKEN)=>route.POST(new Request('
   await post(crmRoute,{action:'member',data:{email:role+'@example.test',name:role,role,active:true}});
   sqlite.prepare('INSERT INTO work_shifts(id,day,member_email,person_name,assignment,note,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run(crypto.randomUUID(),deps['./assign'].ubDay(),role+'@example.test',role,'Sales','','test',new Date().toISOString(),new Date().toISOString());
  }
- const assigned=await (await call({...data,request_id:crypto.randomUUID()})).json();
+ const dup=await (await call({...data,request_id:crypto.randomUUID()})).json();assert.equal(dup.id,first.id);assert.equal(dup.duplicate,true);
+ const assigned=await (await call({...data,request_id:crypto.randomUUID(),product:'Assigned phone'})).json();
  assert.equal(sqlite.prepare('SELECT owner FROM leads WHERE id=?').get(assigned.id).owner,'agent@example.test');
  sqlite.prepare('INSERT INTO suppressions(phone,reason,actor,created_at) VALUES(?,?,?,?)').run('99112234','test','test',new Date().toISOString());
  const suppressed=await (await call({...data,request_id:crypto.randomUUID(),phone:'99112234'})).json();
@@ -32,16 +33,19 @@ const call=(body,token=process.env.CRM_WEB_LOAN_TOKEN)=>route.POST(new Request('
  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM notifications WHERE lead_id=?').get(suppressed.id).n,0);
  await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,0);
  sqlite.prepare("INSERT INTO sms_rules(id,status,message,enabled,created_at,updated_at) VALUES('test-new','new','Request received',1,'now','now') ON CONFLICT(status) DO UPDATE SET enabled=1,message='Request received'").run();
- const smsData={...data,request_id:crypto.randomUUID()};
+ const smsData={...data,request_id:crypto.randomUUID(),product:'SMS phone'};
  const smsLead=await (await call(smsData)).json();await call(smsData);
  assert.equal(sqlite.prepare("SELECT kind FROM activities WHERE id=?").get('sms-'+smsLead.id).kind,'sms_pending');
  await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
  assert.ok(sqlite.prepare('SELECT note FROM activities WHERE id=?').get('sms-'+smsLead.id).note.includes('Unitel'));
  await call(smsData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
  await call({...data,request_id:crypto.randomUUID(),phone:'99112234'});await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,1);
- smsFails=true;const failedData={...data,request_id:crypto.randomUUID()};await call(failedData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
+ smsFails=true;const failedData={...data,request_id:crypto.randomUUID(),product:'Failed phone'};await call(failedData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
  await call(failedData);await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
- const disabledData={...data,request_id:crypto.randomUUID()};await call(disabledData);sqlite.prepare("UPDATE sms_rules SET enabled=0 WHERE status='new'").run();await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
+ const disabledData={...data,request_id:crypto.randomUUID(),product:'Disabled phone'};await call(disabledData);sqlite.prepare("UPDATE sms_rules SET enabled=0 WHERE status='new'").run();await Promise.all(afterTasks.splice(0).map(fn=>fn()));assert.equal(smsCount,2);
+ const parallelData={...data,product:'Parallel Same Day'};const parallel=await Promise.all([call({...parallelData,request_id:crypto.randomUUID()}),call({...parallelData,request_id:crypto.randomUUID()})]);const parallelBodies=await Promise.all(parallel.map(r=>r.json()));assert.equal(parallelBodies[0].id,parallelBodies[1].id);
+ const normalized=await (await call({...parallelData,product:'  parallel   same day ',request_id:crypto.randomUUID()})).json();assert.equal(normalized.id,parallelBodies[0].id);
+ sqlite.prepare('UPDATE leads SET created_at=? WHERE id=?').run(new Date(Date.now()-86400000).toISOString(),normalized.id);const nextDay=await (await call({...parallelData,request_id:crypto.randomUUID()})).json();assert.notEqual(nextDay.id,normalized.id);
  console.log('PASS: web intake auth, strict validation, concurrent retry dedup, conflicts, source, audit and suppression');
 })().catch(e=>{console.error(e);process.exit(1)});
 `);

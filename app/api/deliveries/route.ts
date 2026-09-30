@@ -1,7 +1,7 @@
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {z} from 'zod';
-import {deliveryStatuses,deliveryDone,canSeeDeliveries,isCourierOnly,shiftOff,personKey,type Member,type Delivery} from '@/lib/crm';
+import {deliveryStatuses,deliveryDone,canSeeDeliveries,isCourierOnly,shiftOff,personKey,ubWeek,type Member,type Delivery} from '@/lib/crm';
 import {unitsSchema,saveUnits,duplicateUnits,duplicateWarning} from '@/lib/serials';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
@@ -82,10 +82,11 @@ export async function GET(req:Request){try{
   if(!row)throw new Failure('Хүргэлт олдсонгүй.',404);
   if(isCourierOnly(m.role)&&!(row.courier_email===m.email||(!row.courier_email&&row.courier_name===m.name)))throw new Failure('Энэ хүргэлтийг харах эрхгүй.',403);
   const units=await db().prepare("SELECT * FROM inventory_units WHERE source='delivery' AND ref_id=? ORDER BY created_at").bind(id).all();
-  return Response.json({delivery:row,units:units.results},{headers:{'Cache-Control':'no-store'}});
+  const lines=row.lead_id?await db().prepare('SELECT p.kind,p.qty,i.name,i.code,i.imei,w.name warehouse_name FROM lead_purchase_lines p JOIN inventory_items i ON i.id=p.item_id JOIN inventory_warehouses w ON w.id=p.warehouse_id WHERE p.lead_id=? ORDER BY p.created_at,p.id').bind(row.lead_id).all():null;
+  return Response.json({delivery:row,lines:lines?.results||[],units:units.results},{headers:{'Cache-Control':'no-store'}});
  }
  if(url.searchParams.get('report')==='1'){
-  const rfrom=url.searchParams.get('rfrom')||'',rto=url.searchParams.get('rto')||'';
+  const {from:rfrom,to:rto}=ubWeek();
   let where='1=1';const args:unknown[]=[];
   if(rfrom){day.parse(rfrom);where+=' AND delivered_on>=?';args.push(rfrom);}
   if(rto){day.parse(rto);where+=' AND delivered_on<=?';args.push(rto);}
@@ -100,14 +101,16 @@ export async function GET(req:Request){try{
    db().prepare(`SELECT status,COUNT(*) total FROM deliveries WHERE ${where} GROUP BY status`).bind(...args).all(),
    db().prepare(`SELECT it.name,it.code,COUNT(*) total FROM deliveries d JOIN inventory_items it ON it.id=d.item_id WHERE ${where.replaceAll('courier_email','d.courier_email').replaceAll('courier_name','d.courier_name')} AND d.item_id IS NOT NULL GROUP BY d.item_id ORDER BY total DESC LIMIT 15`).bind(...args).all(),
   ]);
-  return Response.json({total:total?.n||0,byCourier:byCourier.results,byMonth:byMonth.results,byChannel:byChannel.results,byKind:byKind.results,byStatus:byStatus.results,byItem:byItem.results},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({period:{from:rfrom,to:rto},total:total?.n||0,byCourier:byCourier.results,byMonth:byMonth.results,byChannel:byChannel.results,byKind:byKind.results,byStatus:byStatus.results,byItem:byItem.results},{headers:{'Cache-Control':'no-store'}});
  }
  const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page'))||1));
  const q=(url.searchParams.get('q')||'').slice(0,100);
  const status=url.searchParams.get('status')||'',courier=(url.searchParams.get('courier')||'').slice(0,120);
  const channel=(url.searchParams.get('channel')||'').slice(0,60),kind=(url.searchParams.get('kind')||'').slice(0,60);
  const from=url.searchParams.get('from')||'',to=url.searchParams.get('to')||'';
- let where='1=1';const args:unknown[]=[];
+ const week=ubWeek(),period=z.enum(['week','archive','upcoming']).parse(url.searchParams.get('period')||'week');
+ let where=period==='archive'?'delivered_on<?':period==='upcoming'?'delivered_on>?':'delivered_on>=? AND delivered_on<=?';
+ const args:unknown[]=period==='archive'?[week.from]:period==='upcoming'?[week.to]:[week.from,week.to];
  if(q){where+=' AND (d.customer_phone LIKE ? OR d.address LIKE ? OR d.item_info LIKE ? OR it.code LIKE ? OR it.name LIKE ?)';args.push(...Array(5).fill('%'+q+'%'));}
  if(status&&Object.hasOwn(deliveryStatuses,status)){where+=' AND status=?';args.push(status);}
  if(courier){where+=' AND courier_name=?';args.push(courier);}
@@ -117,14 +120,16 @@ export async function GET(req:Request){try{
  if(to){day.parse(to);where+=' AND delivered_on<=?';args.push(to);}
  where=mineOnly(m,where,args);
  const done=deliveryDone.map(s=>`'${s}'`).join(',');
+ const optionArgs:unknown[]=period==='archive'?[week.from]:period==='upcoming'?[week.to]:[week.from,week.to];
+ const optionWhere=mineOnly(m,period==='archive'?'delivered_on<?':period==='upcoming'?'delivered_on>?':'delivered_on>=? AND delivered_on<=?',optionArgs);
  const [rows,count,stats,couriers,channels]=await Promise.all([
   db().prepare(`SELECT d.*,it.code item_code,it.name item_name,it.brand item_brand FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where} ORDER BY d.delivered_on DESC,d.created_at DESC LIMIT 50 OFFSET ?`).bind(...args,(page-1)*50).all(),
   db().prepare(`SELECT COUNT(*) count FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where}`).bind(...args).first<{count:number}>(),
   db().prepare(`SELECT COUNT(*) total,COALESCE(SUM(d.status IN (${done})),0) done,COALESCE(SUM(d.status='pending'),0) pending,COALESCE(SUM(d.status='failed' OR d.status='cancelled'),0) failed,COALESCE(SUM(d.item_id IS NOT NULL),0) linked FROM deliveries d LEFT JOIN inventory_items it ON it.id=d.item_id WHERE ${where}`).bind(...args).first(),
-  db().prepare('SELECT courier_name name,COUNT(*) total FROM deliveries GROUP BY courier_name ORDER BY total DESC LIMIT 100').all(),
-  db().prepare("SELECT payment_channel name FROM deliveries WHERE payment_channel!='' GROUP BY payment_channel ORDER BY COUNT(*) DESC LIMIT 60").all(),
+  db().prepare(`SELECT courier_name name,COUNT(*) total FROM deliveries WHERE ${optionWhere} GROUP BY courier_name ORDER BY total DESC LIMIT 100`).bind(...optionArgs).all(),
+  db().prepare(`SELECT payment_channel name FROM deliveries WHERE ${optionWhere} AND payment_channel!='' GROUP BY payment_channel ORDER BY COUNT(*) DESC LIMIT 60`).bind(...optionArgs).all(),
  ]);
- return Response.json({items:rows.results,count:count?.count||0,page,stats,couriers:couriers.results,channels:channels.results},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({period,week,items:rows.results,count:count?.count||0,page,stats,couriers:couriers.results,channels:channels.results},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return err(e);}}
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);

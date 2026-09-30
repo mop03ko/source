@@ -4,7 +4,7 @@ const ts=require('typescript');const fs=require('fs');const assert=require('node
 const sqlite=new DatabaseSync(':memory:');for(const p of fs.readdirSync('drizzle').filter(p=>p.endsWith('.sql')))sqlite.exec(fs.readFileSync('drizzle/'+p,'utf8'));
 class Statement{constructor(sql,args=[]){this.sql=sql;this.args=args;}bind(...a){return new Statement(this.sql,a)}async first(){return sqlite.prepare(this.sql).get(...this.args)||null}async all(){return {results:sqlite.prepare(this.sql).all(...this.args)}}async run(){const r=sqlite.prepare(this.sql).run(...this.args);return {meta:{changes:Number(r.changes)}}}}
 const DB={prepare:s=>new Statement(s),batch:async statements=>{sqlite.exec('BEGIN');try{const r=[];for(const s of statements)r.push(await s.run());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e}}};
-DB.transaction=async work=>{sqlite.exec('BEGIN');try{const value=await work(DB);sqlite.exec('COMMIT');return value;}catch(e){sqlite.exec('ROLLBACK');throw e;}};
+DB.transaction=async work=>{sqlite.exec('BEGIN');try{const value=await work({prepare:DB.prepare,batch:async statements=>{const results=[];for(const stmt of statements)results.push(await stmt.run());return results;}});sqlite.exec('COMMIT');return value;}catch(e){sqlite.exec('ROLLBACK');throw e;}};
 let user={userId:'owner-test',email:'owner@example.test',displayName:'Owner'};
 const deps={'@/lib/runtime':{env:{DB}},'../app/session':{getCurrentUser:async()=>user}};
 function load(path){const out=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',out)(id=>deps[id]||require(id),m,m.exports);return m.exports;}
@@ -20,7 +20,7 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal((await post('create',{...leadData(),phone:'x'}))[0],400);
  assert.equal((await post('create',{...leadData(),registration:'invalid'}))[0],400);
  [status,d]=await post('create',{...leadData(),registration:'аб99112233'});assert.equal(status,200);const id=d.id;assert.equal(d.added,1);assert.equal((await get('?id='+id))[1].lead.registration,'АБ99112233');
- assert.equal((await post('create',leadData()))[0],409);
+ assert.equal((await post('create',{...leadData(),registration:'\u0410\u041199112233'}))[0],409);
  assert.equal((await get('?view=today'))[1].count,1);assert.deepEqual((await get('?view=dashboard'))[1].leads,(await get('?view=today'))[1].leads);assert.ok(!(await get('?id='+id))[1].activities.some(a=>a.note.includes('АБ99112233')));
  assert.equal((await post('member',{email:'agent@example.test',name:'Agent',role:'agent',active:true}))[0],200);
  assert.equal((await post('member',{email:'operator@example.test',name:'Operator',role:'operator',active:true}))[0],200);
@@ -52,7 +52,7 @@ const leadData=(phone='99112233',owner='owner@example.test')=>({name:'Test only'
  assert.equal((await post('activity',{kind:'message',note:'Cannot',next_at:null,next_action:''},second,detail.lead.version))[0],400);
  assert.equal((await post('activity',{kind:'note',note:'Internal',next_at:null,next_action:''},second,detail.lead.version))[0],200);
  assert.equal((await post('member',{email:'owner@example.test',name:'Owner',role:'agent',active:false}))[0],400);
- const imported=(await post('import',[leadData(),leadData('88112233'),leadData('77112233'),leadData('77112233')]))[1];assert.equal(imported.added,1);assert.equal(imported.skipped,3);
+ const imported=(await post('import',[{...leadData(),...sqlite.prepare('SELECT registration,product FROM leads WHERE id=?').get(id)},leadData('88112233'),leadData('77112233'),leadData('77112233')]))[1];assert.equal(imported.added,1);assert.equal(imported.skipped,3);
  assert.equal((await get())[1].stats.total,3);
  assert.equal(common.normalizePhone('+976 9911-2233'),'99112233');assert.throws(()=>common.normalizePhone('1234'));
  assert.deepEqual(common.parseCSV('name,phone\r\n"A,B",99112233\r\n'),[['name','phone'],['A,B','99112233']]);assert.throws(()=>common.parseCSV('"unfinished'));assert.ok(common.csvCell('=SUM(1)').startsWith('"\''));assert.equal(common.fromInput('2026-09-15T10:00'),'2026-09-15T02:00:00.000Z');

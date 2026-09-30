@@ -26,6 +26,10 @@ const scenario=String.raw`
  for(const view of ['products','items']){[status,d]=await invGet('?view='+view+'&stock=nonzero');assert.equal(status,200);assert.ok(d.items.length>0);assert.ok(d.items.every(i=>i.stock!==0));[status,d]=await invGet('?view='+view+'&stock=nonzero&warehouse_id=missing');assert.equal(d.count,0);}
  assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100,units:[{serial:'222222222222222',barcode:'HISTORICAL-B',note:''}]}))[0],200);
  [status,d]=await invGet(productUrl);assert.equal(d.product.stock,1);assert.equal(d.history[0].item_id,second);assert.equal(d.items.find(i=>i.id===first).stock,1);assert.equal(d.items.find(i=>i.id===second).stock,0);
+ const available=(await invGet(productUrl+'&available_only=1'))[1];assert.equal(available.count,1);assert.equal(available.items[0].id,first);
+ assert.equal((await invGet('?view=products&available_only=1&q=UNIT-B'))[1].count,0);
+ assert.equal((await invGet('?view=products&available_only=1&warehouse_id=missing'))[1].count,0);
+ assert.equal((await invGet('?view=products&available_only=1'))[1].summary.unit_count,1);
  assert.equal(d.product.website_stock,1);assert.equal(d.product.sku,product.sku);assert.ok(d.items.every(i=>i.sku===product.sku));
  [status,d]=await invGet(productUrl+'&unit_q=HISTORICAL-B');assert.equal(d.count,1);assert.equal(d.items[0].id,second);
  assert.equal((await invPost('record_sale',{item_id:second,warehouse_id:warehouse,qty:1,unit_price:1100}))[0],409,'Sold unit cannot be sold twice');

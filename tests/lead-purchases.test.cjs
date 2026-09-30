@@ -7,7 +7,7 @@ const scenario=String.raw`
  const sent=[];deps['@/lib/sms']={...sms,sendSms:async(...args)=>{sent.push(args);}};
  let purchaseRoute=load('app/api/lead-purchases/route.ts');
  const ownerUser={...user};
- async function purchase(data,origin='https://crm.test'){const r=await purchaseRoute.POST(new Request('https://crm.test/api/lead-purchases',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)}));return [r.status,await r.json()];}
+ async function purchase(data,origin='https://crm.test'){const r=await purchaseRoute.POST(new Request('https://crm.test/api/lead-purchases',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({fulfillment:{method:'pickup'},...data})}));return [r.status,await r.json()];}
  async function purchaseGet(id){const r=await purchaseRoute.GET(new Request('https://crm.test/api/lead-purchases?id='+id));return [r.status,await r.json()];}
  async function change(action,id,version,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,id,version,data})}));return [r.status,await r.json()];}
  let phone=99050000;
@@ -28,7 +28,7 @@ const scenario=String.raw`
  const confirmed=sqlite.prepare('SELECT * FROM leads WHERE id=?').get(lead.id);
  assert.equal(confirmed.status,'won');assert.equal(confirmed.next_at,null);assert.equal(confirmed.version,lead.version+1);assert.equal(confirmed.product,lead.product);
  const sale=sqlite.prepare('SELECT * FROM inventory_sales WHERE id=?').get(saleId);
- assert.equal(sale.lead_id,lead.id);assert.equal(sale.customer_name,lead.name);assert.equal(sale.customer_phone,lead.phone);assert.equal(sale.cost_cents,20000);assert.equal(sale.commission_cents,3200);assert.equal(sale.tax_cents,235);assert.equal(sale.total_price,400);
+ assert.equal(sale.lead_id,lead.id);assert.equal(sale.customer_name,lead.name);assert.equal(sale.customer_phone,lead.phone);assert.equal(sale.cost_cents,20000);assert.equal(sale.commission_cents,0);assert.equal(sale.tax_cents,0);assert.equal(sale.total_price,400);
  assert.equal((await invGet('?view=items&id='+item))[1].item.stock,3);
  assert.equal((await invGet('?view=items&id='+item))[1].item.value_cents,30001);
  assert.equal((await purchaseGet(lead.id))[1].purchase.item_code,'LOAN-256');

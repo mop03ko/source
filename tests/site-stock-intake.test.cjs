@@ -9,6 +9,7 @@ INSERT INTO inventory_stock_moves(item_id,qty_delta) VALUES('a',5),('a',-2),('b'
 INSERT INTO inventory_stock_moves VALUES('a',100,'union'),('a',200,'songsoglon'),('a',300,'display'),('a',2,'ffe360f0-ee2b-415f-abe9-ee70113e5e89'),('b',3,'26d60fd9-1308-4ea1-a9d2-d8af01155a97');`);
 let calls=0,failed=false;
 const DB={prepare(sql){return {bind(...args){return {async all(){calls++;if(failed)throw Error('secret');return {results:sqlite.prepare(sql).all(...args)};}};}};}};
+DB.transaction=async work=>{sqlite.exec('BEGIN');try{const value=await work({prepare:DB.prepare,batch:async ss=>{const results=[];for(const s of ss)results.push(await s.run());return results;}});sqlite.exec('COMMIT');return value;}catch(e){sqlite.exec('ROLLBACK');throw e;}};
 const moduleObject={exports:{}};
 new Function('require','module','exports',ts.transpileModule(fs.readFileSync('app/api/integrations/site-stock/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id=>id==='@/lib/runtime'?{env:{DB}}:require(id),moduleObject,moduleObject.exports);
 const token='test-'.repeat(10);process.env.CRM_SITE_STOCK_TOKEN=token;

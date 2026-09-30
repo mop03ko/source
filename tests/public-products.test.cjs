@@ -4,6 +4,7 @@ for(const p of fs.readdirSync('drizzle').filter(p=>p.endsWith('.sql')).sort())sq
 let failed=false,readTransactions=0;
 class Statement{constructor(sql,args=[]){this.sql=sql;this.args=args;}bind(...args){return new Statement(this.sql,args);}async first(){if(failed)throw Error('private SQL and token');return sqlite.prepare(this.sql).get(...this.args)||null;}}
 const DB={prepare:s=>new Statement(s)};
+DB.transaction=async work=>{sqlite.exec('BEGIN');try{const value=await work({prepare:DB.prepare,batch:async ss=>{const results=[];for(const s of ss)results.push(await s.run());return results;}});sqlite.exec('COMMIT');return value;}catch(e){sqlite.exec('ROLLBACK');throw e;}};
 const deps={'./runtime':{env:{DB}},'./database':{getClient:()=>({transaction:async mode=>{assert.equal(mode,'read');readTransactions++;return {execute:async({sql,args})=>{if(failed)throw Error('private SQL and token');return {rows:sqlite.prepare(sql).all(...args)};},commit:async()=>{},rollback:async()=>{},close:()=>{},closed:false};}})}};
 function load(p){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(p,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id=>{if(deps[id])return deps[id];assert.ok(!/session|access/.test(id),'public endpoint must not load sessions');return require(id);},m,m.exports);return m.exports;}
 const lib=load('lib/public-products.ts');deps['@/lib/public-products']=lib;

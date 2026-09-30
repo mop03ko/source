@@ -6,6 +6,7 @@ const allowed=new Set(['path','systemroot','windir','comspec','pathext','temp','
 const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>allowed.has(key.toLowerCase())));
 env.NODE_ENV='test';env.NEXT_TELEMETRY_DISABLED='1';
 const suites=[
+ 'purchase-fulfillment.test.cjs',
  'web-loan-sheet-mirror.test.mjs',
  'storefront-loans.test.cjs',
  'web-loans.test.cjs',

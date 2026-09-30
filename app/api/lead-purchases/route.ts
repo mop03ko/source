@@ -1,3 +1,4 @@
+import {fulfillmentSchema,purchaseWarehouse,completeFulfillment} from '@/lib/purchase-fulfillment';
 import {env} from '@/lib/runtime';
 import {member,Failure,isSameOrigin} from '@/lib/access';
 import {type Lead,type Member} from '@/lib/crm';
@@ -24,9 +25,9 @@ function error(e:unknown){
 }
 const input=z.object({
  lead_id:z.string().min(1).max(80),version:z.number().int().positive(),request_id:z.string().uuid(),
- item_id:z.string().min(1).max(80),warehouse_id:z.string().min(1).max(80),qty:quantity,unit_price:money,
+ item_id:z.string().min(1).max(80),warehouse_id:z.string().max(80).default(''),qty:quantity,unit_price:money,
  platform:z.string().trim().max(80).default(''),bill_number:z.string().trim().max(120).default(''),account:z.string().trim().max(80).default(''),
- commission_rate:z.number().finite().min(0).max(100).optional(),tax_amount:money.default(0),vat_issued:z.boolean().default(false),
+ fulfillment:fulfillmentSchema,
  sold_at:z.string().datetime().nullish(),note:z.string().trim().max(2000).default(''),units:unitsSchema,
 });
 export async function GET(req:Request){try{
@@ -34,8 +35,10 @@ export async function GET(req:Request){try{
  const id=z.string().min(1).max(80).parse(new URL(req.url).searchParams.get('id'));
  await leadFor(db(),id,m);
  const purchase=await db().prepare('SELECT s.id,s.lead_id,s.item_id,s.warehouse_id,s.qty,s.unit_price,s.total_price,s.sold_at,s.created_by,s.platform,s.bill_number,i.name item_name,i.code item_code,i.imei,w.name warehouse_name FROM inventory_sales s JOIN inventory_items i ON i.id=s.item_id JOIN inventory_warehouses w ON w.id=s.warehouse_id WHERE s.lead_id=?').bind(id).first();
+ const lines=await db().prepare('SELECT p.kind,p.qty,p.unit_price,i.name,i.code,i.imei,w.name warehouse_name FROM lead_purchase_lines p JOIN inventory_items i ON i.id=p.item_id JOIN inventory_warehouses w ON w.id=p.warehouse_id WHERE p.lead_id=? ORDER BY p.created_at,p.id').bind(id).all();
+ const fulfillment=await db().prepare('SELECT f.method,f.delivery_id,d.courier_name FROM lead_purchase_fulfillment f LEFT JOIN deliveries d ON d.id=f.delivery_id WHERE f.lead_id=?').bind(id).first();
  const units=purchase?await db().prepare("SELECT * FROM inventory_units WHERE source='lead_purchase' AND ref_id=? ORDER BY created_at").bind((purchase as {id:string}).id).all():null;
- return Response.json({purchase,units:units?.results||[]},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({purchase,lines:lines.results,fulfillment,units:units?.results||[]},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return error(e);}}
 export async function POST(req:Request){try{
  if(!isSameOrigin(req))throw new Failure('Хүсэлтийн эх сурвалж буруу.',403);
@@ -51,21 +54,22 @@ export async function POST(req:Request){try{
   if(await d.prepare('SELECT 1 FROM inventory_sales WHERE lead_id=?').bind(lead.id).first())throw new Failure('Энэ хүсэлтийн худалдан авалт аль хэдийн баталгаажсан.',409);
   const item=await d.prepare('SELECT id,name,code,active FROM inventory_items WHERE id=?').bind(b.item_id).first<{id:string;name:string;code:string;active:number}>();
   if(!item||!item.active)throw new Failure('Идэвхтэй бараа сонгоно уу.',400);
-  const warehouse=await d.prepare('SELECT name FROM inventory_warehouses WHERE id=?').bind(b.warehouse_id).first<{name:string}>();
-  if(!warehouse)throw new Failure('Агуулах олдсонгүй.',400);
+  const warehouse=await purchaseWarehouse(d,item.id,b.qty,b.warehouse_id);
+  b.warehouse_id=warehouse.id;
   const stock=await stockAt(d,item.id,b.warehouse_id);
   if(stock.value_cents<0)throw new Failure('Барааны өртгийн зөрчлийг эхлээд засна уу.',409);
   const cost=withdrawal(stock,b.qty),total=safeTotal(cents(b.unit_price)*b.qty);
   const channel=await d.prepare('SELECT commission_rate,account FROM inventory_channels WHERE name=?').bind(b.platform).first<{commission_rate:number;account:string}>();
-  const rate=b.commission_rate??Number(channel?.commission_rate||0),commission=Math.round(total*rate/100),tax=cents(b.tax_amount);
+  const rate=0,commission=0,tax=0;
   const saleId=crypto.randomUUID(),at=b.sold_at||now;
   const changed=await d.prepare("UPDATE leads SET status='won',next_at=NULL,next_action='Хаагдсан',updated_at=?,version=version+1,op=? WHERE id=? AND version=? AND deleted_at IS NULL").bind(now,request_id,lead.id,b.version).run();
   if(!changed.meta.changes)throw new Failure('Хүсэлт өөрчлөгдсөн байна. Дахин нээнэ үү.',409);
   await d.prepare('INSERT INTO inventory_sales(id,lead_id,item_id,warehouse_id,qty,unit_price,total_price,customer_name,customer_phone,platform,sold_at,note,created_by,created_at,bill_number,account,commission_rate,commission_cents,tax_cents,cost_cents,cost_estimated,vat_issued) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-   .bind(saleId,lead.id,item.id,b.warehouse_id,b.qty,b.unit_price,total/100,lead.name,lead.phone,b.platform,at,b.note,m.email,now,b.bill_number,b.account||channel?.account||'',rate,commission,tax,cost,stock.cost_estimated,b.vat_issued?1:0).run();
+   .bind(saleId,lead.id,item.id,b.warehouse_id,b.qty,b.unit_price,total/100,lead.name,lead.phone,b.platform,at,b.note,m.email,now,b.bill_number,b.account||channel?.account||'',rate,commission,tax,cost,stock.cost_estimated,0).run();
   await movement(d,{item:item.id,warehouse:b.warehouse_id,kind:'sale',qty:-b.qty,value:-cost,estimated:stock.cost_estimated,ref:saleId,actor:m.email,at,note:`Зээлийн хүсэлт ${lead.id}: ${b.note}`});
   await d.prepare('INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),lead.id,lead.phone,'update',`Худалдан авалт баталгаажуулав: ${item.name} (${item.code}), ${warehouse.name}, ${b.qty} ш, нийт ${total/100} ₮. Борлуулалт: ${saleId}`,m.email,now).run();
-  const response={ok:true,id:saleId,lead_id:lead.id};
+  const fulfillment=await completeFulfillment(d,{lead,saleId,item,warehouseId:warehouse.id,qty:b.qty,unitPrice:b.unit_price,contract:b.bill_number,platform:b.platform,fulfillment:b.fulfillment,actor:m,at,now});
+  const response={ok:true,id:saleId,lead_id:lead.id,...fulfillment};
   await saveUnits(d,{source:'lead_purchase',refId:saleId,itemId:item.id,leadId:lead.id,customerPhone:lead.phone,actor:m.email,at:now},b.units);
   await d.prepare('INSERT INTO inventory_requests(id,action,payload,response,created_at) VALUES(?,?,?,?,?)').bind(request_id,'confirm_lead_purchase',payload,JSON.stringify(response),now).run();
   return {response,notify:lead.status!=='won',lead};

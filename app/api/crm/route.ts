@@ -1,3 +1,4 @@
+import {sameDayLoan,normalizeLoanValue} from '@/lib/crm';
 import { assignmentNotice, newLeadNotice } from "@/lib/notifications";
 import { env } from "@/lib/runtime";
 import { member, Failure ,isSameOrigin} from "@/lib/access";
@@ -656,6 +657,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true });
     }
     if (b.action === "create" || b.action === "import") {
+      return await db().transaction(async write=>{
       const incoming =
         b.action === "import"
           ? z.array(leadSchema).min(1).max(100).parse(b.data)
@@ -674,7 +676,7 @@ export async function POST(req: Request) {
             "Идэвхтэй хүсэлтэд дараагийн тов, үйлдэл заавал оруулна.",
           );
         if (
-          await db()
+          await write
             .prepare("SELECT 1 FROM suppressions WHERE phone=?")
             .bind(d.phone)
             .first()
@@ -684,11 +686,8 @@ export async function POST(req: Request) {
           continue;
         }
         if (
-          seen.has(d.phone) ||
-          (await db()
-            .prepare("SELECT 1 FROM leads WHERE phone=?")
-            .bind(d.phone)
-            .first())
+          seen.has(JSON.stringify([d.phone,normalizeLoanValue(d.registration||''),normalizeLoanValue(d.product)])) ||
+          (await sameDayLoan(write,{...d,registration:d.registration||''},now))
         ) {
           if (b.action === "create")
             throw new Failure(
@@ -697,7 +696,7 @@ export async function POST(req: Request) {
             );
           continue;
         }
-        seen.add(d.phone);
+        seen.add(JSON.stringify([d.phone,normalizeLoanValue(d.registration||''),normalizeLoanValue(d.product)]));
         valid.push(d);
       }
       const statements = [];
@@ -706,9 +705,9 @@ export async function POST(req: Request) {
         const id = crypto.randomUUID();
         firstId = id;
         statements.push(
-          db()
+          write
             .prepare(
-              "INSERT INTO leads(id,name,phone,product,source,owner,status,next_at,next_action,created_at,updated_at,op,registration,registration_manual) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM leads WHERE phone=?)",
+              "INSERT INTO leads(id,name,phone,product,source,owner,status,next_at,next_action,created_at,updated_at,op,registration,registration_manual) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?",
             )
             .bind(
               id,
@@ -727,11 +726,10 @@ export async function POST(req: Request) {
               id,
               d.registration || "",
               d.registration ? 1 : 0,
-              d.phone,
             ),
         );
         statements.push(
-          db()
+          write
             .prepare(
               "INSERT INTO activities(id,lead_id,phone,kind,note,actor,created_at) SELECT ?,id,phone,'update','Хүсэлт бүртгэв',?,? FROM leads WHERE id=?",
             )
@@ -740,7 +738,7 @@ export async function POST(req: Request) {
         statements.push(assignmentNotice(id, id, now));
         statements.push(newLeadNotice(id, id, now));
       }
-      const results = statements.length ? await db().batch(statements) : [];
+      const results = await write.batch(statements);
       const added = results
         .filter((_, i) => i % 4 === 0)
         .reduce((n, r) => n + r.meta.changes, 0);
@@ -749,6 +747,7 @@ export async function POST(req: Request) {
         id: firstId,
         added,
         skipped: incoming.length - added,
+      });
       });
     }
     // Ухаалаг хуваарилалт: тухайн өдөр ажлын хуваарьт байгаа борлуулалтын ажилтнуудад, өнөөдөр хамгийн

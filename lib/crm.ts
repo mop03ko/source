@@ -1,3 +1,20 @@
+import type {DatabaseSession} from './database';
+// Calendar week in Ulaanbaatar, Monday through Sunday (inclusive).
+export function ubWeek(now=Date.now()){
+ const local=new Date(now+8*3600000),offset=(local.getUTCDay()+6)%7;
+ local.setUTCHours(0,0,0,0);local.setUTCDate(local.getUTCDate()-offset);
+ const from=local.toISOString().slice(0,10);
+ local.setUTCDate(local.getUTCDate()+6);
+ return {from,to:local.toISOString().slice(0,10)};
+}
+export const normalizeLoanValue=(value:string)=>value.normalize('NFKC').trim().replace(/\s+/g,' ').toUpperCase();
+export const loanDayKey=(data:{phone:string;registration:string;product:string},at:string)=>JSON.stringify([data.phone,normalizeLoanValue(data.registration),normalizeLoanValue(data.product),new Date(Date.parse(at)+8*3600000).toISOString().slice(0,10)]);
+export async function sameDayLoan(d:DatabaseSession,data:{phone:string;registration:string;product:string},at:string){
+ const day=new Date(Date.parse(at)+8*3600000).toISOString().slice(0,10),from=new Date(day+'T00:00:00+08:00').toISOString(),to=new Date(Date.parse(from)+86400000).toISOString();
+ const rows=await d.prepare('SELECT id,registration,product FROM leads WHERE phone=? AND created_at>=? AND created_at<? AND deleted_at IS NULL ORDER BY created_at,id').bind(data.phone,from,to).all<{id:string;registration:string;product:string}>();
+ return rows.results.find(r=>normalizeLoanValue(r.registration)===normalizeLoanValue(data.registration)&&normalizeLoanValue(r.product)===normalizeLoanValue(data.product))||null;
+}
+
 export const stages: Record<string,string> = {review:'Мэдээлэл шалгах',new:'Шинэ хүсэлт',contacted:'Холбогдсон',materials:'Материал бүрдүүлж буй',pending:'Шийдвэр хүлээж буй',appointment:'Уулзалт товлосон',unreachable:'Холбогдоогүй',won:'Худалдан авсан',lost:'Татгалзсан',invalid:'Буруу дугаар'};
 export const sources=['Facebook','Instagram','Утас','Вэбсайт','Дэлгүүр','Байгууллага','Бусад'];
 export const roles:Record<string,string>={admin:'Админ',director:'Удирдлага',manager:'Ахлах',agent:'Борлуулалтын ажилтан',operator:'Оператор',marketing:'Маркетинг',it:'IT',delivery:'Хүргэлтийн ажилтан'};

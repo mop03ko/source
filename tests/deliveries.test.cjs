@@ -13,7 +13,7 @@ deps['./runtime']=deps['@/lib/runtime'];const access=load('lib/access.ts');deps[
 async function crmGet(query=''){const r=await crmRoute.GET(new Request('https://crm.test/api/crm'+query));return [r.status,await r.json()];}
 async function crmPost(action,data){const r=await crmRoute.POST(new Request('https://crm.test/api/crm',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
 async function stockPost(action,data){const r=await stockRoute.POST(new Request('https://crm.test/api/inventory',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data})}));return [r.status,await r.json()];}
-async function get(query=''){const r=await route.GET(new Request('https://crm.test/api/deliveries'+query));return [r.status,await r.json()];}
+async function get(query=''){if(!query.includes('period=')&&!query.includes('report='))query+=(query?'&':'?')+'period=archive';const r=await route.GET(new Request('https://crm.test/api/deliveries'+query));return [r.status,await r.json()];}
 async function post(action,data,id,version){const r=await route.POST(new Request('https://crm.test/api/deliveries',{method:'POST',headers:{Origin:'https://crm.test','Content-Type':'application/json'},body:JSON.stringify({action,data,id,version})}));return [r.status,await r.json()];}
 const COURIER='courier@example.test';
 const base=(o={})=>({delivered_on:'2026-09-10',kind:'24 цаг',item_info:'Dyson V15s',customer_phone:'99112233',address:'ХУД 11-р хороо',payment_channel:'Зөгий',contents:'Бараа, гэрээ',courier_email:COURIER,courier_name:'',status:'pending',note:'',...o});
@@ -99,26 +99,29 @@ const base=(o={})=>({delivered_on:'2026-09-10',kind:'24 цаг',item_info:'Dyson
  const legacy=(await post('create',base({delivered_on:'2026-07-02',courier_email:null,courier_name:'Идэрчулуун',payment_channel:'Бэлэн'})))[1].id;
  user={userId:'c',email:COURIER,displayName:'Идэрчулуун'};
  [status,d]=await get();assert.equal(d.count,4);assert.ok(d.items.some(i=>i.id===legacy));
- // Хүргэгчийн тайлан зөвхөн өөрийн мөрөөр хязгаарлагдана.
- [status,d]=await get('?report=1');assert.equal(status,200);assert.equal(d.total,4);
- assert.equal(d.byCourier.length,1);assert.equal(d.byCourier[0].name,'Идэрчулуун');
- // Ахлахын дашбоард: ажилтан тус бүрийн гүйцэтгэл, сар, суваг, төрлийн задаргаа.
+ // Dashboard is always this UB calendar week, even if a caller supplies historical dates.
+ assert.equal((await get('?report=1'))[1].total,0);
  user={userId:'mg',email:'manager@example.test',displayName:'Manager'};
- [status,d]=await get('?report=1');assert.equal(status,200);assert.equal(d.total,5);
- const ider=d.byCourier.find(r=>r.name==='Идэрчулуун'),bayar=d.byCourier.find(r=>r.name==='Баярхүү');
- assert.equal(ider.total,4);assert.equal(ider.done,2);assert.equal(ider.pending,2);assert.equal(ider.active_days,4);
- assert.equal(ider.last_day,'2026-09-12');
- assert.equal(bayar.total,1);assert.equal(bayar.done,1);
- assert.equal(d.byCourier[0].name,'Идэрчулуун'); // хамгийн их хүргэлттэй нь эхэлнэ
- assert.deepEqual(d.byMonth.map(m=>m.month),['2026-07','2026-08','2026-09']);
- assert.equal(d.byMonth.find(m=>m.month==='2026-09').total,3);
- assert.equal(d.byChannel.find(c=>c.channel==='Зөгий').total,2);
- assert.equal(d.byKind.find(k=>k.kind==='Яаралтай').total,1);
- assert.equal(d.byStatus.find(s=>s.status==='delivered').total,3);
- assert.equal(d.byItem.length,1);assert.equal(d.byItem[0].code,'DY-V15S');assert.equal(d.byItem[0].total,1);
- // Тайлангийн хугацааны шүүлт
- [status,d]=await get('?report=1&rfrom=2026-09-01&rto=2026-09-30');
- assert.equal(d.total,3);assert.equal(d.byCourier.length,1);
- assert.equal((await get('?report=1&rfrom=2026'))[0],400);
- console.log('PASS: delivery journal role isolation (marketing/IT blocked), courier self-scoping by email and legacy name, courier status-only permissions, manager CRUD with optimistic locking, date/status/courier validation, list filters, warehouse-item linking (validated, searchable by code/name, unlinkable) and per-courier dashboard aggregation (performance, months, channels, kinds, top items).');
+ assert.equal((await get('?period=week'))[1].count,0);
+ const week=deps['@/lib/crm'].ubWeek();
+ const previous=new Date(Date.parse(week.from+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+ const next=new Date(Date.parse(week.to+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+ const monday=(await post('create',base({delivered_on:week.from,item_id:itemId})))[1].id;
+ const sunday=(await post('create',base({delivered_on:week.to,status:'delivered'})))[1].id;
+ await post('create',base({delivered_on:previous}));await post('create',base({delivered_on:next}));
+ const other=(await post('create',base({delivered_on:week.from,courier_email:null,courier_name:'Other'})))[1].id;
+ [status,d]=await get('?period=week');assert.equal(status,200);assert.equal(d.count,3);assert.equal(d.stats.total,3);assert.ok(d.items.some(r=>r.id===monday)&&d.items.some(r=>r.id===sunday));
+ assert.equal((await get('?period=upcoming'))[1].count,1);
+ assert.equal((await get('?period=archive'))[1].count,6);
+ [status,d]=await get('?report=1&rfrom=2000-01-01&rto=2999-01-01');assert.equal(status,200);assert.equal(d.total,3);assert.equal(d.byItem[0].code,'DY-V15S');assert.equal(d.byStatus.find(r=>r.status==='delivered').total,1);
+ assert.deepEqual(d.period,week);
+ user={userId:'c',email:COURIER,displayName:'Идэрчулуун'};
+ [status,d]=await get('?period=week');assert.equal(d.count,2);assert.ok(!d.items.some(r=>r.id===other));assert.deepEqual(d.couriers.map(c=>c.name),['Идэрчулуун']);
+ assert.equal((await get('?report=1'))[1].total,2);
+ assert.equal((await get('?period=invalid'))[0],400);
+ // UB Sunday/Monday boundary and year rollover.
+ assert.deepEqual(deps['@/lib/crm'].ubWeek(Date.parse('2026-09-27T15:59:59Z')),{from:'2026-09-21',to:'2026-09-27'});
+ assert.deepEqual(deps['@/lib/crm'].ubWeek(Date.parse('2026-09-27T16:00:00Z')),{from:'2026-09-28',to:'2026-10-04'});
+ assert.deepEqual(deps['@/lib/crm'].ubWeek(Date.parse('2026-01-01T00:00:00Z')),{from:'2025-12-29',to:'2026-01-04'});
+ console.log('PASS: delivery permissions, CRUD, filters, archive, current week dashboard, upcoming deliveries and UB week boundaries.');
 })().catch(e=>{console.error(e);process.exit(1)});
